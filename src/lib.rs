@@ -6,6 +6,7 @@ extern crate error_chain;
 extern crate quote;
 extern crate syn;
 
+pub mod check;
 pub mod error;
 
 mod parse;
@@ -26,31 +27,31 @@ pub type Tasks = HashMap<Ident, Task>;
 #[derive(Debug)]
 pub struct App {
     pub device: Tokens,
-    pub idle: Idle,
-    pub init: Init,
-    pub resources: Statics,
-    pub tasks: Tasks,
+    pub idle: Option<Idle>,
+    pub init: Option<Init>,
+    pub resources: Option<Statics>,
+    pub tasks: Option<Tasks>,
 }
 
 /// `init`
 #[derive(Debug)]
 pub struct Init {
-    pub path: Tokens,
+    pub path: Option<Tokens>,
 }
 
 /// `idle`
 #[derive(Debug)]
 pub struct Idle {
-    pub locals: Statics,
-    pub path: Tokens,
-    pub resources: Idents,
+    pub locals: Option<Statics>,
+    pub path: Option<Tokens>,
+    pub resources: Option<Idents>,
 }
 
 #[derive(Debug)]
 pub struct Task {
     pub enabled: Option<bool>,
     pub priority: Option<u8>,
-    pub resources: Idents,
+    pub resources: Option<Idents>,
 }
 
 // `$ident: $ty = $expr;`

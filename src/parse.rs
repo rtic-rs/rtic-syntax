@@ -57,10 +57,10 @@ pub fn app(input: &str) -> Result<App> {
 
     Ok(App {
         device: device.ok_or("`device` field is missing")?,
-        idle: idle.ok_or("`idle` field is missing")?,
-        init: init.ok_or("`init` field is missing")?,
-        resources: resources.unwrap_or(HashMap::new()),
-        tasks: tasks.unwrap_or(HashMap::new()),
+        idle,
+        init,
+        resources,
+        tasks,
     })
 }
 
@@ -199,9 +199,9 @@ fn idle(tts: &mut Peekable<Iter<TokenTree>>) -> Result<Idle> {
         })?;
 
         Ok(Idle {
-            locals: locals.unwrap_or(HashMap::new()),
-            path: path.ok_or("`path` field missing")?,
-            resources: resources.unwrap_or(HashSet::new()),
+            locals,
+            path,
+            resources,
         })
     })
 }
@@ -223,9 +223,7 @@ fn init(tts: &mut Peekable<Iter<TokenTree>>) -> Result<Init> {
             Ok(())
         })?;
 
-        Ok(Init {
-            path: path.ok_or("`path` field missing")?,
-        })
+        Ok(Init { path })
     })
 }
 
@@ -360,7 +358,7 @@ fn task(tts: &mut Peekable<Iter<TokenTree>>) -> Result<Task> {
         Ok(Task {
             enabled,
             priority,
-            resources: resources.unwrap_or(HashSet::new()),
+            resources,
         })
     })
 }
