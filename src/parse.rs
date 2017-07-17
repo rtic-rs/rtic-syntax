@@ -234,6 +234,12 @@ fn static_(tts: &mut Iter<TokenTree>) -> Result<Static> {
         if let Some(tt) = tts.next() {
             if tt == &TokenTree::Token(Token::Eq) {
                 break;
+            } else if tt == &TokenTree::Token(Token::Semi) {
+                fragments.push(tt);
+                bail!(
+                    "expected a type, found Semicolon: `{}`",
+                    quote!(#(#fragments)*)
+                );
             } else {
                 fragments.push(tt);
             }
