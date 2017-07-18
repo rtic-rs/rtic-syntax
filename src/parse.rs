@@ -2,8 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::iter::Peekable;
 use std::slice::Iter;
 
-use quote::Tokens;
-use syn::{self, DelimToken, Ident, IntTy, Lit, Token, TokenTree};
+use syn::{self, DelimToken, Ident, IntTy, Lit, Path, Token, TokenTree};
 
 use error::*;
 
@@ -234,12 +233,6 @@ fn static_(tts: &mut Iter<TokenTree>) -> Result<Static> {
         if let Some(tt) = tts.next() {
             if tt == &TokenTree::Token(Token::Eq) {
                 break;
-            } else if tt == &TokenTree::Token(Token::Semi) {
-                fragments.push(tt);
-                bail!(
-                    "expected a type, found Semicolon: `{}`",
-                    quote!(#(#fragments)*)
-                );
             } else {
                 fragments.push(tt);
             }
@@ -248,8 +241,7 @@ fn static_(tts: &mut Iter<TokenTree>) -> Result<Static> {
         }
     }
 
-    ensure!(!fragments.is_empty(), "type is missing");
-    let ty = quote!(#(#fragments)*);
+    let ty = syn::parse_type(&format!("{}", quote!(#(#fragments)*)))?;
 
     let mut fragments = vec![];
     loop {
@@ -306,7 +298,7 @@ fn statics(tts: &mut Peekable<Iter<TokenTree>>) -> Result<Statics> {
     })
 }
 
-fn path(tts: &mut Peekable<Iter<TokenTree>>) -> Result<Tokens> {
+fn path(tts: &mut Peekable<Iter<TokenTree>>) -> Result<Path> {
     let mut fragments = vec![];
 
     loop {
@@ -323,7 +315,7 @@ fn path(tts: &mut Peekable<Iter<TokenTree>>) -> Result<Tokens> {
         tts.next();
     }
 
-    Ok(quote!(#(#fragments)*))
+    Ok(syn::parse_path(&format!("{}", quote!(#(#fragments)*)))?)
 }
 
 fn task(tts: &mut Peekable<Iter<TokenTree>>) -> Result<Task> {

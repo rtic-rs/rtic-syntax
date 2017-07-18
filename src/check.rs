@@ -1,15 +1,14 @@
 use std::collections::HashMap;
 
-use quote::Tokens;
-use syn::Ident;
+use syn::{Ident, Path};
 
 use error::*;
-use {Idents, Statics};
+use {util, Idents, Statics};
 
 pub type Tasks = HashMap<Ident, Task>;
 
 pub struct App {
-    pub device: Tokens,
+    pub device: Path,
     pub idle: Idle,
     pub init: Init,
     pub resources: Statics,
@@ -18,12 +17,12 @@ pub struct App {
 
 pub struct Idle {
     pub locals: Statics,
-    pub path: Tokens,
+    pub path: Path,
     pub resources: Idents,
 }
 
 pub struct Init {
-    pub path: Tokens,
+    pub path: Path,
 }
 
 pub struct Task {
@@ -74,7 +73,7 @@ fn idle(idle: Option<::Idle>) -> Result<Idle> {
     } else {
         Idle {
             locals: Statics::new(),
-            path: quote!(idle),
+            path: util::mk_path("idle"),
             resources: Idents::new(),
         }
     })
@@ -91,21 +90,23 @@ fn init(init: Option<::Init>) -> Result<Init> {
             bail!("empty `init` field. It should be removed.");
         }
     } else {
-        Init { path: quote!(init) }
+        Init {
+            path: util::mk_path("init"),
+        }
     })
 }
 
-fn path(default: &str, path: Option<Tokens>) -> Result<Tokens> {
+fn path(default: &str, path: Option<Path>) -> Result<Path> {
     Ok(if let Some(path) = path {
         ensure!(
-            path.as_str() != default,
+            path.segments.len() == 1 &&
+                path.segments[0].ident.as_ref() != default,
             "this is the default value. It should be omitted."
         );
 
         path
     } else {
-        let default = Ident::new(default);
-        quote!(#default)
+        util::mk_path(default)
     })
 }
 

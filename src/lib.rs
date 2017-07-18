@@ -10,11 +10,12 @@ pub mod check;
 pub mod error;
 
 mod parse;
+mod util;
 
 use std::collections::{HashMap, HashSet};
 
 use quote::Tokens;
-use syn::Ident;
+use syn::{Ident, Path, Ty};
 
 use error::*;
 
@@ -26,7 +27,7 @@ pub type Tasks = HashMap<Ident, Task>;
 
 #[derive(Debug)]
 pub struct App {
-    pub device: Tokens,
+    pub device: Path,
     pub idle: Option<Idle>,
     pub init: Option<Init>,
     pub resources: Option<Statics>,
@@ -36,14 +37,14 @@ pub struct App {
 /// `init`
 #[derive(Debug)]
 pub struct Init {
-    pub path: Option<Tokens>,
+    pub path: Option<Path>,
 }
 
 /// `idle`
 #[derive(Debug)]
 pub struct Idle {
     pub locals: Option<Statics>,
-    pub path: Option<Tokens>,
+    pub path: Option<Path>,
     pub resources: Option<Idents>,
 }
 
@@ -58,7 +59,7 @@ pub struct Task {
 #[derive(Debug)]
 pub struct Static {
     pub expr: Tokens,
-    pub ty: Tokens,
+    pub ty: Ty,
 }
 
 impl App {
