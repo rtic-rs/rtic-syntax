@@ -269,11 +269,21 @@ fn statics(tts: &mut Peekable<Iter<TokenTree>>) -> Result<Statics> {
 
         let mut tts = tts.iter();
         while let Some(tt) = tts.next() {
-            let ident = if let &TokenTree::Token(Token::Ident(ref id)) = tt {
-                id
-            } else {
-                bail!("expected Ident, found {:?}", tt);
-            };
+            match tt {
+                &TokenTree::Token(Token::Ident(ref id))
+                    if id.as_ref() == "static" => {}
+                _ => {
+                    bail!("expected keyword `static`, found {:?}", tt);
+                }
+            }
+
+            let tt = tts.next();
+            let ident =
+                if let Some(&TokenTree::Token(Token::Ident(ref id))) = tt {
+                    id
+                } else {
+                    bail!("expected Ident, found {:?}", tt);
+                };
 
             ensure!(
                 !statics.contains_key(ident),
