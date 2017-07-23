@@ -99,7 +99,7 @@ fn init(init: Option<::Init>) -> Result<Init> {
 fn path(default: &str, path: Option<Path>) -> Result<Path> {
     Ok(if let Some(path) = path {
         ensure!(
-            path.segments.len() == 1 &&
+            path.segments.len() != 1 ||
                 path.segments[0].ident.as_ref() != default,
             "this is the default value. It should be omitted."
         );
