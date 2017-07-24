@@ -164,7 +164,6 @@ fn idents(tts: &mut Peekable<Iter<TokenTree>>) -> Result<Idents> {
 
 fn idle(tts: &mut Peekable<Iter<TokenTree>>) -> Result<Idle> {
     ::parse::delimited(tts, DelimToken::Brace, |tts| {
-        let mut locals = None;
         let mut path = None;
         let mut resources = None;
 
@@ -174,13 +173,6 @@ fn idle(tts: &mut Peekable<Iter<TokenTree>>) -> Result<Idle> {
                     ensure!(path.is_none(), "duplicated `path` field");
 
                     path = Some(::parse::path(tts)?);
-                }
-                "locals" => {
-                    ensure!(locals.is_none(), "duplicated `locals` field");
-
-                    locals = Some(
-                        ::parse::statics(tts).chain_err(|| "parsing `locals`")?,
-                    );
                 }
                 "resources" => {
                     ensure!(
@@ -197,11 +189,7 @@ fn idle(tts: &mut Peekable<Iter<TokenTree>>) -> Result<Idle> {
             Ok(())
         })?;
 
-        Ok(Idle {
-            locals,
-            path,
-            resources,
-        })
+        Ok(Idle { path, resources })
     })
 }
 

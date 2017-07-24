@@ -16,7 +16,6 @@ pub struct App {
 }
 
 pub struct Idle {
-    pub locals: Statics,
     pub path: Path,
     pub resources: Idents,
 }
@@ -59,20 +58,17 @@ fn idents(field: &str, idents: Option<Idents>) -> Result<Idents> {
 fn idle(idle: Option<::Idle>) -> Result<Idle> {
     Ok(if let Some(idle) = idle {
         ensure!(
-            idle.locals.is_some() || idle.path.is_some() ||
-                idle.resources.is_some(),
+            idle.path.is_some() || idle.resources.is_some(),
             "empty `idle` field. It should be removed."
         );
 
         Idle {
-            locals: ::check::statics("locals", idle.locals)?,
             path: ::check::path("idle", idle.path)
                 .chain_err(|| "checking `path`")?,
             resources: ::check::idents("resources", idle.resources)?,
         }
     } else {
         Idle {
-            locals: Statics::new(),
             path: util::mk_path("idle"),
             resources: Idents::new(),
         }

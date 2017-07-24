@@ -43,7 +43,6 @@ pub struct Init {
 /// `idle`
 #[derive(Debug)]
 pub struct Idle {
-    pub locals: Option<Statics>,
     pub path: Option<Path>,
     pub resources: Option<Idents>,
 }
