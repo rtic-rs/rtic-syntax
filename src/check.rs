@@ -26,6 +26,7 @@ pub struct Init {
 
 pub struct Task {
     pub enabled: Option<bool>,
+    pub path: Option<Path>,
     pub priority: Option<u8>,
     pub resources: Idents,
 }
@@ -129,16 +130,22 @@ fn tasks(tasks: Option<::Tasks>) -> Result<Tasks> {
 
         tasks
             .into_iter()
-            .map(|(name, task)| {
-                Ok((
-                    name.clone(),
-                    Task {
-                        enabled: task.enabled,
-                        priority: task.priority,
-                        resources: ::check::idents("resources", task.resources)
-                            .chain_err(|| format!("checking task `{}`", name))?,
-                    },
-                ))
+            .map(|(name_, task)| {
+                let name = name_.clone();
+                (move || -> Result<_> {
+                    Ok((
+                        name,
+                        Task {
+                            enabled: task.enabled,
+                            path: task.path,
+                            priority: task.priority,
+                            resources: ::check::idents(
+                                "resources",
+                                task.resources,
+                            )?,
+                        },
+                    ))
+                })().chain_err(|| format!("checking task `{}`", name_))
             })
             .collect::<Result<_>>()?
     } else {

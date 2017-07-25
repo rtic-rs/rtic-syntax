@@ -319,6 +319,7 @@ fn path(tts: &mut Peekable<Iter<TokenTree>>) -> Result<Path> {
 fn task(tts: &mut Peekable<Iter<TokenTree>>) -> Result<Task> {
     ::parse::delimited(tts, DelimToken::Brace, |tts| {
         let mut enabled = None;
+        let mut path = None;
         let mut priority = None;
         let mut resources = None;
 
@@ -329,6 +330,13 @@ fn task(tts: &mut Peekable<Iter<TokenTree>>) -> Result<Task> {
 
                     enabled = Some(::parse::bool(tts.next())
                         .chain_err(|| "parsing `enabled`")?);
+                }
+                "path" => {
+                    ensure!(path.is_none(), "duplicated `path` field");
+
+                    path = Some(
+                        ::parse::path(tts).chain_err(|| "parsing `path`")?,
+                    );
                 }
                 "priority" => {
                     ensure!(priority.is_none(), "duplicated `priority` field");
@@ -353,6 +361,7 @@ fn task(tts: &mut Peekable<Iter<TokenTree>>) -> Result<Task> {
 
         Ok(Task {
             enabled,
+            path,
             priority,
             resources,
         })

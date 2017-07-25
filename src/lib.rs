@@ -50,6 +50,7 @@ pub struct Idle {
 #[derive(Debug)]
 pub struct Task {
     pub enabled: Option<bool>,
+    pub path: Option<Path>,
     pub priority: Option<u8>,
     pub resources: Option<Idents>,
 }
