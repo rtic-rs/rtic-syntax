@@ -1,1 +1,3 @@
+//! Errors
+
 error_chain!();

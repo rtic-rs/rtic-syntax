@@ -1,6 +1,12 @@
 [package]
 authors = ["Jorge Aparicio <jorge@japaric.io>"]
+categories = ["concurrency", "embedded", "no-std"]
+description = "Parser of the app! macro used by the Real Time for The Masses (RTFM) framework"
+documentation = "https://docs.rs/rtfm-syntax"
+keywords = []
+license = "MIT OR Apache-2.0"
 name = "rtfm-syntax"
+repository = "https://github.com/japaric/rtfm-syntax"
 version = "0.1.0"
 
 [dependencies]

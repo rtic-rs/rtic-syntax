@@ -1,6 +1,9 @@
 # `rtfm-syntax`
 
-> `rtfm!` macro parser
+> Parser of the `app!` macro used by the Real Time For the Masses (RTFM)
+> framework
+
+## [Documentation](https://docs.rs/rtfm-syntax)
 
 ## License
 
