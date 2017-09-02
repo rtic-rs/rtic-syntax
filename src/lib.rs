@@ -87,7 +87,7 @@ pub struct Task {
 #[derive(Debug)]
 pub struct Static {
     /// `$Expr`
-    pub expr: Expr,
+    pub expr: Option<Expr>,
     /// `$Ty`
     pub ty: Ty,
     _extensible: (),
