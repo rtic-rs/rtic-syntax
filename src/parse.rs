@@ -233,13 +233,20 @@ fn static_(tts: &mut Iter<TokenTree>) -> Result<Static> {
     let mut fragments = vec![];
     loop {
         if let Some(tt) = tts.next() {
-            if tt == &TokenTree::Token(Token::Eq) {
-                break;
-            } else {
-                fragments.push(tt);
+            match *tt {
+                TokenTree::Token(Token::Eq) => break,
+                TokenTree::Token(Token::Semi) => {
+                    let ty = syn::parse_type(&format!("{}", quote!(#(#fragments)*)))?;
+                    return Ok(Static {
+                        _extensible: (),
+                        expr: None,
+                        ty,
+                    });
+                }
+                _ => fragments.push(tt),
             }
         } else {
-            bail!("expected Equal, found end of macro");
+            bail!("expected `=` or `;`, found end of macro");
         }
     }
 
@@ -263,7 +270,7 @@ fn static_(tts: &mut Iter<TokenTree>) -> Result<Static> {
 
     Ok(Static {
         _extensible: (),
-        expr,
+        expr: Some(expr),
         ty,
     })
 }
