@@ -21,6 +21,8 @@ pub struct App {
     pub init: Init,
     /// `resources: $Statics`
     pub resources: Statics,
+    /// `root: $path`
+    pub root: Option<Path>,
     /// `tasks: { $Tasks }`
     pub tasks: Tasks,
     _extensible: (),
@@ -67,6 +69,7 @@ pub fn app(app: ::App) -> Result<App> {
         init: ::check::init(app.init).chain_err(|| "checking `init`")?,
         resources: ::check::statics("resources", app.resources)
             .chain_err(|| "checking `resources`")?,
+        root: app.root,
         tasks: ::check::tasks(app.tasks).chain_err(|| "checking `tasks`")?,
     })
 }

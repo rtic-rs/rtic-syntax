@@ -46,6 +46,8 @@ pub struct App {
     pub init: Option<Init>,
     /// `resources: $Resources`
     pub resources: Option<Statics>,
+    /// `root: $path`
+    pub root: Option<Path>,
     /// `tasks: { $Tasks }`
     pub tasks: Option<Tasks>,
     _extensible: (),

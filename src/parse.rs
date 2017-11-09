@@ -16,6 +16,7 @@ pub fn app(input: &str) -> Result<App> {
     let mut idle = None;
     let mut init = None;
     let mut resources = None;
+    let mut root = None;
     let mut tasks = None;
 
     fields(&tts, |key, tts| {
@@ -43,6 +44,13 @@ pub fn app(input: &str) -> Result<App> {
                     ::parse::statics(tts).chain_err(|| "parsing `resources`")?,
                 );
             }
+            "root" => {
+                ensure!(root.is_none(), "duplicated `root` field");
+
+                root = Some(
+                    ::parse::path(tts).chain_err(|| "parsing `root`")?,
+                );
+            }
             "tasks" => {
                 ensure!(tasks.is_none(), "duplicated `tasks` field");
 
@@ -61,6 +69,7 @@ pub fn app(input: &str) -> Result<App> {
         idle,
         init,
         resources,
+        root,
         tasks,
     })
 }
