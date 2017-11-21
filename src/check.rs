@@ -41,6 +41,8 @@ pub struct Idle {
 pub struct Init {
     /// `path: $Path`
     pub path: Path,
+    /// `resources: $Resources`
+    pub resources: Resources,
     _extensible: (),
 }
 
@@ -80,8 +82,7 @@ fn idle(idle: Option<::Idle>) -> Result<Idle> {
 
         Idle {
             _extensible: (),
-            path: ::check::path("idle", idle.path)
-                .chain_err(|| "checking `path`")?,
+            path: ::check::path("idle", idle.path).chain_err(|| "checking `path`")?,
             resources: ::check::resources("resources", idle.resources)?,
         }
     } else {
@@ -94,29 +95,28 @@ fn idle(idle: Option<::Idle>) -> Result<Idle> {
 }
 
 fn init(init: Option<::Init>) -> Result<Init> {
-    Ok(if let Some(init) = init {
-        if let Some(path) = init.path {
-            Init {
-                _extensible: (),
-                path: ::check::path("init", Some(path))
-                    .chain_err(|| "checking `path`")?,
-            }
-        } else {
-            bail!("empty `init` field. It should be removed.");
-        }
+    let init_is_some = init.is_some();
+    let (path, resources) = if let Some(init) = init {
+        (init.path, init.resources)
     } else {
-        Init {
-            _extensible: (),
-            path: util::mk_path("init"),
-        }
+        (None, None)
+    };
+
+    if init_is_some && path.is_none() && resources.is_none() {
+        bail!("empty `init` field. It should be removed.");
+    }
+
+    Ok(Init {
+        _extensible: (),
+        resources: resources.unwrap_or(Resources::new()),
+        path: ::check::path("init", path).chain_err(|| "checking `path`")?,
     })
 }
 
 fn path(default: &str, path: Option<Path>) -> Result<Path> {
     Ok(if let Some(path) = path {
         ensure!(
-            path.segments.len() != 1 ||
-                path.segments[0].ident.as_ref() != default,
+            path.segments.len() != 1 || path.segments[0].ident.as_ref() != default,
             "this is the default value. It should be omitted."
         );
 
@@ -173,13 +173,11 @@ fn tasks(tasks: Option<::Tasks>) -> Result<Tasks> {
                             enabled: task.enabled,
                             path: task.path,
                             priority: task.priority,
-                            resources: ::check::resources(
-                                "resources",
-                                task.resources,
-                            )?,
+                            resources: ::check::resources("resources", task.resources)?,
                         },
                     ))
-                })().chain_err(|| format!("checking task `{}`", name_))
+                })()
+                    .chain_err(|| format!("checking task `{}`", name_))
             })
             .collect::<Result<_>>()?
     } else {
