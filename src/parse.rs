@@ -170,6 +170,7 @@ fn idle(tts: &mut Peekable<Iter<TokenTree>>) -> Result<Idle> {
 fn init(tts: &mut Peekable<Iter<TokenTree>>) -> Result<Init> {
     ::parse::delimited(tts, DelimToken::Brace, |tts| {
         let mut path = None;
+        let mut resources = None;
 
         ::parse::fields(tts, |key, tts| {
             match key.as_ref() {
@@ -177,6 +178,12 @@ fn init(tts: &mut Peekable<Iter<TokenTree>>) -> Result<Init> {
                     ensure!(path.is_none(), "duplicated `path` field");
 
                     path = Some(::parse::path(tts)?);
+                }
+                "resources" => {
+                    ensure!(resources.is_none(), "duplicated `resources` field");
+
+                    resources = Some(::parse::resources(tts)
+                                     .chain_err(|| "parsing `resources`")?);
                 }
                 _ => bail!("unknown field: `{}`", key),
             }
@@ -187,6 +194,7 @@ fn init(tts: &mut Peekable<Iter<TokenTree>>) -> Result<Init> {
         Ok(Init {
             _extensible: (),
             path,
+            resources,
         })
     })
 }

@@ -44,7 +44,7 @@ pub struct App {
     pub idle: Option<Idle>,
     /// `init: { $Init }`
     pub init: Option<Init>,
-    /// `resources: $Resources`
+    /// `resources: $Statics`
     pub resources: Option<Statics>,
     /// `tasks: { $Tasks }`
     pub tasks: Option<Tasks>,
@@ -66,6 +66,8 @@ pub struct Idle {
 pub struct Init {
     /// `path: $Path`
     pub path: Option<Path>,
+    /// `resources: $Resources`
+    pub resources: Option<Resources>,
     _extensible: (),
 }
 
