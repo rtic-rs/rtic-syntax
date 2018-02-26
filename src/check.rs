@@ -64,7 +64,7 @@ pub struct Task {
 pub fn app(app: ::App) -> Result<App> {
     Ok(App {
         _extensible: (),
-        device: app.device,
+        device: app.device.expect("`device` field is missing"),
         idle: ::check::idle(app.idle).chain_err(|| "checking `idle`")?,
         init: ::check::init(app.init).chain_err(|| "checking `init`")?,
         resources: ::check::statics("resources", app.resources)

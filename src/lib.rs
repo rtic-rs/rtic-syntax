@@ -1,45 +1,43 @@
 //! Parser of the `app!` macro used by the Real Time For the Masses (RTFM)
 //! framework
+#![feature(proc_macro)]
 #![deny(missing_debug_implementations)]
 #![deny(missing_docs)]
 #![deny(warnings)]
 
 #[macro_use]
 extern crate error_chain;
-#[macro_use]
 extern crate quote;
+#[macro_use]
 extern crate syn;
+extern crate proc_macro;
+extern crate proc_macro2;
 
 pub mod check;
-pub mod error;
-
 mod parse;
 mod util;
+pub mod error;
 
+use proc_macro::TokenStream;
 use std::collections::{HashMap, HashSet};
-
-use quote::Tokens;
-use syn::{Ident, Path, Ty};
-
-use error::*;
-
-/// A rust expression
-pub type Expr = Tokens;
+use syn::{Ident, Path};
+use syn::synom::ParseError;
+use syn::ItemStatic;
 
 /// `[$($ident),*]`
 pub type Resources = HashSet<Ident>;
 
 /// `$(static $Ident: $Ty = $expr;)*`
-pub type Statics = HashMap<Ident, Static>;
+pub type Statics = HashMap<Ident, ItemStatic>;
 
 /// `$($Ident: { .. },)*`
 pub type Tasks = HashMap<Ident, Task>;
 
 /// `app! { .. }`
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct App {
     /// `device: $path`
-    pub device: Path,
+    pub device: Option<Path>,
     /// `idle: { $Idle }`
     pub idle: Option<Idle>,
     /// `init: { $Init }`
@@ -52,7 +50,7 @@ pub struct App {
 }
 
 /// `idle: { .. }`
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Idle {
     /// `path: $Path`
     pub path: Option<Path>,
@@ -62,7 +60,7 @@ pub struct Idle {
 }
 
 /// `init: { .. }`
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Init {
     /// `path: $Path`
     pub path: Option<Path>,
@@ -72,7 +70,7 @@ pub struct Init {
 }
 
 /// `$Ident: { .. }`
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Task {
     /// `enabled: $bool`
     pub enabled: Option<bool>,
@@ -85,19 +83,9 @@ pub struct Task {
     _extensible: (),
 }
 
-/// `static $Ident: $Ty = $Expr;`
-#[derive(Debug)]
-pub struct Static {
-    /// `$Expr`
-    pub expr: Option<Expr>,
-    /// `$Ty`
-    pub ty: Ty,
-    _extensible: (),
-}
-
 impl App {
     /// Parses the contents of the `app! { .. }` macro
-    pub fn parse(input: &str) -> Result<Self> {
-        parse::app(input)
+    pub fn parse(input: TokenStream) -> Result<Self, ParseError> {
+        syn::parse(input)
     }
 }

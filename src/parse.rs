@@ -1,446 +1,222 @@
+
 use std::collections::{HashMap, HashSet};
-use std::iter::Peekable;
-use std::slice::Iter;
 
-use syn::{self, DelimToken, Ident, IntTy, Lit, Path, Token, TokenTree};
+use syn::{Ident, Path};
+use syn::synom::Synom;
+use syn::Expr;
+use syn::ItemStatic;
+use syn::ExprArray;
+use syn::LitBool;
+use syn::LitInt;
 
-use error::*;
+use {App, Idle, Init, Resources, Statics, Task};
 
-use {App, Idle, Init, Resources, Static, Statics, Task, Tasks};
-
-/// Parses the contents of `app! { $App }`
-pub fn app(input: &str) -> Result<App> {
-    let tts = syn::parse_token_trees(input)?;
-
-    let mut device = None;
-    let mut idle = None;
-    let mut init = None;
-    let mut resources = None;
-    let mut tasks = None;
-
-    fields(&tts, |key, tts| {
-        match key.as_ref() {
-            "device" => {
-                ensure!(device.is_none(), "duplicated `device` field");
-
-                device =
-                    Some(::parse::path(tts).chain_err(|| "parsing `device`")?);
-            }
-            "idle" => {
-                ensure!(idle.is_none(), "duplicated `idle` field");
-
-                idle = Some(::parse::idle(tts).chain_err(|| "parsing `idle`")?);
-            }
-            "init" => {
-                ensure!(init.is_none(), "duplicated `init` field");
-
-                init = Some(::parse::init(tts).chain_err(|| "parsing `init`")?);
-            }
-            "resources" => {
-                ensure!(resources.is_none(), "duplicated `resources` field");
-
-                resources = Some(
-                    ::parse::statics(tts).chain_err(|| "parsing `resources`")?,
-                );
-            }
-            "tasks" => {
-                ensure!(tasks.is_none(), "duplicated `tasks` field");
-
-                tasks =
-                    Some(::parse::tasks(tts).chain_err(|| "parsing `tasks`")?);
-            }
-            _ => bail!("unknown field: `{}`", key),
-        }
-
-        Ok(())
-    })?;
-
-    Ok(App {
-        _extensible: (),
-        device: device.ok_or("`device` field is missing")?,
-        idle,
-        init,
-        resources,
-        tasks,
-    })
-}
-
-/// Parses a boolean
-fn bool(tt: Option<&TokenTree>) -> Result<bool> {
-    if let Some(&TokenTree::Token(Token::Literal(Lit::Bool(bool)))) = tt {
-        Ok(bool)
-    } else {
-        bail!("expected boolean, found {:?}", tt);
-    }
-}
-
-/// Parses a delimited token tree
-fn delimited<R, F>(
-    tts: &mut Peekable<Iter<TokenTree>>,
-    delimiter: DelimToken,
-    f: F,
-) -> Result<R>
-where
-    F: FnOnce(&[TokenTree]) -> Result<R>,
-{
-    let tt = tts.next();
-    if let Some(&TokenTree::Delimited(ref block)) = tt {
-        ensure!(
-            block.delim == delimiter,
-            "expected {:?}, found {:?}",
-            delimiter,
-            block.delim
-        );
-
-        f(&block.tts)
-    } else {
-        bail!("expected a Delimited sequence, found {:?}", tt);
-    }
-}
-
-/// Parses `$($Ident: $($tt)*,)*`
-fn fields<F>(tts: &[TokenTree], mut f: F) -> Result<()>
-where
-    F: FnMut(&Ident, &mut Peekable<Iter<TokenTree>>) -> Result<()>,
-{
-    let mut tts = tts.iter().peekable();
-
-    while let Some(tt) = tts.next() {
-        let ident = if let TokenTree::Token(Token::Ident(ref id)) = *tt {
-            id
-        } else {
-            bail!("expected Ident, found {:?}", tt);
-        };
-
-        let tt = tts.next();
-        if let Some(&TokenTree::Token(Token::Colon)) = tt {
-        } else {
-            bail!("expected Colon, found {:?}", tt);
-        }
-
-        f(ident, &mut tts)?;
-
-        let tt = tts.next();
-        match tt {
-            None | Some(&TokenTree::Token(Token::Comma)) => {}
-            _ => bail!("expected Comma, found {:?}", tt),
+// TODO move this to error module ?
+// Reports errors on duplicate fields in structs
+macro_rules! ensure {
+    ($e:expr, $field:ident, $msg:expr) => {
+        if !$e {
+            $field.span.unstable().error($msg).emit();
         }
     }
-
-    Ok(())
 }
 
-/// Parses the LHS of `idle: { $Idle }`
-fn idle(tts: &mut Peekable<Iter<TokenTree>>) -> Result<Idle> {
-    ::parse::delimited(tts, DelimToken::Brace, |tts| {
-        let mut path = None;
-        let mut resources = None;
+named!(parse_statics -> Statics, map!(braces!(many0!(syn!(ItemStatic))), |s| {
+    let mut static_map = HashMap::new();
+    let (_, statics) = s;
+    for s in statics { 
+        static_map.insert(s.ident, s);
+    }
+    static_map
+}));
 
-        ::parse::fields(tts, |key, tts| {
-            match key.as_ref() {
-                "path" => {
-                    ensure!(path.is_none(), "duplicated `path` field");
-
-                    path = Some(::parse::path(tts)?);
-                }
-                "resources" => {
-                    ensure!(
-                        resources.is_none(),
-                        "duplicated `resources` field"
-                    );
-
-                    resources = Some(::parse::resources(tts)
-                        .chain_err(|| "parsing `resources`")?);
-                }
-                _ => bail!("unknown field: `{}`", key),
-            }
-
-            Ok(())
-        })?;
-
-        Ok(Idle {
-            _extensible: (),
-            path,
-            resources,
-        })
-    })
-}
-
-/// Parses the LHS of `init: { $Init }`
-fn init(tts: &mut Peekable<Iter<TokenTree>>) -> Result<Init> {
-    ::parse::delimited(tts, DelimToken::Brace, |tts| {
-        let mut path = None;
-        let mut resources = None;
-
-        ::parse::fields(tts, |key, tts| {
-            match key.as_ref() {
-                "path" => {
-                    ensure!(path.is_none(), "duplicated `path` field");
-
-                    path = Some(::parse::path(tts)?);
-                }
-                "resources" => {
-                    ensure!(resources.is_none(), "duplicated `resources` field");
-
-                    resources = Some(::parse::resources(tts)
-                                     .chain_err(|| "parsing `resources`")?);
-                }
-                _ => bail!("unknown field: `{}`", key),
-            }
-
-            Ok(())
-        })?;
-
-        Ok(Init {
-            _extensible: (),
-            path,
-            resources,
-        })
-    })
-}
-
-/// Parses `[$($Ident,)*]`
-fn resources(tts: &mut Peekable<Iter<TokenTree>>) -> Result<Resources> {
-    ::parse::delimited(tts, DelimToken::Bracket, |tts| {
-        let mut idents = HashSet::new();
-
-        let mut tts = tts.iter().peekable();
-        while let Some(tt) = tts.next() {
-            if let &TokenTree::Token(Token::Ident(ref ident)) = tt {
-                ensure!(
-                    !idents.contains(ident),
-                    "ident {} listed more than once"
-                );
-
-                idents.insert(ident.clone());
-
-                if let Some(tt) = tts.next() {
-                    ensure!(
-                        tt == &TokenTree::Token(Token::Comma),
-                        "expected Comma, found {:?}",
-                        tt
-                    );
-
-                    if tts.peek().is_none() {
-                        break;
-                    }
-                } else {
-                    break;
-                }
-            } else {
-                bail!("expected Ident, found {:?}", tt);
-            }
-        }
-
-        Ok(idents)
-    })
-}
-
-/// Parses `$Ty = $Expr`
-fn static_(tts: &mut Iter<TokenTree>) -> Result<Static> {
-    let mut fragments = vec![];
-    loop {
-        if let Some(tt) = tts.next() {
-            match *tt {
-                TokenTree::Token(Token::Eq) => break,
-                TokenTree::Token(Token::Semi) => {
-                    let ty = syn::parse_type(&format!("{}", quote!(#(#fragments)*)))?;
-                    return Ok(Static {
-                        _extensible: (),
-                        expr: None,
-                        ty,
-                    });
-                }
-                _ => fragments.push(tt),
-            }
-        } else {
-            bail!("expected `=` or `;`, found end of macro");
+fn ident_from_expr_array(input: ExprArray) -> HashSet<Ident> {
+    let mut idents = HashSet::new();
+    for elem in input.elems {
+        if let Expr::Path(expr_path) = elem {
+            for ident in expr_path.path.segments {
+                idents.insert(ident.ident);
+            } 
         }
     }
-
-    let ty = syn::parse_type(&format!("{}", quote!(#(#fragments)*)))?;
-
-    let mut fragments = vec![];
-    loop {
-        if let Some(tt) = tts.next() {
-            if tt == &TokenTree::Token(Token::Semi) {
-                break;
-            } else {
-                fragments.push(tt);
-            }
-        } else {
-            bail!("expected Semicolon, found end of macro");
-        }
-    }
-
-    ensure!(!fragments.is_empty(), "initial value is missing");
-    let expr = quote!(#(#fragments)*);
-
-    Ok(Static {
-        _extensible: (),
-        expr: Some(expr),
-        ty,
-    })
+    idents
 }
 
-/// Parses `$($Ident: $Ty = $Expr;)*`
-fn statics(tts: &mut Peekable<Iter<TokenTree>>) -> Result<Statics> {
-    ::parse::delimited(tts, DelimToken::Brace, |tts| {
-        let mut statics = HashMap::new();
+named!(parse_resource_ident -> Resources, do_parse!(
+    res_path_vals: alt!(syn!(ExprArray) |
+                        map!(epsilon!(), |_|panic!("Failed to parse resources"))) >>
+    res_set: map!(value!(res_path_vals), ident_from_expr_array) >>
+    (res_set)
+));
 
-        let mut tts = tts.iter();
-        while let Some(tt) = tts.next() {
-            match tt {
-                &TokenTree::Token(Token::Ident(ref id))
-                    if id.as_ref() == "static" => {}
-                _ => {
-                    bail!("expected keyword `static`, found {:?}", tt);
-                }
+// Parse fields of a `Task`
+named!(task_fields -> Task, do_parse!(
+    mut task: value!(Task::default()) >>
+    _loop: many0!(
+        do_parse!(
+            field: syn!(Ident) >>
+            _colon: punct!(:) >>
+            switch!(value!(field.as_ref()),
+                "enabled" => map!(syn!(LitBool), |lit_bool| {
+                    ensure!(task.enabled.is_none(),
+                            field,
+                            format!("Duplicate field `{}`", field));
+                    let val = lit_bool.value;
+                    task.enabled = Some(val);
+                }) |
+                "path" => map!(syn!(Path), |path| {
+                    ensure!(task.path.is_none(),
+                            field,
+                            format!("Duplicate field `{}`", field));
+                    task.path = Some(path);
+                })|
+                "priority" => map!(syn!(LitInt), |lit_int| {
+                    ensure!(task.priority.is_none(),
+                            field,
+                            format!("Duplicate field `{}`", field));
+                    let val = lit_int.value();
+                    ensure!(val < 256, field, "priority should be less than 256");
+                    task.priority = Some(val as u8);
+                }) |
+                "resources" => map!(parse_resource_ident, |res| {
+                    ensure!(task.resources.is_none(),
+                            field, 
+                            format!("Duplicate field `{}`", field));
+                    task.resources = Some(res);
+                }) |
+                _ => map!(epsilon!(), |_| {
+                    field.span.unstable().error(format!("Unknown field `{}`", field)).emit();
+                })
+            ) >>
+            // TODO ideally should parse even with an optional comma
+            _comma: syn!(Token![,]) >> ()
+        )
+    ) >>
+    (task)
+));
+
+// Parse a `Task`
+named!(parse_tasks -> HashMap<Ident, Task>, do_parse!(
+    mut task_map: value!(HashMap::new()) >>
+    many0!(do_parse!(
+        task_name: syn!(Ident) >>
+        _colon: syn!(Token![:]) >>
+        map!(braces!(call!(task_fields)), |(_, parsed_task)|{
+            if task_map.contains_key(&task_name) {
+                task_name.span.unstable().error(format!("Unknown field `{}`", task_name)).emit();
+                panic!("Duplicate task {}", task_name.as_ref());
             }
+            task_map.insert(task_name, parsed_task);
+        }) >>
+        _comma: option!(syn!(Token![,])) >> ()
+    )) >>
+    (task_map)
+));
 
-            let tt = tts.next();
-            let ident =
-                if let Some(&TokenTree::Token(Token::Ident(ref id))) = tt {
-                    id
-                } else {
-                    bail!("expected Ident, found {:?}", tt);
-                };
-
-            ensure!(
-                !statics.contains_key(ident),
-                "resource {} listed more than once",
-                ident
-            );
-
-            let tt = tts.next();
-            if let Some(&TokenTree::Token(Token::Colon)) = tt {
-            } else {
-                bail!("expected Colon, found {:?}", tt);
-            }
-
-            statics.insert(
-                ident.clone(),
-                ::parse::static_(&mut tts)
-                    .chain_err(|| format!("parsing `{}`", ident))?,
-            );
-        }
-
-        Ok(statics)
-    })
+impl Synom for App {
+    /// Parses the content of the `App` struct
+    named!(parse -> App, do_parse!(
+        mut app_holder: value!(App::default()) >> 
+        many0!(
+            do_parse!(
+                field: syn!(Ident) >>
+                _colon: syn!(Token![:]) >>
+                switch!(value!(field.as_ref()),
+                "device" => map!(syn!(Path), |path| {
+                    ensure!(app_holder.device.is_none(),
+                            field,
+                            format!("Duplicate field `{}`", field));
+                    app_holder.device = Some(path);
+                })|
+                "init" => map!(braces!(syn!(Init)), |(_, init)| {
+                    ensure!(app_holder.init.is_none(),
+                            field,
+                            format!("Duplicate field `{}`", field));
+                    app_holder.init = Some(init);
+                }) |
+                "idle" => map!(braces!(syn!(Idle)), |(_, idle)| {
+                    ensure!(app_holder.idle.is_none(),
+                            field,
+                            format!("Duplicate field `{}`", field));
+                    app_holder.idle = Some(idle);
+                }) |
+                "resources" => map!(parse_statics, |statics| {
+                    ensure!(app_holder.resources.is_none(),
+                            field,
+                            format!("Duplicate field `{}`", field));
+                    app_holder.resources = Some(statics);
+                }) |
+                "tasks" => map!(braces!(call!(parse_tasks)), |(_, tasks)| {
+                    ensure!(app_holder.tasks.is_none(),
+                            field,
+                            format!("Duplicate field `{}`", field));
+                    app_holder.tasks = Some(tasks);
+                }) |
+                _ => call!(|_| {
+                    field.span.unstable().error(format!("Unknown field `{}`", field)).emit();
+                    panic!("Unknown field `{}`", field);
+                })
+                ) >>
+                _comma: syn!(Token![,]) >>
+                (())
+            )
+        ) >>
+        (app_holder)
+    ));
 }
 
-/// Parses a `Path` from `$($tt)*`
-fn path(tts: &mut Peekable<Iter<TokenTree>>) -> Result<Path> {
-    let mut fragments = vec![];
-
-    loop {
-        if let Some(tt) = tts.peek() {
-            if tt == &&TokenTree::Token(Token::Comma) {
-                break;
-            } else {
-                fragments.push(tt.clone());
-            }
-        } else {
-            bail!("expected Comma, found end of macro")
-        }
-
-        tts.next();
-    }
-
-    Ok(syn::parse_path(&format!("{}", quote!(#(#fragments)*)))?)
+impl Synom for Init {
+    named!(parse -> Init, do_parse!(
+        mut parsed_init: value!(Init::default()) >>
+        many0!(
+            do_parse!(
+                field: syn!(Ident) >>
+                _colon: punct!(:) >>
+                switch!(value!(field.as_ref()), 
+                    "path" => map!(syn!(Path), |path| {
+                        parsed_init.path = Some(path);
+                    }) |
+                    "resources" => map!(parse_resource_ident, |res| {
+                        parsed_init.resources = Some(res);
+                    }) |
+                    _ => call!(|_| {
+                        field.span.unstable().error(format!("Unknown field `{}`", field)).emit();
+                        panic!("Unknown field `{}`", field);
+                    })
+                ) >>
+                _comma: syn!(Token![,]) >>
+                (())
+            )
+        ) >>
+        (parsed_init)
+    ));
 }
 
-/// Parses the LHS of `$Ident: { .. }`
-fn task(tts: &mut Peekable<Iter<TokenTree>>) -> Result<Task> {
-    ::parse::delimited(tts, DelimToken::Brace, |tts| {
-        let mut enabled = None;
-        let mut path = None;
-        let mut priority = None;
-        let mut resources = None;
-
-        ::parse::fields(tts, |key, tts| {
-            match key.as_ref() {
-                "enabled" => {
-                    ensure!(enabled.is_none(), "duplicated `enabled` field");
-
-                    enabled = Some(::parse::bool(tts.next())
-                        .chain_err(|| "parsing `enabled`")?);
-                }
-                "path" => {
-                    ensure!(path.is_none(), "duplicated `path` field");
-
-                    path = Some(
-                        ::parse::path(tts).chain_err(|| "parsing `path`")?,
-                    );
-                }
-                "priority" => {
-                    ensure!(priority.is_none(), "duplicated `priority` field");
-
-                    priority = Some(::parse::u8(tts.next())
-                        .chain_err(|| "parsing `priority`")?);
-                }
-                "resources" => {
-                    ensure!(
-                        resources.is_none(),
-                        "duplicated `resources` field"
-                    );
-
-                    resources = Some(::parse::resources(tts)
-                        .chain_err(|| "parsing `resources`")?);
-                }
-                _ => bail!("unknown field: `{}`", key),
-            }
-
-            Ok(())
-        })?;
-
-        Ok(Task {
-            _extensible: (),
-            enabled,
-            path,
-            priority,
-            resources,
-        })
-    })
-}
-
-/// Parses `$($Ident: { $Task })*`
-fn tasks(tts: &mut Peekable<Iter<TokenTree>>) -> Result<Tasks> {
-    ::parse::delimited(tts, DelimToken::Brace, |tts| {
-        let mut tasks = HashMap::new();
-
-        ::parse::fields(tts, |key, tts| {
-            ensure!(
-                !tasks.contains_key(key),
-                "task {} listed more than once",
-                key
-            );
-
-            tasks.insert(
-                key.clone(),
-                ::parse::task(tts)
-                    .chain_err(|| format!("parsing task `{}`", key))?,
-            );
-
-            Ok(())
-        })?;
-
-        Ok(tasks)
-    })
-}
-
-/// Parses an integer with type `u8`
-fn u8(tt: Option<&TokenTree>) -> Result<u8> {
-    if let Some(
-        &TokenTree::Token(
-            Token::Literal(Lit::Int(priority, IntTy::Unsuffixed)),
-        ),
-    ) = tt
-    {
-        ensure!(priority < 256, "{} is out of the `u8` range", priority);
-
-        Ok(priority as u8)
-    } else {
-        bail!("expected integer, found {:?}", tt);
-    }
+impl Synom for Idle {
+    /// Parses the content of the Idle struct
+    named!(parse -> Self, do_parse!(
+        mut idle_parsed: value!(Idle::default()) >> 
+        many0!(
+            do_parse!(
+                field: syn!(Ident) >>
+                _colon: syn!(Token![:]) >>
+                switch!(value!(field.as_ref()),
+                "path" => map!(syn!(Path), |path| {
+                    idle_parsed.path = Some(path);
+                })|
+                "resources" => map!(parse_resource_ident, |res| {
+                    idle_parsed.resources = Some(res);
+                }) |
+                _ => call!(|_| {
+                    field.span.unstable().error(format!("Unknown field `{}`", field)).emit();
+                    panic!("Unknown field `{}`", field);
+                })
+                ) >>
+                _comma: syn!(Token![,]) >>
+                (())
+            )
+        ) >>
+        (idle_parsed)
+    )
+    );
 }
