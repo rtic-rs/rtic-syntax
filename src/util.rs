@@ -1,14 +1,15 @@
-use syn::{Ident, Path, PathParameters, PathSegment};
+use syn::{Ident, Path, PathSegment, PathArguments};
+use syn::punctuated::Punctuated;
 
 /// Creates a path with contents `#ident`
 pub fn mk_path(ident: &str) -> Path {
+    let mut segment = Punctuated::new();
+    segment.push(PathSegment {
+                ident: Ident::from(ident),
+                arguments: PathArguments::None,
+    });
     Path {
-        global: false,
-        segments: vec![
-            PathSegment {
-                ident: Ident::new(ident),
-                parameters: PathParameters::none(),
-            },
-        ],
+        leading_colon: None,
+        segments: segment
     }
 }
