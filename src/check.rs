@@ -1,17 +1,29 @@
-//! Syntax checking pass
+//! Specification checker
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
-use syn::{Ident, Path};
+use proc_macro2::Span;
+use syn::spanned::Spanned as _Spanned;
+use syn::{self, Expr, Ident, Path, PathSegment, Type};
 
-use error::*;
-use {util, Resources, Statics};
+use {check, Outcome, Result, Spanned};
 
-/// `$($Ident: { .. },)*`
+/// Checked [`Idents`](../struct.Idents.html)
+///
+/// No duplicate identifier in this list
+pub type Idents = HashSet<Ident>;
+
+/// Checked [`Statics`](../struct.Statics.html)
+///
+/// No duplicate static in this list
+pub type Statics = HashMap<Ident, Static>;
+
+/// Checked [`Tasks`](../struct.Tasks.html)
+///
+/// No duplicate task in this list
 pub type Tasks = HashMap<Ident, Task>;
 
-/// `app! { .. }`
-#[derive(Debug)]
+/// Checked [`App`](../struct.App.html)
 pub struct App {
     /// `device: $path`
     pub device: Path,
@@ -26,161 +38,264 @@ pub struct App {
     _extensible: (),
 }
 
-/// `idle: { .. }`
-#[derive(Debug)]
-pub struct Idle {
-    /// `path: $Path`
-    pub path: Path,
-    /// `resources: $Resources`
-    pub resources: Resources,
-    _extensible: (),
+impl super::App {
+    /// Checks the parsed specification
+    pub fn check(self) -> Result<App> {
+        let resources = if let Some(resources) = self.resources {
+            resources.check()?
+        } else {
+            Statics::new()
+        };
+
+        let init = if let Some(init) = self.init {
+            init.check(&resources)?
+        } else {
+            Init::default()
+        };
+
+        Ok(App {
+            device: self.device,
+            idle: if let Some(idle) = self.idle {
+                idle.check(&resources, &init)?
+            } else {
+                Idle::default()
+            },
+            tasks: if let Some(tasks) = self.tasks {
+                tasks.check(&resources, &init)?
+            } else {
+                Tasks::new()
+            },
+            init,
+            resources,
+            _extensible: (),
+        })
+    }
 }
 
-/// `init: { .. }`
-#[derive(Debug)]
+/// Checked [`Init`](../struct.Init.html)
 pub struct Init {
     /// `path: $Path`
     pub path: Path,
     /// `resources: $Resources`
-    pub resources: Resources,
+    pub resources: Idents,
     _extensible: (),
 }
 
-/// `$Ident: { .. }`
-#[derive(Debug)]
+impl Default for Init {
+    fn default() -> Self {
+        Init {
+            path: Path::from(PathSegment::from(Ident::new("init", Span::call_site()))),
+            resources: Idents::new(),
+            _extensible: (),
+        }
+    }
+}
+
+impl super::Init {
+    fn check(self, statics: &Statics) -> Result<Init> {
+        let mut outcome = Outcome::default();
+
+        let path = check::path(self.path, "init", &outcome);
+
+        let resources = check::resources(self.resources, statics, None, &mut outcome);
+
+        if outcome.is_error() {
+            Err(format_err!("Specification error"))
+        } else {
+            Ok(Init {
+                path,
+                resources,
+                _extensible: (),
+            })
+        }
+    }
+}
+
+/// Checked [`Idle`](../struct.Idle.html)
+pub struct Idle {
+    /// `path: $Path`
+    pub path: Path,
+    /// `resources: $Resources`
+    pub resources: Idents,
+    _extensible: (),
+}
+
+impl Default for Idle {
+    fn default() -> Self {
+        Idle {
+            path: Path::from(PathSegment::from(Ident::new("idle", Span::call_site()))),
+            resources: Idents::new(),
+            _extensible: (),
+        }
+    }
+}
+
+impl super::Idle {
+    fn check(self, statics: &Statics, init: &Init) -> Result<Idle> {
+        let mut outcome = Outcome::default();
+
+        let path = check::path(self.path, "idle", &outcome);
+
+        let resources = check::resources(self.resources, statics, Some(init), &mut outcome);
+
+        if outcome.is_error() {
+            Err(format_err!("Specification error"))
+        } else {
+            Ok(Idle {
+                path,
+                resources,
+                _extensible: (),
+            })
+        }
+    }
+}
+
+/// The `: $ty [ = $expr]` part of a static
+pub struct Static {
+    /// `$ty`
+    pub ty: Type,
+    /// `$expr`
+    pub expr: Option<Expr>,
+    _extensible: (),
+}
+
+impl Spanned<super::Statics> {
+    fn check(self) -> Result<Statics> {
+        let mut resources = Statics::new();
+
+        let mut outcome = Outcome::default();
+
+        if self.node.0.is_empty() {
+            outcome.warn_empty_list(self.span);
+        }
+
+        for static_ in self.node.0 {
+            if resources.contains_key(&static_.ident) {
+                outcome.error_duplicate_resource(static_.ident.span());
+            }
+
+            resources.insert(
+                static_.ident,
+                Static {
+                    ty: static_.ty,
+                    expr: static_.expr,
+                    _extensible: (),
+                },
+            );
+        }
+
+        if outcome.is_error() {
+            Err(format_err!("Specification error"))
+        } else {
+            Ok(resources)
+        }
+    }
+}
+
+/// The RHS part (`: { .. }`) of a task
 pub struct Task {
     /// `enabled: $bool`
     pub enabled: Option<bool>,
     /// `path: $Path`
-    pub path: Option<Path>,
+    pub path: Path,
     /// `priority: $u8`
     pub priority: Option<u8>,
     /// `resources: $Resources`
-    pub resources: Resources,
+    pub resources: Idents,
     _extensible: (),
 }
 
-/// Checks the syntax of the parsed `app!` macro
-pub fn app(app: ::App) -> Result<App> {
-    Ok(App {
-        _extensible: (),
-        device: app.device,
-        idle: ::check::idle(app.idle).chain_err(|| "checking `idle`")?,
-        init: ::check::init(app.init).chain_err(|| "checking `init`")?,
-        resources: ::check::statics("resources", app.resources)
-            .chain_err(|| "checking `resources`")?,
-        tasks: ::check::tasks(app.tasks).chain_err(|| "checking `tasks`")?,
-    })
+impl Spanned<super::Tasks> {
+    fn check(self, statics: &Statics, init: &Init) -> Result<Tasks> {
+        let mut tasks = Tasks::new();
+
+        let mut outcome = Outcome::default();
+
+        if self.node.0.is_empty() {
+            outcome.warn_empty_list(self.span)
+        }
+
+        for (name, task) in self.node.0 {
+            if tasks.contains_key(&name) {
+                outcome.error_duplicate_task(name.span());
+                continue;
+            }
+
+            tasks.insert(name, task.check(statics, init, &mut outcome));
+        }
+
+        if outcome.is_error() {
+            Err(format_err!("Specification error"))
+        } else {
+            Ok(tasks)
+        }
+    }
 }
 
-fn idle(idle: Option<::Idle>) -> Result<Idle> {
-    Ok(if let Some(idle) = idle {
-        ensure!(
-            idle.path.is_some() || idle.resources.is_some(),
-            "empty `idle` field. It should be removed."
-        );
-
-        Idle {
+impl super::Task {
+    fn check(self, statics: &Statics, init: &Init, outcome: &mut Outcome) -> Task {
+        Task {
+            enabled: self.enabled,
+            path: self.path,
+            priority: self.priority,
+            resources: check::resources(self.resources, statics, Some(init), outcome),
             _extensible: (),
-            path: ::check::path("idle", idle.path).chain_err(|| "checking `path`")?,
-            resources: ::check::resources("resources", idle.resources)?,
         }
-    } else {
-        Idle {
-            _extensible: (),
-            path: util::mk_path("idle"),
-            resources: Resources::new(),
-        }
-    })
+    }
 }
 
-fn init(init: Option<::Init>) -> Result<Init> {
-    let init_is_some = init.is_some();
-    let (path, resources) = if let Some(init) = init {
-        (init.path, init.resources)
-    } else {
-        (None, None)
-    };
-
-    if init_is_some && path.is_none() && resources.is_none() {
-        bail!("empty `init` field. It should be removed.");
+fn path(path: Option<Path>, def: &str, outcome: &Outcome) -> Path {
+    let def_path = syn::parse_str(def).unwrap();
+    if let Some(path) = path.as_ref() {
+        if path == &def_path {
+            outcome.warn(
+                path.span(),
+                "this is the default path; consider removing this key value pair",
+            );
+        }
     }
 
-    Ok(Init {
-        _extensible: (),
-        resources: resources.unwrap_or(Resources::new()),
-        path: ::check::path("init", path).chain_err(|| "checking `path`")?,
-    })
+    path.unwrap_or(def_path)
 }
 
-fn path(default: &str, path: Option<Path>) -> Result<Path> {
-    Ok(if let Some(path) = path {
-        ensure!(
-            path.segments.len() != 1 || path.segments[0].ident.as_ref() != default,
-            "this is the default value. It should be omitted."
-        );
+fn resources(
+    idents: Option<Spanned<super::Idents>>,
+    statics: &Statics,
+    init: Option<&Init>,
+    outcome: &mut Outcome,
+) -> Idents {
+    if let Some(idents) = idents.as_ref() {
+        if idents.node.is_empty() {
+            outcome.warn_empty_list(idents.span)
+        }
+    }
 
-        path
-    } else {
-        util::mk_path(default)
-    })
-}
+    let mut resources = Idents::new();
+    for ident in idents.map(|ids| ids.node.0).unwrap_or(vec![]) {
+        if resources.contains(&ident) {
+            outcome.error_duplicate_resource(ident.span());
+            continue;
+        }
 
-fn resources(field: &str, idents: Option<Resources>) -> Result<Resources> {
-    Ok(if let Some(idents) = idents {
-        ensure!(
-            !idents.is_empty(),
-            "empty `{}` field. It should be removed.",
-            field
-        );
+        if let Some(static_) = statics.get(&ident) {
+            let we_are_init = init.is_none();
+            if we_are_init && static_.expr.is_none() {
+                outcome.error_uninitialized_resource(ident.span());
+                continue;
+            }
+        } else {
+            outcome.error_undeclared_resource(ident.span());
+            continue;
+        }
 
-        idents
-    } else {
-        Resources::new()
-    })
-}
+        if let Some(init) = init {
+            if init.resources.contains(&ident) {
+                outcome.error_owned_resource(ident.span());
+            }
+        }
 
-fn statics(field: &str, statics: Option<Statics>) -> Result<Statics> {
-    Ok(if let Some(statics) = statics {
-        ensure!(
-            !statics.is_empty(),
-            "empty `{}` field. It should be removed.",
-            field
-        );
+        resources.insert(ident);
+    }
 
-        statics
-    } else {
-        Statics::new()
-    })
-}
-
-fn tasks(tasks: Option<::Tasks>) -> Result<Tasks> {
-    Ok(if let Some(tasks) = tasks {
-        ensure!(
-            !tasks.is_empty(),
-            "empty `tasks` field. It should be removed"
-        );
-
-        tasks
-            .into_iter()
-            .map(|(name_, task)| {
-                let name = name_.clone();
-                (move || -> Result<_> {
-                    Ok((
-                        name,
-                        Task {
-                            _extensible: (),
-                            enabled: task.enabled,
-                            path: task.path,
-                            priority: task.priority,
-                            resources: ::check::resources("resources", task.resources)?,
-                        },
-                    ))
-                })()
-                    .chain_err(|| format!("checking task `{}`", name_))
-            })
-            .collect::<Result<_>>()?
-    } else {
-        Tasks::new()
-    })
+    resources
 }

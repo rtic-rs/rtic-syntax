@@ -7,9 +7,17 @@ keywords = []
 license = "MIT OR Apache-2.0"
 name = "rtfm-syntax"
 repository = "https://github.com/japaric/rtfm-syntax"
-version = "0.2.1"
+version = "0.3.0"
 
 [dependencies]
-error-chain = "0.10.0"
-quote = "0.3.15"
-syn = "0.11.11"
+quote = "0.5.1"
+failure = "0.1.1"
+either = "1.5.0"
+
+[dependencies.proc-macro2]
+features = ["nightly"]
+version = "0.3.6"
+
+[dependencies.syn]
+features = ["extra-traits", "full"]
+version = "0.13.1"
