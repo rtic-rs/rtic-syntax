@@ -5,6 +5,17 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+## [v0.3.0] - 2018-04-16
+
+### Changed
+
+- Updated the `syn` dependency to a recent release. Error and warning messages are now raised on
+  parsing and checking issues.
+- [breaking-change] Changed the parsing and checking API (structs).
+- The checking pass now checks the specification to, for example, reject a specification where a
+  task declares that it has access to a resource that wasn't declared in the top level `resources`
+  field.
+
 ## [v0.2.1] - 2018-01-15
 
 ### Added
