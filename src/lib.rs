@@ -3,6 +3,7 @@
 #![deny(missing_docs)]
 #![deny(warnings)]
 #![feature(proc_macro)]
+#![feature(try_from)]
 
 extern crate either;
 #[macro_use]
