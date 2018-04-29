@@ -1,11 +1,11 @@
 //! Raw `Synom` parsing
 
-use either::Either;
 use proc_macro2::TokenStream;
-use syn::Path;
 use syn::punctuated::Punctuated;
 use syn::synom::Synom;
-use syn::{Ident, LitInt, LitBool};
+use syn::token::{Brace, Bracket};
+use syn::Path;
+use syn::{Ident, LitInt, Type};
 
 pub struct Map<KV>
 where
@@ -15,7 +15,7 @@ where
 }
 
 pub type App = Map<AppKv>;
-pub type Idle = Map<IdleKv>;
+pub type Init = Map<InitKv>;
 pub type Task = Map<TaskKv>;
 pub type Tasks = Map<TasksKv>;
 
@@ -26,40 +26,65 @@ where
     named!(parse -> Self, map!(call!(Punctuated::parse_terminated), |kvs| Map { kvs }));
 }
 
-/// Key value pair inside `app! { .. }`
-///
-/// `$key:ident: $value:path` OR `$key:ident: { $($value:tt)* }`
 pub struct AppKv {
     pub key: Ident,
-    pub value: Either<Path, TokenStream>,
+    pub value: AppValue,
+}
+
+pub enum AppValue {
+    Device(Path),
+    Idle((Brace, TokenStream)),
+    Init((Brace, TokenStream)),
+    Resources((Brace, TokenStream)),
+    FreeInterrupts((Bracket, TokenStream)),
+    Tasks((Brace, TokenStream)),
+    Unknown(TokenStream),
 }
 
 impl Synom for AppKv {
     named!(parse -> Self, do_parse!(
         key: syn!(Ident) >>
             _colon: punct!(:) >>
-            value: alt!(
-                map!(syn!(Path), |path| Either::Left(path)) |
-                map!(braces!(syn!(TokenStream)), |(_, ts)| Either::Right(ts))
+            value: switch!(
+                value!(key.as_ref()),
+                "device" => map!(syn!(Path), AppValue::Device) |
+                "idle" => map!(braces!(syn!(TokenStream)), AppValue::Idle) |
+                "init" => map!(braces!(syn!(TokenStream)), AppValue::Init) |
+                "resources" => map!(braces!(syn!(TokenStream)), AppValue::Resources) |
+                "free_interrupts" => map!(brackets!(syn!(TokenStream)), AppValue::FreeInterrupts) |
+                "tasks" => map!(braces!(syn!(TokenStream)), AppValue::Tasks) |
+                _ => map!(syn!(TokenStream), AppValue::Unknown)
             ) >>
             (AppKv { key, value })
     ));
 }
 
-pub struct IdleKv {
+pub struct InitKv {
     pub key: Ident,
-    pub value: Either<Path, TokenStream>,
+    pub value: InitValue,
 }
 
-impl Synom for IdleKv {
+pub enum InitValue {
+    Path(Path),
+    Resources((Bracket, TokenStream)),
+    Async((Bracket, TokenStream)),
+    AsyncAfter((Bracket, TokenStream)),
+    Unknown(TokenStream),
+}
+
+impl Synom for InitKv {
     named!(parse -> Self, do_parse!(
         key: syn!(Ident) >>
             _colon: punct!(:) >>
-            value: alt!(
-                map!(syn!(Path), |path| Either::Left(path)) |
-                map!(brackets!(syn!(TokenStream)), |(_, ts)| Either::Right(ts))
+            value: switch!(
+                value!(key.as_ref()),
+                "path" => map!(syn!(Path), InitValue::Path) |
+                "resources" => map!(brackets!(syn!(TokenStream)), InitValue::Resources) |
+                "async" => map!(brackets!(syn!(TokenStream)), InitValue::Async) |
+                "async_after" => map!(brackets!(syn!(TokenStream)), InitValue::AsyncAfter) |
+                _ => map!(syn!(TokenStream), InitValue::Unknown)
             ) >>
-            (IdleKv { key, value })
+            (InitKv { key, value })
     ));
 }
 
@@ -78,10 +103,15 @@ impl Synom for TasksKv {
 }
 
 pub enum TaskValue {
-    Bool(LitBool),
-    Idents(TokenStream),
-    Int(LitInt),
+    Interrupt(Ident),
     Path(Path),
+    Input(Type),
+    Async((Bracket, TokenStream)),
+    AsyncAfter((Bracket, TokenStream)),
+    Resources((Bracket, TokenStream)),
+    Priority(LitInt),
+    Capacity(LitInt),
+    Unknown(TokenStream),
 }
 
 pub struct TaskKv {
@@ -93,11 +123,18 @@ impl Synom for TaskKv {
     named!(parse -> Self, do_parse!(
         key: syn!(Ident) >>
             _colon: punct!(:) >>
-            value: alt!(
-                map!(syn!(LitBool), |lb| TaskValue::Bool(lb)) |
-                map!(syn!(LitInt), |li| TaskValue::Int(li)) |
-                map!(syn!(Path), |path| TaskValue::Path(path)) |
-                map!(brackets!(syn!(TokenStream)), |(_, ts)| TaskValue::Idents(ts))
+            value: switch!(
+                value!(key.as_ref()),
+                "interrupt" => map!(syn!(Ident), TaskValue::Interrupt) |
+                "path" => map!(syn!(Path), TaskValue::Path) |
+                "input" => map!(syn!(Type), TaskValue::Input) |
+                "type" => map!(syn!(Type), TaskValue::Input) |
+                "async" => map!(brackets!(syn!(TokenStream)), TaskValue::Async) |
+                "async_after" => map!(brackets!(syn!(TokenStream)), TaskValue::AsyncAfter) |
+                "resources" => map!(brackets!(syn!(TokenStream)), TaskValue::Resources) |
+                "priority" => map!(syn!(LitInt), TaskValue::Priority) |
+                "capacity" => map!(syn!(LitInt), TaskValue::Capacity) |
+                _ => map!(syn!(TokenStream), TaskValue::Unknown)
             ) >>
             (TaskKv { key, value })
     ));

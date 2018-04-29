@@ -1,10 +1,14 @@
 //! Specification checker
 
 use std::collections::{HashMap, HashSet};
+use std::ops::Range;
 
+use either::Either;
 use proc_macro2::Span;
+use syn::punctuated::Punctuated;
 use syn::spanned::Spanned as _Spanned;
-use syn::{self, Expr, Ident, Path, PathSegment, Type};
+use syn::token::Paren;
+use syn::{self, Expr, Ident, LitInt, Path, PathSegment, Type, TypeTuple};
 
 use {check, Outcome, Result, Spanned};
 
@@ -33,6 +37,8 @@ pub struct App {
     pub init: Init,
     /// `resources: $Statics`
     pub resources: Statics,
+    /// `free_interrupts: $Idents`
+    pub free_interrupts: Idents,
     /// `tasks: { $Tasks }`
     pub tasks: Tasks,
     _extensible: (),
@@ -41,34 +47,49 @@ pub struct App {
 impl super::App {
     /// Checks the parsed specification
     pub fn check(self) -> Result<App> {
+        let mut outcome = Outcome::default();
+
         let resources = if let Some(resources) = self.resources {
-            resources.check()?
+            resources.check(&mut outcome)
         } else {
             Statics::new()
         };
 
         let init = if let Some(init) = self.init {
-            init.check(&resources)?
+            init.check(&resources, &mut outcome)
         } else {
             Init::default()
         };
 
-        Ok(App {
-            device: self.device,
-            idle: if let Some(idle) = self.idle {
-                idle.check(&resources, &init)?
-            } else {
-                Idle::default()
-            },
-            tasks: if let Some(tasks) = self.tasks {
-                tasks.check(&resources, &init)?
-            } else {
-                Tasks::new()
-            },
-            init,
-            resources,
-            _extensible: (),
-        })
+        let idle = if let Some(idle) = self.idle {
+            idle.check(&resources, &init, &mut outcome)
+        } else {
+            Idle::default()
+        };
+
+        let free_interrupts = check::idents(self.free_interrupts, &mut outcome);
+
+        let tasks = if let Some(tasks) = self.tasks {
+            tasks.check(&resources, &init, &mut outcome)
+        } else {
+            Tasks::new()
+        };
+
+        check::tasks(&init, &tasks, &free_interrupts, &mut outcome);
+
+        if outcome.is_error() {
+            Err(format_err!("Specification error"))
+        } else {
+            Ok(App {
+                device: self.device,
+                idle,
+                free_interrupts,
+                tasks,
+                init,
+                resources,
+                _extensible: (),
+            })
+        }
     }
 }
 
@@ -78,35 +99,41 @@ pub struct Init {
     pub path: Path,
     /// `resources: $Resources`
     pub resources: Idents,
+    /// `async: $Idents`
+    pub async: Idents,
+    /// `async_after: $Idents`
+    pub async_after: Idents,
     _extensible: (),
 }
 
 impl Default for Init {
     fn default() -> Self {
         Init {
-            path: Path::from(PathSegment::from(Ident::new("init", Span::call_site()))),
+            path: mkpath("init"),
             resources: Idents::new(),
+            async: Idents::new(),
+            async_after: Idents::new(),
             _extensible: (),
         }
     }
 }
 
-impl super::Init {
-    fn check(self, statics: &Statics) -> Result<Init> {
-        let mut outcome = Outcome::default();
+impl Spanned<super::Init> {
+    fn check(self, statics: &Statics, outcome: &mut Outcome) -> Init {
+        let path = check::path(self.node.path, "init", &outcome);
 
-        let path = check::path(self.path, "init", &outcome);
+        let resources = check::resources(self.node.resources, statics, None, outcome);
 
-        let resources = check::resources(self.resources, statics, None, &mut outcome);
+        let async = check::idents(self.node.async, outcome);
 
-        if outcome.is_error() {
-            Err(format_err!("Specification error"))
-        } else {
-            Ok(Init {
-                path,
-                resources,
-                _extensible: (),
-            })
+        let async_after = check::idents(self.node.async_after, outcome);
+
+        Init {
+            path,
+            resources,
+            async,
+            async_after,
+            _extensible: (),
         }
     }
 }
@@ -123,29 +150,23 @@ pub struct Idle {
 impl Default for Idle {
     fn default() -> Self {
         Idle {
-            path: Path::from(PathSegment::from(Ident::new("idle", Span::call_site()))),
+            path: mkpath("idle"),
             resources: Idents::new(),
             _extensible: (),
         }
     }
 }
 
-impl super::Idle {
-    fn check(self, statics: &Statics, init: &Init) -> Result<Idle> {
-        let mut outcome = Outcome::default();
+impl Spanned<super::Idle> {
+    fn check(self, statics: &Statics, init: &Init, outcome: &mut Outcome) -> Idle {
+        let path = check::path(self.node.path, "idle", &outcome);
 
-        let path = check::path(self.path, "idle", &outcome);
+        let resources = check::resources(self.node.resources, statics, Some(init), outcome);
 
-        let resources = check::resources(self.resources, statics, Some(init), &mut outcome);
-
-        if outcome.is_error() {
-            Err(format_err!("Specification error"))
-        } else {
-            Ok(Idle {
-                path,
-                resources,
-                _extensible: (),
-            })
+        Idle {
+            path,
+            resources,
+            _extensible: (),
         }
     }
 }
@@ -160,10 +181,8 @@ pub struct Static {
 }
 
 impl Spanned<super::Statics> {
-    fn check(self) -> Result<Statics> {
+    fn check(self, outcome: &mut Outcome) -> Statics {
         let mut resources = Statics::new();
-
-        let mut outcome = Outcome::default();
 
         if self.node.0.is_empty() {
             outcome.warn_empty_list(self.span);
@@ -184,32 +203,32 @@ impl Spanned<super::Statics> {
             );
         }
 
-        if outcome.is_error() {
-            Err(format_err!("Specification error"))
-        } else {
-            Ok(resources)
-        }
+        resources
     }
 }
 
 /// The RHS part (`: { .. }`) of a task
 pub struct Task {
-    /// `enabled: $bool`
-    pub enabled: Option<bool>,
+    /// `interrupt: $Ident` || `capacity: $u8`
+    pub interrupt_or_capacity: Either<Ident, u8>,
     /// `path: $Path`
     pub path: Path,
+    /// `input: $Type`
+    pub input: Type,
     /// `priority: $u8`
-    pub priority: Option<u8>,
+    pub priority: u8,
     /// `resources: $Resources`
     pub resources: Idents,
+    /// `async: $Idents`
+    pub async: Idents,
+    /// `async_after: $Idents`
+    pub async_after: Idents,
     _extensible: (),
 }
 
 impl Spanned<super::Tasks> {
-    fn check(self, statics: &Statics, init: &Init) -> Result<Tasks> {
+    fn check(self, statics: &Statics, init: &Init, outcome: &mut Outcome) -> Tasks {
         let mut tasks = Tasks::new();
-
-        let mut outcome = Outcome::default();
 
         if self.node.0.is_empty() {
             outcome.warn_empty_list(self.span)
@@ -221,37 +240,102 @@ impl Spanned<super::Tasks> {
                 continue;
             }
 
-            tasks.insert(name, task.check(statics, init, &mut outcome));
+            tasks.insert(name, task.check(&name, statics, init, outcome));
         }
 
-        if outcome.is_error() {
-            Err(format_err!("Specification error"))
-        } else {
-            Ok(tasks)
-        }
+        tasks
     }
 }
 
 impl super::Task {
-    fn check(self, statics: &Statics, init: &Init, outcome: &mut Outcome) -> Task {
+    fn check(self, name: &Ident, statics: &Statics, init: &Init, outcome: &mut Outcome) -> Task {
+        let interrupt_or_capacity = match (self.interrupt, self.capacity) {
+            (Some(interrupt), Some(capacity)) => {
+                outcome.error(
+                    capacity.span(),
+                    "`capacity` and `interrupt` can't be specified at the same time",
+                );
+
+                Either::Left(interrupt)
+            }
+            (Some(interrupt), None) => Either::Left(interrupt),
+            (None, Some(capacity)) => {
+                Either::Right(check::lit_int(Some(capacity), 1, 1..255, outcome) as u8)
+            }
+            (None, None) => Either::Right(1),
+        };
+
+        let input = check::input(self.input, outcome);
+
+        if interrupt_or_capacity.is_left() && input != mkunit() {
+            outcome.error_interrupt_task_with_input(input.span());
+        }
+
         Task {
-            enabled: self.enabled,
-            path: self.path,
-            priority: self.priority,
+            interrupt_or_capacity,
+            path: check::path(self.path, name.as_ref(), outcome),
+            priority: check::lit_int(self.priority, 1, 1..255, outcome) as u8,
+            input,
             resources: check::resources(self.resources, statics, Some(init), outcome),
+            async: check::idents(self.async, outcome),
+            async_after: check::idents(self.async_after, outcome),
             _extensible: (),
         }
     }
+}
+
+fn idents(idents: Option<Spanned<super::Idents>>, outcome: &mut Outcome) -> Idents {
+    if let Some(idents) = idents.as_ref() {
+        if idents.node.is_empty() {
+            outcome.warn_empty_list(idents.span)
+        }
+    }
+
+    let mut set = Idents::new();
+    for ident in idents.map(|ids| ids.node.0).unwrap_or(vec![]) {
+        if set.contains(&ident) {
+            outcome.error_duplicate_resource(ident.span());
+            continue;
+        }
+
+        set.insert(ident);
+    }
+
+    set
+}
+
+fn input(input: Option<Type>, outcome: &mut Outcome) -> Type {
+    let def = mkunit();
+    if let Some(input) = input.as_ref() {
+        if input == &def {
+            outcome.warn_default_value(input.span());
+        }
+    }
+
+    input.unwrap_or(def)
+}
+
+fn lit_int(lit: Option<LitInt>, def: u64, range: Range<u64>, outcome: &mut Outcome) -> u64 {
+    if let Some(lit) = lit.as_ref() {
+        if lit.value() == def {
+            outcome.warn_default_value(lit.span());
+        }
+    }
+
+    let val = lit.as_ref().map(|lit| lit.value()).unwrap_or(def);
+
+    if val < range.start || val > range.end {
+        outcome.error_out_of_range(lit.span(), range);
+    }
+
+    val
 }
 
 fn path(path: Option<Path>, def: &str, outcome: &Outcome) -> Path {
     let def_path = syn::parse_str(def).unwrap();
     if let Some(path) = path.as_ref() {
         if path == &def_path {
-            outcome.warn(
-                path.span(),
-                "this is the default path; consider removing this key value pair",
-            );
+            outcome.warn_default_value(path.span());
         }
     }
 
@@ -298,4 +382,82 @@ fn resources(
     }
 
     resources
+}
+
+fn tasks(init: &Init, tasks: &Tasks, free_interrupts: &Idents, outcome: &mut Outcome) {
+    let mut callable = HashSet::new();
+    let mut noncallable = HashSet::new();
+    let mut interrupts = HashSet::new();
+
+    for (name, task) in tasks {
+        if let Either::Left(int) = task.interrupt_or_capacity.as_ref() {
+            noncallable.insert(name);
+
+            if interrupts.contains(int) {
+                outcome.error_shared_interrupt(int.span());
+                continue;
+            }
+
+            interrupts.insert(int);
+        } else {
+            callable.insert(name);
+        }
+    }
+
+    let mut unused = callable.clone();
+
+    // check `init`
+    for duplicate in init.async.intersection(&init.async_after) {
+        outcome.error_duplicate_async(duplicate.span())
+    }
+
+    for async in init.async.iter().chain(&init.async_after) {
+        if noncallable.contains(async) {
+            outcome.error_invalid_async(async.span());
+        } else if callable.contains(async) {
+            unused.remove(async);
+        } else {
+            outcome.error_undeclared_task(async.span());
+        }
+    }
+
+    // check tasks
+    for task in tasks.values() {
+        for duplicate in task.async.intersection(&task.async_after) {
+            outcome.error_duplicate_async(duplicate.span())
+        }
+
+        for async in task.async.iter().chain(&task.async_after) {
+            if noncallable.contains(async) {
+                outcome.error_invalid_async(async.span());
+            } else if callable.contains(async) {
+                unused.remove(async);
+            } else {
+                outcome.error_undeclared_task(async.span());
+            }
+        }
+    }
+
+    // unused tasks
+    for task in unused {
+        outcome.warn_unused_task(task.span());
+    }
+
+    // free interrupts that aren't
+    for int in free_interrupts {
+        if interrupts.contains(int) {
+            outcome.error_free_interrupt_isnt(int.span());
+        }
+    }
+}
+
+fn mkpath(id: &str) -> Path {
+    Path::from(PathSegment::from(Ident::new(id, Span::call_site())))
+}
+
+fn mkunit() -> Type {
+    Type::Tuple(TypeTuple {
+        paren_token: Paren(Span::call_site()),
+        elems: Punctuated::new(),
+    })
 }

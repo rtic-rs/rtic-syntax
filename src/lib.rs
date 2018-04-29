@@ -1,7 +1,8 @@
 //! Parser of the `app!` macro used by the Real Time For the Masses (RTFM) framework
 
 #![deny(missing_docs)]
-#![deny(warnings)]
+// #![deny(warnings)]
+#![allow(warnings)]
 #![feature(proc_macro)]
 
 extern crate either;
@@ -13,18 +14,14 @@ extern crate quote;
 #[macro_use]
 extern crate syn;
 
-use std::convert::TryInto;
-use std::ops;
+use std::ops::{self, Range};
 
 pub use failure::Error;
 
-use either::Either;
 use proc_macro2::{Span, TokenStream};
 use syn::punctuated::Punctuated;
 use syn::synom::Synom;
-use syn::{Expr, Ident, Path, Type};
-
-use raw::TaskValue;
+use syn::{Expr, Ident, LitInt, Path, Type};
 
 pub mod check;
 mod raw;
@@ -36,12 +33,14 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub struct App {
     /// `device: $path`
     pub device: Path,
-    /// `idle: { $Idle }`
-    pub idle: Option<Idle>,
-    /// `init: { $Init }`
-    pub init: Option<Init>,
     /// `resources: $Statics`
     pub resources: Option<Spanned<Statics>>,
+    /// `idle: { $Idle }`
+    pub idle: Option<Spanned<Idle>>,
+    /// `init: { $Init }`
+    pub init: Option<Spanned<Init>>,
+    /// `free_interrupts: $Idents`
+    pub free_interrupts: Option<Spanned<Idents>>,
     /// `tasks: { $Tasks }`
     pub tasks: Option<Spanned<Tasks>>,
     _extensible: (),
@@ -50,9 +49,12 @@ pub struct App {
 impl App {
     /// Parses the contents of the `app! { .. }` macro
     pub fn parse(ts: proc_macro::TokenStream) -> Result<Self> {
+        use raw::AppValue as V;
+
         let app: raw::App = syn::parse(ts)?;
 
         let mut device = None;
+        let mut free_interrupts = None;
         let mut idle = None;
         let mut init = None;
         let mut resources = None;
@@ -60,69 +62,75 @@ impl App {
 
         let mut outcome = Outcome::default();
         for kv in app.kvs.into_pairs().map(|pair| pair.into_value()) {
-            let key = kv.key.as_ref();
-            let span = kv.key.span();
-            match key {
-                "device" => if let Either::Left(path) = kv.value {
+            let kspan = kv.key.span();
+
+            match kv.value {
+                V::Device(path) => {
                     if device.is_some() {
-                        outcome.error_duplicate_key(span);
+                        outcome.error_duplicate_key(kspan);
                     } else {
                         device = Some(path);
                     }
-                } else {
-                    outcome.error_value_is_not_a_path(span);
-                },
-                "resources" => if let Either::Right(ts) = kv.value {
+                }
+                V::FreeInterrupts((bracket, ts)) => {
+                    if free_interrupts.is_some() {
+                        outcome.error_duplicate_key(kspan);
+                    } else {
+                        let idents = syn::parse2(ts)?;
+                        free_interrupts = Some(Spanned {
+                            node: idents,
+                            span: bracket.0,
+                        });
+                    }
+                }
+                V::Resources((brace, ts)) => {
                     if resources.is_some() {
-                        outcome.error_duplicate_key(span);
+                        outcome.error_duplicate_key(kspan);
                     } else {
                         let statics = syn::parse2(ts)?;
                         resources = Some(Spanned {
                             node: statics,
-                            span,
+                            span: brace.0,
                         });
                     }
-                } else {
-                    outcome.error_value_is_not_a_map(span);
-                },
-                "init" => if let Either::Right(ts) = kv.value {
+                }
+                V::Init((brace, ts)) => {
                     if init.is_some() {
-                        outcome.error_duplicate_key(span);
+                        outcome.error_duplicate_key(kspan);
                     } else {
-                        // A bit of hack but Idle has the exact same fields as Init so we reuse its
-                        // parser here
-                        let idle = Idle::parse(ts)?;
-                        init = Some(Init {
-                            path: idle.path,
-                            resources: idle.resources,
-                            _extensible: (),
+                        init = Some(Spanned {
+                            node: Init::parse(ts, false)?,
+                            span: brace.0,
+                        });
+                    }
+                }
+                V::Idle((brace, ts)) => {
+                    if idle.is_some() {
+                        outcome.error_duplicate_key(kspan);
+                    } else {
+                        // A bit of hack but Init is a superset of Idle so we reuse its parser here
+                        let init = Init::parse(ts, true)?;
+                        idle = Some(Spanned {
+                            node: Idle {
+                                path: init.path,
+                                resources: init.resources,
+                                _extensible: (),
+                            },
+                            span: brace.0,
                         })
                     }
-                } else {
-                    outcome.error_value_is_not_a_map(span);
-                },
-                "idle" => if let Either::Right(ts) = kv.value {
-                    if idle.is_some() {
-                        outcome.error_duplicate_key(span);
-                    } else {
-                        idle = Some(Idle::parse(ts)?);
-                    }
-                } else {
-                    outcome.error_value_is_not_a_map(span);
-                },
-                "tasks" => if let Either::Right(ts) = kv.value {
+                }
+                V::Tasks((brace, ts)) => {
                     if tasks.is_some() {
-                        outcome.error_duplicate_key(span);
+                        outcome.error_duplicate_key(kspan);
                     } else {
                         tasks = Some(Spanned {
                             node: Tasks::parse(ts)?,
-                            span,
+                            span: brace.0,
                         });
                     }
-                } else {
-                    outcome.error_value_is_not_a_map(span);
-                },
-                _ => outcome.error_unknown_key(span),
+                }
+                V::Unknown(..) => outcome.error_unknown_key(kspan),
             }
         }
 
@@ -134,6 +142,7 @@ impl App {
         } else {
             Ok(App {
                 device,
+                free_interrupts,
                 idle,
                 init,
                 resources,
@@ -199,6 +208,10 @@ pub struct Init {
     pub path: Option<Path>,
     /// `resources: $Idents`
     pub resources: Option<Spanned<Idents>>,
+    /// `async: $Idents`
+    pub async: Option<Spanned<Idents>>,
+    /// `async_after: $Idents`
+    pub async_after: Option<Spanned<Idents>>,
     _extensible: (),
 }
 
@@ -211,45 +224,82 @@ pub struct Idle {
     _extensible: (),
 }
 
-impl Idle {
-    fn parse(ts: TokenStream) -> Result<Idle> {
-        let idle: raw::Idle = syn::parse2(ts)?;
+impl Init {
+    // Parser shared between `Idle` and `Init`
+    fn parse(ts: TokenStream, is_idle: bool) -> Result<Init> {
+        use raw::InitValue as V;
 
+        let init: raw::Init = syn::parse2(ts)?;
+
+        let mut async = None;
+        let mut async_after = None;
         let mut path = None;
         let mut resources = None;
         let mut outcome = Outcome::default();
-        for kv in idle.kvs.into_pairs().map(|p| p.into_value()) {
-            let span = kv.key.span();
-            match kv.key.as_ref() {
-                "path" => if let Either::Left(path_) = kv.value {
+        for kv in init.kvs.into_pairs().map(|p| p.into_value()) {
+            let kspan = kv.key.span();
+
+            match kv.value {
+                V::Path(p) => {
                     if path.is_some() {
-                        outcome.error_duplicate_key(span);
+                        outcome.error_duplicate_key(kspan);
                     } else {
-                        path = Some(path_);
+                        path = Some(p);
                     }
-                } else {
-                    outcome.error_value_is_not_a_path(span);
-                },
-                "resources" => if let Either::Right(ts) = kv.value {
+                }
+                V::Resources((bracket, ts)) => {
                     if resources.is_some() {
-                        outcome.error_duplicate_key(span);
+                        outcome.error_duplicate_key(kspan);
                     } else {
                         let idents = syn::parse2(ts)?;
-                        resources = Some(Spanned { node: idents, span });
+                        resources = Some(Spanned {
+                            node: idents,
+                            span: bracket.0,
+                        });
                     }
-                } else {
-                    outcome.error_value_is_not_an_array(span);
-                },
-                _ => outcome.error_unknown_key(span),
+                }
+                V::Async((bracket, ts)) => {
+                    if is_idle {
+                        outcome.error_unknown_key(kspan)
+                    } else {
+                        if async.is_some() {
+                            outcome.error_duplicate_key(kspan);
+                        } else {
+                            let idents = syn::parse2(ts)?;
+                            async = Some(Spanned {
+                                node: idents,
+                                span: bracket.0,
+                            });
+                        }
+                    }
+                }
+                V::AsyncAfter((bracket, ts)) => {
+                    if is_idle {
+                        outcome.error_unknown_key(kspan)
+                    } else {
+                        if async_after.is_some() {
+                            outcome.error_duplicate_key(kspan);
+                        } else {
+                            let idents = syn::parse2(ts)?;
+                            async_after = Some(Spanned {
+                                node: idents,
+                                span: bracket.0,
+                            });
+                        }
+                    }
+                }
+                V::Unknown(..) => outcome.error_unknown_key(kspan),
             }
         }
 
         if outcome.is_error() {
             Err(format_err!("Syntax error"))
         } else {
-            Ok(Idle {
+            Ok(Init {
                 path,
                 resources,
+                async,
+                async_after,
                 _extensible: (),
             })
         }
@@ -273,81 +323,123 @@ impl Tasks {
 
 /// `$Ident: { .. }`
 pub struct Task {
-    /// `enabled: $bool`
-    pub enabled: Option<bool>,
+    /// `interrupt: $Ident`
+    pub interrupt: Option<Ident>,
     /// `path: $Path`
-    pub path: Path,
-    /// `priority: $u8`
-    pub priority: Option<u8>,
+    pub path: Option<Path>,
+    /// `input: $Type`
+    pub input: Option<Type>,
+    /// `priority: $LitInt`
+    pub priority: Option<LitInt>,
+    /// `capacity: $LitInt`
+    pub capacity: Option<LitInt>,
     /// `resources: $Resources`
     pub resources: Option<Spanned<Idents>>,
+    /// `async: $Idents`
+    pub async: Option<Spanned<Idents>>,
+    /// `async_after: $Idents`
+    pub async_after: Option<Spanned<Idents>>,
     _extensible: (),
 }
 
 impl Task {
     fn parse(ts: TokenStream) -> Result<Self> {
+        use raw::TaskValue as V;
+
         let task: raw::Task = syn::parse2(ts)?;
 
-        let mut enabled = None;
+        let mut async = None;
+        let mut async_after = None;
+        let mut capacity = None;
+        let mut input = None;
+        let mut interrupt = None;
         let mut path = None;
         let mut priority = None;
         let mut resources = None;
 
         let mut outcome = Outcome::default();
         for kv in task.kvs.into_pairs().map(|pair| pair.into_value()) {
-            let key = kv.key.as_ref();
-            let span = kv.key.span();
-            match key {
-                "enabled" => if let TaskValue::Bool(b) = kv.value {
-                    if enabled.is_some() {
-                        outcome.error_duplicate_key(span);
+            let kspan = kv.key.span();
+
+            match kv.value {
+                V::Interrupt(id) => {
+                    if interrupt.is_some() {
+                        outcome.error_duplicate_key(kspan);
                     } else {
-                        enabled = Some(b.value);
+                        interrupt = Some(id);
                     }
-                } else {
-                    outcome.error_value_is_not_a_boolean(span);
-                },
-                "path" => if let TaskValue::Path(p) = kv.value {
+                }
+                V::Path(p) => {
                     if path.is_some() {
-                        outcome.error_duplicate_key(span);
+                        outcome.error_duplicate_key(kspan);
                     } else {
                         path = Some(p);
                     }
-                } else {
-                    outcome.error_value_is_not_a_path(span);
-                },
-                "priority" => if let TaskValue::Int(p) = kv.value {
-                    if priority.is_some() {
-                        outcome.error_duplicate_key(span);
+                }
+                V::Input(ty) => {
+                    if input.is_some() {
+                        outcome.error_duplicate_key(kspan);
                     } else {
-                        priority = Some(p.value().try_into()?);
+                        input = Some(ty);
                     }
-                } else {
-                    outcome.error_value_is_not_a_path(span);
-                },
-                "resources" => if let TaskValue::Idents(ts) = kv.value {
+                }
+                V::Async((bracket, ts)) => {
+                    if async.is_some() {
+                        outcome.error_duplicate_key(kspan);
+                    } else {
+                        async = Some(Spanned {
+                            node: syn::parse2(ts)?,
+                            span: bracket.0,
+                        });
+                    }
+                }
+                V::AsyncAfter((bracket, ts)) => {
+                    if async_after.is_some() {
+                        outcome.error_duplicate_key(kspan);
+                    } else {
+                        async_after = Some(Spanned {
+                            node: syn::parse2(ts)?,
+                            span: bracket.0,
+                        });
+                    }
+                }
+                V::Capacity(lit) => {
+                    if capacity.is_some() {
+                        outcome.error_duplicate_key(kspan);
+                    } else {
+                        capacity = Some(lit);
+                    }
+                }
+                V::Priority(lit) => {
+                    if priority.is_some() {
+                        outcome.error_duplicate_key(kspan);
+                    } else {
+                        priority = Some(lit);
+                    }
+                }
+                V::Resources((bracket, ts)) => {
                     if resources.is_some() {
-                        outcome.error_duplicate_key(span);
+                        outcome.error_duplicate_key(kspan);
                     } else {
                         resources = Some(Spanned {
                             node: syn::parse2(ts)?,
-                            span,
+                            span: bracket.0,
                         });
                     }
-                } else {
-                    outcome.error_value_is_not_a_path(span);
-                },
-                _ => outcome.error_unknown_key(span),
+                }
+                V::Unknown(..) => outcome.error_unknown_key(kspan),
             }
         }
-
-        let path = path.ok_or_else(|| format_err!("`path` is missing or invalid"))?;
 
         if outcome.is_error() {
             Err(format_err!("Syntax error"))
         } else {
             Ok(Task {
-                enabled,
+                async,
+                async_after,
+                capacity,
+                input,
+                interrupt,
                 path,
                 priority,
                 resources,
@@ -384,14 +476,57 @@ impl Outcome {
         self.error(span, "this task name appears more than once in this list")
     }
 
+    fn error_duplicate_async(&mut self, span: Span) {
+        self.error(
+            span,
+            "a task can't be listed under `async` and `async_after` at the same time",
+        )
+    }
+
+    fn error_free_interrupt_isnt(&mut self, span: Span) {
+        self.error(span, "this interrupt is bound to a task");
+    }
+
+    fn error_interrupt_task_with_input(&mut self, span: Span) {
+        self.error(span, "task bound to interrupt must have no input");
+    }
+
+    fn error_invalid_async(&mut self, span: Span) {
+        self.error(
+            span,
+            "Tasks bound to interrupts can't be asynchronously called",
+        )
+    }
+
+    fn error_out_of_range(&mut self, span: Span, range: Range<u64>) {
+        self.error(
+            span,
+            &format!(
+                "this value is outside the valid range of `{:?}`",
+                (range.start, range.end)
+            ),
+        )
+    }
+
     fn error_owned_resource(&mut self, span: Span) {
         self.error(span, "this resource is owned by `init` and can't be shared")
+    }
+
+    fn error_shared_interrupt(&mut self, span: Span) {
+        self.error(span, "this interrupt is already bound to another task")
     }
 
     fn error_undeclared_resource(&mut self, span: Span) {
         self.error(
             span,
             "this resource has not been declared in the top level list",
+        )
+    }
+
+    fn error_undeclared_task(&mut self, span: Span) {
+        self.error(
+            span,
+            "this task has not been declared in the top level list",
         )
     }
 
@@ -406,37 +541,26 @@ impl Outcome {
         self.error(key, "unknown key")
     }
 
-    fn error_value_is_not_an_array(&mut self, key: Span) {
-        self.error(
-            key,
-            "the value of this key must be an array (e.g. `[A, B, C]`)",
-        )
-    }
-
-    fn error_value_is_not_a_boolean(&mut self, key: Span) {
-        self.error(key, "the value of this key must be a boolean (e.g. `true`)")
-    }
-
-    fn error_value_is_not_a_map(&mut self, key: Span) {
-        self.error(
-            key,
-            "the value of this key must be a map (e.g. `{ key: value, .. }`)",
-        )
-    }
-
-    fn error_value_is_not_a_path(&mut self, key: Span) {
-        self.error(
-            key,
-            "the value of this key must be a path (e.g. `foo::bar` or `baz`)",
-        )
-    }
-
     fn warn(&self, span: Span, msg: &str) {
         span.unstable().warning(msg).emit();
     }
 
+    fn warn_default_value(&self, span: Span) {
+        self.warn(
+            span,
+            "this is the default value; consider removing this key value pair",
+        );
+    }
+
     fn warn_empty_list(&self, span: Span) {
         self.warn(span, "this list is empty; consider removing it");
+    }
+
+    fn warn_unused_task(&self, span: Span) {
+        self.warn(
+            span,
+            "this task is not bound to an interrupt, or asynchronously called",
+        );
     }
 
     fn is_error(&self) -> bool {
