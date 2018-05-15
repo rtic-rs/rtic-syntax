@@ -208,10 +208,10 @@ pub struct Init {
     pub path: Option<Path>,
     /// `resources: $Idents`
     pub resources: Option<Spanned<Idents>>,
-    /// `async: $Idents`
-    pub async: Option<Spanned<Idents>>,
-    /// `async_after: $Idents`
-    pub async_after: Option<Spanned<Idents>>,
+    /// `schedule_now: $Idents`
+    pub schedule_now: Option<Spanned<Idents>>,
+    /// `schedule_after: $Idents`
+    pub schedule_after: Option<Spanned<Idents>>,
     _extensible: (),
 }
 
@@ -231,8 +231,8 @@ impl Init {
 
         let init: raw::Init = syn::parse2(ts)?;
 
-        let mut async = None;
-        let mut async_after = None;
+        let mut schedule_now = None;
+        let mut schedule_after = None;
         let mut path = None;
         let mut resources = None;
         let mut outcome = Outcome::default();
@@ -258,30 +258,30 @@ impl Init {
                         });
                     }
                 }
-                V::Async((bracket, ts)) => {
+                V::ScheduleNow((bracket, ts)) => {
                     if is_idle {
                         outcome.error_unknown_key(kspan)
                     } else {
-                        if async.is_some() {
+                        if schedule_now.is_some() {
                             outcome.error_duplicate_key(kspan);
                         } else {
                             let idents = syn::parse2(ts)?;
-                            async = Some(Spanned {
+                            schedule_now = Some(Spanned {
                                 node: idents,
                                 span: bracket.0,
                             });
                         }
                     }
                 }
-                V::AsyncAfter((bracket, ts)) => {
+                V::ScheduleAfter((bracket, ts)) => {
                     if is_idle {
                         outcome.error_unknown_key(kspan)
                     } else {
-                        if async_after.is_some() {
+                        if schedule_after.is_some() {
                             outcome.error_duplicate_key(kspan);
                         } else {
                             let idents = syn::parse2(ts)?;
-                            async_after = Some(Spanned {
+                            schedule_after = Some(Spanned {
                                 node: idents,
                                 span: bracket.0,
                             });
@@ -298,8 +298,8 @@ impl Init {
             Ok(Init {
                 path,
                 resources,
-                async,
-                async_after,
+                schedule_now,
+                schedule_after,
                 _extensible: (),
             })
         }
@@ -331,14 +331,14 @@ pub struct Task {
     pub input: Option<Type>,
     /// `priority: $LitInt`
     pub priority: Option<LitInt>,
-    /// `capacity: $LitInt`
-    pub capacity: Option<LitInt>,
+    /// `instances: $LitInt`
+    pub instances: Option<LitInt>,
     /// `resources: $Resources`
     pub resources: Option<Spanned<Idents>>,
-    /// `async: $Idents`
-    pub async: Option<Spanned<Idents>>,
-    /// `async_after: $Idents`
-    pub async_after: Option<Spanned<Idents>>,
+    /// `schedule_now: $Idents`
+    pub schedule_now: Option<Spanned<Idents>>,
+    /// `schedule_after: $Idents`
+    pub schedule_after: Option<Spanned<Idents>>,
     _extensible: (),
 }
 
@@ -348,9 +348,9 @@ impl Task {
 
         let task: raw::Task = syn::parse2(ts)?;
 
-        let mut async = None;
-        let mut async_after = None;
-        let mut capacity = None;
+        let mut schedule_now = None;
+        let mut schedule_after = None;
+        let mut instances = None;
         let mut input = None;
         let mut interrupt = None;
         let mut path = None;
@@ -383,31 +383,31 @@ impl Task {
                         input = Some(ty);
                     }
                 }
-                V::Async((bracket, ts)) => {
-                    if async.is_some() {
+                V::ScheduleNow((bracket, ts)) => {
+                    if schedule_now.is_some() {
                         outcome.error_duplicate_key(kspan);
                     } else {
-                        async = Some(Spanned {
+                        schedule_now = Some(Spanned {
                             node: syn::parse2(ts)?,
                             span: bracket.0,
                         });
                     }
                 }
-                V::AsyncAfter((bracket, ts)) => {
-                    if async_after.is_some() {
+                V::ScheduleAfter((bracket, ts)) => {
+                    if schedule_after.is_some() {
                         outcome.error_duplicate_key(kspan);
                     } else {
-                        async_after = Some(Spanned {
+                        schedule_after = Some(Spanned {
                             node: syn::parse2(ts)?,
                             span: bracket.0,
                         });
                     }
                 }
-                V::Capacity(lit) => {
-                    if capacity.is_some() {
+                V::Instances(lit) => {
+                    if instances.is_some() {
                         outcome.error_duplicate_key(kspan);
                     } else {
-                        capacity = Some(lit);
+                        instances = Some(lit);
                     }
                 }
                 V::Priority(lit) => {
@@ -435,9 +435,9 @@ impl Task {
             Err(format_err!("Syntax error"))
         } else {
             Ok(Task {
-                async,
-                async_after,
-                capacity,
+                schedule_now,
+                schedule_after,
+                instances,
                 input,
                 interrupt,
                 path,
@@ -476,10 +476,10 @@ impl Outcome {
         self.error(span, "this task name appears more than once in this list")
     }
 
-    fn error_duplicate_async(&mut self, span: Span) {
+    fn error_duplicate_schedule(&mut self, span: Span) {
         self.error(
             span,
-            "a task can't be listed under `async` and `async_after` at the same time",
+            "a task can't be listed under `schedule` and `schedule_after` at the same time",
         )
     }
 
@@ -487,14 +487,14 @@ impl Outcome {
         self.error(span, "this interrupt is bound to a task");
     }
 
-    fn error_interrupt_task_with_input(&mut self, span: Span) {
+    fn error_event_task_with_input(&mut self, span: Span) {
         self.error(span, "task bound to interrupt must have no input");
     }
 
-    fn error_invalid_async(&mut self, span: Span) {
+    fn error_invalid_schedule(&mut self, span: Span) {
         self.error(
             span,
-            "Tasks bound to interrupts can't be asynchronously called",
+            "Event tasks can't be programmatically scheduled",
         )
     }
 
@@ -559,7 +559,7 @@ impl Outcome {
     fn warn_unused_task(&self, span: Span) {
         self.warn(
             span,
-            "this task is not bound to an interrupt, or asynchronously called",
+            "this task is not bound to an interrupt, or scheduled by another task",
         );
     }
 

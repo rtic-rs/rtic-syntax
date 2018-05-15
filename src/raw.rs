@@ -67,8 +67,8 @@ pub struct InitKv {
 pub enum InitValue {
     Path(Path),
     Resources((Bracket, TokenStream)),
-    Async((Bracket, TokenStream)),
-    AsyncAfter((Bracket, TokenStream)),
+    ScheduleNow((Bracket, TokenStream)),
+    ScheduleAfter((Bracket, TokenStream)),
     Unknown(TokenStream),
 }
 
@@ -80,8 +80,8 @@ impl Synom for InitKv {
                 value!(key.as_ref()),
                 "path" => map!(syn!(Path), InitValue::Path) |
                 "resources" => map!(brackets!(syn!(TokenStream)), InitValue::Resources) |
-                "async" => map!(brackets!(syn!(TokenStream)), InitValue::Async) |
-                "async_after" => map!(brackets!(syn!(TokenStream)), InitValue::AsyncAfter) |
+                "schedule_now" => map!(brackets!(syn!(TokenStream)), InitValue::ScheduleNow) |
+                "schedule_after" => map!(brackets!(syn!(TokenStream)), InitValue::ScheduleAfter) |
                 _ => map!(syn!(TokenStream), InitValue::Unknown)
             ) >>
             (InitKv { key, value })
@@ -106,11 +106,11 @@ pub enum TaskValue {
     Interrupt(Ident),
     Path(Path),
     Input(Type),
-    Async((Bracket, TokenStream)),
-    AsyncAfter((Bracket, TokenStream)),
+    ScheduleNow((Bracket, TokenStream)),
+    ScheduleAfter((Bracket, TokenStream)),
     Resources((Bracket, TokenStream)),
     Priority(LitInt),
-    Capacity(LitInt),
+    Instances(LitInt),
     Unknown(TokenStream),
 }
 
@@ -129,11 +129,11 @@ impl Synom for TaskKv {
                 "path" => map!(syn!(Path), TaskValue::Path) |
                 "input" => map!(syn!(Type), TaskValue::Input) |
                 "type" => map!(syn!(Type), TaskValue::Input) |
-                "async" => map!(brackets!(syn!(TokenStream)), TaskValue::Async) |
-                "async_after" => map!(brackets!(syn!(TokenStream)), TaskValue::AsyncAfter) |
+                "schedule_now" => map!(brackets!(syn!(TokenStream)), TaskValue::ScheduleNow) |
+                "schedule_after" => map!(brackets!(syn!(TokenStream)), TaskValue::ScheduleAfter) |
                 "resources" => map!(brackets!(syn!(TokenStream)), TaskValue::Resources) |
                 "priority" => map!(syn!(LitInt), TaskValue::Priority) |
-                "capacity" => map!(syn!(LitInt), TaskValue::Capacity) |
+                "instances" => map!(syn!(LitInt), TaskValue::Instances) |
                 _ => map!(syn!(TokenStream), TaskValue::Unknown)
             ) >>
             (TaskKv { key, value })

@@ -99,10 +99,10 @@ pub struct Init {
     pub path: Path,
     /// `resources: $Resources`
     pub resources: Idents,
-    /// `async: $Idents`
-    pub async: Idents,
-    /// `async_after: $Idents`
-    pub async_after: Idents,
+    /// `schedule_now: $Idents`
+    pub schedule_now: Idents,
+    /// `schedule_after: $Idents`
+    pub schedule_after: Idents,
     _extensible: (),
 }
 
@@ -111,8 +111,8 @@ impl Default for Init {
         Init {
             path: mkpath("init"),
             resources: Idents::new(),
-            async: Idents::new(),
-            async_after: Idents::new(),
+            schedule_now: Idents::new(),
+            schedule_after: Idents::new(),
             _extensible: (),
         }
     }
@@ -124,15 +124,15 @@ impl Spanned<super::Init> {
 
         let resources = check::resources(self.node.resources, statics, None, outcome);
 
-        let async = check::idents(self.node.async, outcome);
+        let schedule_now = check::idents(self.node.schedule_now, outcome);
 
-        let async_after = check::idents(self.node.async_after, outcome);
+        let schedule_after = check::idents(self.node.schedule_after, outcome);
 
         Init {
             path,
             resources,
-            async,
-            async_after,
+            schedule_now,
+            schedule_after,
             _extensible: (),
         }
     }
@@ -209,20 +209,20 @@ impl Spanned<super::Statics> {
 
 /// The RHS part (`: { .. }`) of a task
 pub struct Task {
-    /// `interrupt: $Ident` || `capacity: $u8`
-    pub interrupt_or_capacity: Either<Ident, u8>,
+    /// `interrupt: $Ident` || `instances: $u8`
+    pub interrupt_or_instances: Either<Ident, u8>,
     /// `path: $Path`
     pub path: Path,
-    /// `input: $Type`
-    pub input: Type,
+    /// `input: $Type` - `None` means no input, i.e. the input type is `()`
+    pub input: Option<Type>,
     /// `priority: $u8`
     pub priority: u8,
     /// `resources: $Resources`
     pub resources: Idents,
-    /// `async: $Idents`
-    pub async: Idents,
-    /// `async_after: $Idents`
-    pub async_after: Idents,
+    /// `schedule_now: $Idents`
+    pub schedule_now: Idents,
+    /// `schedule_after: $Idents`
+    pub schedule_after: Idents,
     _extensible: (),
 }
 
@@ -249,36 +249,36 @@ impl Spanned<super::Tasks> {
 
 impl super::Task {
     fn check(self, name: &Ident, statics: &Statics, init: &Init, outcome: &mut Outcome) -> Task {
-        let interrupt_or_capacity = match (self.interrupt, self.capacity) {
-            (Some(interrupt), Some(capacity)) => {
+        let interrupt_or_instances = match (self.interrupt, self.instances) {
+            (Some(interrupt), Some(instances)) => {
                 outcome.error(
-                    capacity.span(),
-                    "`capacity` and `interrupt` can't be specified at the same time",
+                    instances.span(),
+                    "`instances` and `interrupt` can't be specified at the same time",
                 );
 
                 Either::Left(interrupt)
             }
             (Some(interrupt), None) => Either::Left(interrupt),
-            (None, Some(capacity)) => {
-                Either::Right(check::lit_int(Some(capacity), 1, 1..255, outcome) as u8)
+            (None, Some(instances)) => {
+                Either::Right(check::lit_int(Some(instances), 1, 1..255, outcome) as u8)
             }
             (None, None) => Either::Right(1),
         };
 
         let input = check::input(self.input, outcome);
 
-        if interrupt_or_capacity.is_left() && input != mkunit() {
-            outcome.error_interrupt_task_with_input(input.span());
+        if interrupt_or_instances.is_left() && input.is_some() {
+            outcome.error_event_task_with_input(input.span());
         }
 
         Task {
-            interrupt_or_capacity,
+            interrupt_or_instances,
             path: check::path(self.path, name.as_ref(), outcome),
             priority: check::lit_int(self.priority, 1, 1..255, outcome) as u8,
             input,
             resources: check::resources(self.resources, statics, Some(init), outcome),
-            async: check::idents(self.async, outcome),
-            async_after: check::idents(self.async_after, outcome),
+            schedule_now: check::idents(self.schedule_now, outcome),
+            schedule_after: check::idents(self.schedule_after, outcome),
             _extensible: (),
         }
     }
@@ -304,15 +304,16 @@ fn idents(idents: Option<Spanned<super::Idents>>, outcome: &mut Outcome) -> Iden
     set
 }
 
-fn input(input: Option<Type>, outcome: &mut Outcome) -> Type {
+fn input(input: Option<Type>, outcome: &mut Outcome) -> Option<Type> {
     let def = mkunit();
     if let Some(input) = input.as_ref() {
         if input == &def {
             outcome.warn_default_value(input.span());
+            return None;
         }
     }
 
-    input.unwrap_or(def)
+    input
 }
 
 fn lit_int(lit: Option<LitInt>, def: u64, range: Range<u64>, outcome: &mut Outcome) -> u64 {
@@ -390,7 +391,7 @@ fn tasks(init: &Init, tasks: &Tasks, free_interrupts: &Idents, outcome: &mut Out
     let mut interrupts = HashSet::new();
 
     for (name, task) in tasks {
-        if let Either::Left(int) = task.interrupt_or_capacity.as_ref() {
+        if let Either::Left(int) = task.interrupt_or_instances.as_ref() {
             noncallable.insert(name);
 
             if interrupts.contains(int) {
@@ -407,33 +408,33 @@ fn tasks(init: &Init, tasks: &Tasks, free_interrupts: &Idents, outcome: &mut Out
     let mut unused = callable.clone();
 
     // check `init`
-    for duplicate in init.async.intersection(&init.async_after) {
-        outcome.error_duplicate_async(duplicate.span())
+    for duplicate in init.schedule_now.intersection(&init.schedule_after) {
+        outcome.error_duplicate_schedule(duplicate.span())
     }
 
-    for async in init.async.iter().chain(&init.async_after) {
-        if noncallable.contains(async) {
-            outcome.error_invalid_async(async.span());
-        } else if callable.contains(async) {
-            unused.remove(async);
+    for task in init.schedule_now.iter().chain(&init.schedule_after) {
+        if noncallable.contains(task) {
+            outcome.error_invalid_schedule(task.span());
+        } else if callable.contains(task) {
+            unused.remove(task);
         } else {
-            outcome.error_undeclared_task(async.span());
+            outcome.error_undeclared_task(task.span());
         }
     }
 
     // check tasks
     for task in tasks.values() {
-        for duplicate in task.async.intersection(&task.async_after) {
-            outcome.error_duplicate_async(duplicate.span())
+        for duplicate in task.schedule_now.intersection(&task.schedule_after) {
+            outcome.error_duplicate_schedule(duplicate.span())
         }
 
-        for async in task.async.iter().chain(&task.async_after) {
-            if noncallable.contains(async) {
-                outcome.error_invalid_async(async.span());
-            } else if callable.contains(async) {
-                unused.remove(async);
+        for t in task.schedule_now.iter().chain(&task.schedule_after) {
+            if noncallable.contains(t) {
+                outcome.error_invalid_schedule(t.span());
+            } else if callable.contains(t) {
+                unused.remove(t);
             } else {
-                outcome.error_undeclared_task(async.span());
+                outcome.error_undeclared_task(t.span());
             }
         }
     }
