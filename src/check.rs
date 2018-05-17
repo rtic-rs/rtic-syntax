@@ -362,13 +362,7 @@ fn resources(
             continue;
         }
 
-        if let Some(static_) = statics.get(&ident) {
-            let we_are_init = init.is_none();
-            if we_are_init && static_.expr.is_none() {
-                outcome.error_uninitialized_resource(ident.span());
-                continue;
-            }
-        } else {
+        if statics.get(&ident).is_none() {
             outcome.error_undeclared_resource(ident.span());
             continue;
         }
