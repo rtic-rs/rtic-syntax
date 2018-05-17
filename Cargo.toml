@@ -12,7 +12,10 @@ version = "0.3.0"
 [dependencies]
 quote = "0.5.1"
 failure = "0.1.1"
-either = "1"
+
+[dependencies.either]
+version = "1"
+default-features = false
 
 [dependencies.proc-macro2]
 features = ["nightly"]
