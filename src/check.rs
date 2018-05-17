@@ -32,7 +32,7 @@ pub struct App {
     /// `device: $path`
     pub device: Path,
     /// `idle: { $Idle }`
-    pub idle: Idle,
+    pub idle: Option<Idle>,
     /// `init: { $Init }`
     pub init: Init,
     /// `resources: $Statics`
@@ -61,11 +61,8 @@ impl super::App {
             Init::default()
         };
 
-        let idle = if let Some(idle) = self.idle {
-            idle.check(&resources, &init, &mut outcome)
-        } else {
-            Idle::default()
-        };
+        let idle = self.idle
+            .map(|idle| idle.check(&resources, &init, &mut outcome));
 
         let free_interrupts = check::idents(self.free_interrupts, &mut outcome);
 
