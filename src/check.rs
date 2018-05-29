@@ -237,7 +237,7 @@ impl Spanned<super::Tasks> {
                 continue;
             }
 
-            tasks.insert(name, task.check(&name, statics, init, outcome));
+            tasks.insert(name.clone(), task.check(&name, statics, init, outcome));
         }
 
         tasks
@@ -270,7 +270,7 @@ impl super::Task {
 
         Task {
             interrupt_or_instances,
-            path: check::path(self.path, name.as_ref(), outcome),
+            path: check::path(self.path, &name.to_string(), outcome),
             priority: check::lit_int(self.priority, 1, 1..255, outcome) as u8,
             input,
             resources: check::resources(self.resources, statics, Some(init), outcome),

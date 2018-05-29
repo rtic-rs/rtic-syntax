@@ -46,7 +46,7 @@ impl Synom for AppKv {
         key: syn!(Ident) >>
             _colon: punct!(:) >>
             value: switch!(
-                value!(key.as_ref()),
+                value!(&*key.to_string()),
                 "device" => map!(syn!(Path), AppValue::Device) |
                 "idle" => map!(braces!(syn!(TokenStream)), AppValue::Idle) |
                 "init" => map!(braces!(syn!(TokenStream)), AppValue::Init) |
@@ -77,7 +77,7 @@ impl Synom for InitKv {
         key: syn!(Ident) >>
             _colon: punct!(:) >>
             value: switch!(
-                value!(key.as_ref()),
+                value!(&*key.to_string()),
                 "path" => map!(syn!(Path), InitValue::Path) |
                 "resources" => map!(brackets!(syn!(TokenStream)), InitValue::Resources) |
                 "schedule_now" => map!(brackets!(syn!(TokenStream)), InitValue::ScheduleNow) |
@@ -124,7 +124,7 @@ impl Synom for TaskKv {
         key: syn!(Ident) >>
             _colon: punct!(:) >>
             value: switch!(
-                value!(key.as_ref()),
+                value!(&*key.to_string()),
                 "interrupt" => map!(syn!(Ident), TaskValue::Interrupt) |
                 "path" => map!(syn!(Path), TaskValue::Path) |
                 "input" => map!(syn!(Type), TaskValue::Input) |
