@@ -61,7 +61,8 @@ impl App {
 
         let mut outcome = Outcome::default();
         for kv in app.kvs.into_pairs().map(|pair| pair.into_value()) {
-            let key = kv.key.as_ref();
+            let key_string = kv.key.to_string();
+            let key = key_string.as_ref();
             let span = kv.key.span();
             match key {
                 "device" => if let Either::Left(path) = kv.value {
@@ -221,7 +222,7 @@ impl Idle {
         let mut outcome = Outcome::default();
         for kv in idle.kvs.into_pairs().map(|p| p.into_value()) {
             let span = kv.key.span();
-            match kv.key.as_ref() {
+            match kv.key.to_string().as_ref() {
                 "path" => if let Either::Left(path_) = kv.value {
                     if path.is_some() {
                         outcome.error_duplicate_key(span);
@@ -296,7 +297,8 @@ impl Task {
 
         let mut outcome = Outcome::default();
         for kv in task.kvs.into_pairs().map(|pair| pair.into_value()) {
-            let key = kv.key.as_ref();
+            let key_string = kv.key.to_string();
+            let key = key_string.as_ref();
             let span = kv.key.span();
             match key {
                 "enabled" => if let TaskValue::Bool(b) = kv.value {

@@ -10,7 +10,7 @@ repository = "https://github.com/japaric/rtfm-syntax"
 version = "0.3.3"
 
 [dependencies]
-quote = "0.5.1"
+quote = "0.6.3"
 failure = "0.1.1"
 
 [dependencies.either]
@@ -19,8 +19,8 @@ version = "1"
 
 [dependencies.proc-macro2]
 features = ["nightly"]
-version = "0.3.6"
+version = "0.4.6"
 
 [dependencies.syn]
 features = ["extra-traits", "full"]
-version = "0.13.1"
+version = "0.14.2"
