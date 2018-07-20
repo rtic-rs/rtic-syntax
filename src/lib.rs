@@ -2,7 +2,10 @@
 
 #![deny(missing_docs)]
 #![deny(warnings)]
-#![feature(proc_macro)]
+#![feature(use_extern_macros)]
+#![feature(proc_macro_span)]
+#![feature(proc_macro_diagnostic)]
+#![feature(proc_macro_raw_ident)]
 #![feature(try_from)]
 
 extern crate either;
