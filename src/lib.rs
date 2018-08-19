@@ -2,7 +2,7 @@
 
 #![deny(missing_docs)]
 #![deny(warnings)]
-#![feature(proc_macro)]
+#![feature(proc_macro_diagnostic)]
 #![feature(try_from)]
 
 extern crate either;
