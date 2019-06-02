@@ -1,0 +1,12 @@
+[package]
+authors = ["Jorge Aparicio <jorge@japaric.io>"]
+edition = "2018"
+name = "mock"
+publish = false
+version = "0.0.0-alpha.0"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+rtfm-syntax = { path = ".." }

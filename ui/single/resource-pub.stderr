@@ -1,0 +1,8 @@
+error: resources must have inherited / private visibility
+ --> $DIR/resource-pub.rs:5:5
+  |
+5 |     pub static X: u32 = 0;
+  |     ^^^
+
+error: aborting due to previous error
+

@@ -1,0 +1,8 @@
+error: `idle` must have type signature `fn(idle::Context) -> !`
+ --> $DIR/idle-unsafe.rs:6:15
+  |
+6 |     unsafe fn idle(_: idle::Context) -> ! {
+  |               ^^^^
+
+error: aborting due to previous error
+

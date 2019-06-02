@@ -1,0 +1,8 @@
+error: this resource is initialized by core 0
+  --> $DIR/init-late-twice.rs:13:30
+   |
+13 |     #[init(core = 1, late = [A])]
+   |                              ^
+
+error: aborting due to previous error
+

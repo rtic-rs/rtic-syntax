@@ -1,0 +1,8 @@
+error: argument appears more than once
+ --> $DIR/idle-double-resources.rs:5:29
+  |
+5 |     #[idle(resources = [A], resources = [B])]
+  |                             ^^^^^^^^^
+
+error: aborting due to previous error
+

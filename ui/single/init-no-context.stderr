@@ -1,0 +1,8 @@
+error: `init` must have type signature `fn(init::Context) [-> init::LateResources]`
+ --> $DIR/init-no-context.rs:6:8
+  |
+6 |     fn init() {}
+  |        ^^^^
+
+error: aborting due to previous error
+

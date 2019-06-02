@@ -1,0 +1,8 @@
+error: this resource is not being initialized
+ --> $DIR/init-late-uninitialized.rs:8:16
+  |
+8 |         static C: u32;
+  |                ^
+
+error: aborting due to previous error
+

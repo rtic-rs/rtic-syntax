@@ -1,0 +1,8 @@
+error: tasks cannot be named `init` or `idle`
+ --> $DIR/task-init.rs:6:8
+  |
+6 |     fn init(_: init::Context) {}
+  |        ^^^^
+
+error: aborting due to previous error
+

@@ -1,0 +1,8 @@
+error: this literal must be in the range 1...255
+ --> $DIR/task-priority-too-high.rs:5:23
+  |
+5 |     #[task(priority = 256)]
+  |                       ^^^
+
+error: aborting due to previous error
+

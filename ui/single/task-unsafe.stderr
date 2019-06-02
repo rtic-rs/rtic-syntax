@@ -1,0 +1,8 @@
+error: this task handler must have type signature `fn(foo::Context, ..)`
+ --> $DIR/task-unsafe.rs:6:15
+  |
+6 |     unsafe fn foo(_: foo::Context) {}
+  |               ^^^
+
+error: aborting due to previous error
+

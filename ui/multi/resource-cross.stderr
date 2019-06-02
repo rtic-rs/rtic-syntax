@@ -1,0 +1,8 @@
+error: `static mut` resources can NOT be accessed from different cores
+  --> $DIR/resource-cross.rs:10:35
+   |
+10 |     #[task(core = 1, resources = [X])]
+   |                                   ^
+
+error: aborting due to previous error
+

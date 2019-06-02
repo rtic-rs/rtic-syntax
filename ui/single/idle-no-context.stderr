@@ -1,0 +1,8 @@
+error: `idle` must have type signature `fn(idle::Context) -> !`
+ --> $DIR/idle-no-context.rs:6:8
+  |
+6 |     fn idle() -> ! {
+  |        ^^^^
+
+error: aborting due to previous error
+
