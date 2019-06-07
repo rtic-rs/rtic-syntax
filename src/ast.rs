@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 use syn::Path;
 use syn::{ArgCaptured, Attribute, Expr, Ident, Pat, Stmt, Token, Type};
 
-use crate::{Map, Set};
+use crate::{Core, Map, Set};
 
 /// The `#[app]` attribute
 #[derive(Debug)]
@@ -38,10 +38,13 @@ pub struct App {
     pub software_tasks: Map<SoftwareTask>,
 
     /// Interrupts used to dispatch software tasks
-    pub extern_interrupts: Map<ExternInterrupt>,
+    pub extern_interrupts: ExternInterrupts,
 
     pub(crate) _extensible: (),
 }
+
+/// Interrupts used to dispatch software tasks
+pub type ExternInterrupts = BTreeMap<Core, Map<ExternInterrupt>>;
 
 /// The arguments of the `#[app]` attribute
 #[derive(Debug)]
@@ -293,9 +296,6 @@ pub struct HardwareTaskArgs {
 pub struct ExternInterrupt {
     /// Attributes that will apply to this interrupt handler
     pub attrs: Vec<Attribute>,
-
-    /// Whether this interrupt is core specific: e.g. `#[cfg(core = "0")]`
-    pub core: Option<u8>,
 
     pub(crate) _extensible: (),
 }

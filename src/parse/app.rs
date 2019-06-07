@@ -13,8 +13,9 @@ use syn::{
 use super::Input;
 use crate::{
     ast::{
-        App, AppArgs, ExternInterrupt, HardwareTask, HardwareTaskArgs, HardwareTaskKind, Idle,
-        IdleArgs, Init, InitArgs, LateResource, Resource, SoftwareTask, SoftwareTaskArgs,
+        App, AppArgs, ExternInterrupt, ExternInterrupts, HardwareTask, HardwareTaskArgs,
+        HardwareTaskKind, Idle, IdleArgs, Init, InitArgs, LateResource, Resource, SoftwareTask,
+        SoftwareTaskArgs,
     },
     parse::util,
     Map, Settings,
@@ -115,7 +116,7 @@ impl App {
         let mut hardware_tasks = Map::new();
         let mut software_tasks = Map::new();
 
-        let mut extern_interrupts = Map::new();
+        let mut extern_interrupts = ExternInterrupts::new();
 
         let mut seen_idents = BTreeMap::<u8, HashSet<Ident>>::new();
         let mut bindings = BTreeMap::<u8, HashSet<Ident>>::new();
@@ -298,18 +299,37 @@ impl App {
 
                     for item in mod_.items {
                         match item {
-                            ForeignItem::Fn(ref item) if settings.parse_extern_interrupt => {
-                                match extern_interrupts.entry(item.ident.clone()) {
-                                    Entry::Occupied(..) => {
-                                        return Err(parse::Error::new(
-                                            item.ident.span(),
-                                            "this extern interrupt is listed more than once",
-                                        ));
-                                    }
+                            ForeignItem::Fn(item) => {
+                                if settings.parse_extern_interrupt {
+                                    let (core, ident, extern_interrupt) =
+                                        ExternInterrupt::parse(item, cores)?;
 
-                                    Entry::Vacant(entry) => {
-                                        entry.insert(ExternInterrupt::parse(item, cores)?);
+                                    let extern_interrupts =
+                                        extern_interrupts.entry(core).or_default();
+
+                                    let span = ident.span();
+                                    match extern_interrupts.entry(ident) {
+                                        Entry::Occupied(..) => {
+                                            return Err(parse::Error::new(
+                                                span,
+                                                if cores == 1 {
+                                                    "this extern interrupt is listed more than once"
+                                                } else {
+                                                    "this extern interrupt is listed more than once on \
+                                                 this core"
+                                                },
+                                            ));
+                                        }
+
+                                        Entry::Vacant(entry) => {
+                                            entry.insert(extern_interrupt);
+                                        }
                                     }
+                                } else {
+                                    return Err(parse::Error::new(
+                                        item.ident.span(),
+                                        "this item must live outside the `#[app]` module",
+                                    ));
                                 }
                             }
 
@@ -327,7 +347,12 @@ impl App {
                                     .insert(item.ident.clone(), LateResource::parse(item)?);
                             }
 
-                            _ => {}
+                            _ => {
+                                return Err(parse::Error::new(
+                                    item.span(),
+                                    "this item must live outside the `#[app]` module",
+                                ))
+                            }
                         }
                     }
                 }

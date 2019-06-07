@@ -9,9 +9,13 @@ fn ast_extern_interrupt_core() {
         quote!(
             const APP: () = {
                 extern "C" {
+                    #[core = 0]
                     fn a();
 
-                    #[cfg(core = "0")]
+                    #[core = 1]
+                    fn a();
+
+                    #[core = 1]
                     fn b();
                 }
             };
@@ -24,16 +28,22 @@ fn ast_extern_interrupt_core() {
     )
     .unwrap();
 
-    assert_eq!(app.extern_interrupts.len(), 2);
-
-    let mut interrupts = app.extern_interrupts.iter();
+    let interrupts0 = &app.extern_interrupts[&0];
+    assert_eq!(interrupts0.len(), 1);
+    let mut interrupts = interrupts0.iter();
     let (name, interrupt) = interrupts.next().unwrap();
     assert_eq!(name.to_string(), "a");
-    assert_eq!(interrupt.core, None);
+    assert!(interrupt.attrs.is_empty());
 
+    let interrupts1 = &app.extern_interrupts[&1];
+    assert_eq!(interrupts1.len(), 2);
+    let mut interrupts = interrupts1.iter();
+    let (name, interrupt) = interrupts.next().unwrap();
+    assert_eq!(name.to_string(), "a");
+    assert!(interrupt.attrs.is_empty());
     let (name, interrupt) = interrupts.next().unwrap();
     assert_eq!(name.to_string(), "b");
-    assert_eq!(interrupt.core, Some(0));
+    assert!(interrupt.attrs.is_empty());
 }
 
 #[test]
