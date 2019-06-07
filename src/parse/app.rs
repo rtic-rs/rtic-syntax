@@ -118,6 +118,25 @@ impl App {
         let mut extern_interrupts = Map::new();
 
         let mut seen_idents = BTreeMap::<u8, HashSet<Ident>>::new();
+        let mut bindings = BTreeMap::<u8, HashSet<Ident>>::new();
+        let mut check_binding = |core: u8, ident: &Ident| {
+            let bindings = bindings.entry(core).or_default();
+
+            if bindings.contains(ident) {
+                return Err(parse::Error::new(
+                    ident.span(),
+                    if cores == 1 {
+                        "a task has already been bound to this exception / interrupt"
+                    } else {
+                        "a task has already been bound to this exception / interrupt on this core"
+                    },
+                ));
+            } else {
+                bindings.insert(ident.clone());
+            }
+
+            Ok(())
+        };
         let mut check_ident = |core: u8, ident: &Ident| {
             let seen_idents = seen_idents.entry(core).or_default();
 
@@ -209,6 +228,7 @@ impl App {
                             span,
                         )?;
 
+                        check_binding(args.core, args.binds.as_ref().unwrap_or(&item.ident))?;
                         check_ident(args.core, &item.ident)?;
 
                         hardware_tasks.insert(

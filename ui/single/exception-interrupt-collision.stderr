@@ -1,0 +1,8 @@
+error: a task has already been bound to this exception / interrupt
+ --> $DIR/exception-interrupt-collision.rs:8:25
+  |
+8 |     #[interrupt(binds = UART0)]
+  |                         ^^^^^
+
+error: aborting due to previous error
+
