@@ -288,7 +288,7 @@ impl App {
                                     }
 
                                     Entry::Vacant(entry) => {
-                                        entry.insert(ExternInterrupt::parse(item)?);
+                                        entry.insert(ExternInterrupt::parse(item, cores)?);
                                     }
                                 }
                             }

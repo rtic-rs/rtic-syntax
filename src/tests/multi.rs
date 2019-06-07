@@ -3,6 +3,40 @@ use quote::quote;
 use crate::Settings;
 
 #[test]
+fn ast_extern_interrupt_core() {
+    let (app, _analysis) = crate::parse2(
+        quote!(cores = 2),
+        quote!(
+            const APP: () = {
+                extern "C" {
+                    fn a();
+
+                    #[cfg(core = "0")]
+                    fn b();
+                }
+            };
+        ),
+        Settings {
+            parse_cores: true,
+            parse_extern_interrupt: true,
+            ..Settings::default()
+        },
+    )
+    .unwrap();
+
+    assert_eq!(app.extern_interrupts.len(), 2);
+
+    let mut interrupts = app.extern_interrupts.iter();
+    let (name, interrupt) = interrupts.next().unwrap();
+    assert_eq!(name.to_string(), "a");
+    assert_eq!(interrupt.core, None);
+
+    let (name, interrupt) = interrupts.next().unwrap();
+    assert_eq!(name.to_string(), "b");
+    assert_eq!(interrupt.core, Some(0));
+}
+
+#[test]
 fn unused_resource() {
     // this shouldn't crash the analysis
     let (_app, analysis) = crate::parse2(

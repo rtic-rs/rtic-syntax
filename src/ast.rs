@@ -294,6 +294,9 @@ pub struct ExternInterrupt {
     /// Attributes that will apply to this interrupt handler
     pub attrs: Vec<Attribute>,
 
+    /// Whether this interrupt is core specific: e.g. `#[cfg(core = "0")]`
+    pub core: Option<u8>,
+
     pub(crate) _extensible: (),
 }
 

@@ -1,11 +1,11 @@
 use std::collections::HashSet;
 
 use syn::{
-    bracketed,
-    parse::{self, ParseStream},
+    bracketed, parenthesized,
+    parse::{self, Parse, ParseStream},
     punctuated::Punctuated,
     Abi, ArgCaptured, AttrStyle, Attribute, FnArg, ForeignItemFn, Ident, IntSuffix, Item, ItemFn,
-    ItemStatic, LitInt, Pat, PathArguments, ReturnType, Stmt, Token, Type, Visibility,
+    ItemStatic, LitInt, LitStr, Pat, PathArguments, ReturnType, Stmt, Token, Type, Visibility,
 };
 
 use crate::Set;
@@ -69,6 +69,47 @@ pub fn extract_cfgs(attrs: Vec<Attribute>) -> (Vec<Attribute>, Vec<Attribute>) {
     }
 
     (cfgs, not_cfgs)
+}
+
+pub fn extract_cfg_core(iattrs: &[Attribute], cores: u8) -> (Option<u8>, Vec<Attribute>) {
+    struct Cfg {
+        ident: Ident,
+        _eq: Token![=],
+        lit: LitStr,
+    }
+
+    impl Parse for Cfg {
+        fn parse(input: ParseStream<'_>) -> parse::Result<Self> {
+            let content;
+            parenthesized!(content in input);
+            Ok(Cfg {
+                ident: content.parse()?,
+                _eq: content.parse()?,
+                lit: content.parse()?,
+            })
+        }
+    }
+
+    let mut ocore = None;
+    let mut oattrs = vec![];
+    for attr in iattrs {
+        if attr_eq(attr, "cfg") {
+            if let Ok(cfg) = syn::parse2::<Cfg>(attr.tts.clone()) {
+                if cfg.ident.to_string() == "core" {
+                    if let Ok(core) = cfg.lit.value().parse::<u8>() {
+                        if core < cores {
+                            ocore = Some(core);
+                            continue;
+                        }
+                    }
+                }
+            }
+        }
+
+        oattrs.push(attr.clone());
+    }
+
+    (ocore, oattrs)
 }
 
 pub fn extract_locals(stmts: Vec<Stmt>) -> parse::Result<(Vec<ItemStatic>, Vec<Stmt>)> {
