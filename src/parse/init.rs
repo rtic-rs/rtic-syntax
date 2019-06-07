@@ -59,7 +59,7 @@ impl Init {
         Err(parse::Error::new(
             span,
             &format!(
-                "this `#[init]` must have type signature `fn({}::Context) [-> {0}::LateResources]`",
+                "this `#[init]` function must have signature `fn({}::Context) [-> {0}::LateResources]`",
                 name
             ),
         ))

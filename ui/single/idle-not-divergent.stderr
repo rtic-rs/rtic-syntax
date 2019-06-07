@@ -1,4 +1,4 @@
-error: `idle` must have type signature `fn(idle::Context) -> !`
+error: this `#[idle]` function must have signature `fn(idle::Context) -> !`
  --> $DIR/idle-not-divergent.rs:6:8
   |
 6 |     fn idle(_: idle::Context) {}

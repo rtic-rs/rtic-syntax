@@ -1,4 +1,4 @@
-error: `idle` must have type signature `fn(idle::Context) -> !`
+error: this `#[idle]` function must have signature `fn(idle::Context) -> !`
  --> $DIR/idle-unsafe.rs:6:15
   |
 6 |     unsafe fn idle(_: idle::Context) -> ! {

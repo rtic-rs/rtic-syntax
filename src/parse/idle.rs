@@ -53,7 +53,7 @@ impl Idle {
         Err(parse::Error::new(
             item.ident.span(),
             &format!(
-                "this `#[idle]` must have type signature `fn({}::Context) -> !`",
+                "this `#[idle]` function must have signature `fn({}::Context) -> !`",
                 name
             ),
         ))
