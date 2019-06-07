@@ -258,7 +258,7 @@ pub struct HardwareTask {
 }
 
 /// The types of hardware task
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum HardwareTaskKind {
     /// A core owned exception
     Exception,
