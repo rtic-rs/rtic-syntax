@@ -143,7 +143,8 @@ pub fn parse(
     parse2(args.into(), input.into(), settings)
 }
 
-fn parse2(
+/// `proc_macro2::TokenStream` version of `parse`
+pub fn parse2(
     args: TokenStream2,
     input: TokenStream2,
     ref settings: Settings,
