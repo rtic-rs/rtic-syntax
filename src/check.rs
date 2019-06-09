@@ -143,6 +143,20 @@ pub fn app(app: &App) -> parse::Result<()> {
         }
     }
 
+    // check that external interrupts are not used as hardware tasks
+    for (name, task) in &app.hardware_tasks {
+        let binds = task.args.binds(name);
+
+        if let Some(extern_interrupts) = app.extern_interrupts.get(&task.args.core) {
+            if extern_interrupts.contains_key(binds) {
+                return Err(parse::Error::new(
+                    binds.span(),
+                    "`extern` interrupts can't be used as hardware tasks",
+                ));
+            }
+        }
+    }
+
     // Check that all referenced tasks have been declared
     for task in app.task_references() {
         if !tasks_set.contains(task) {
