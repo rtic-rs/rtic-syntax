@@ -10,9 +10,7 @@ use crate::{ast::App, Core, Set};
 
 pub(crate) fn app(app: &App) -> Analysis {
     // a. Which core initializes which resources
-    // b. Location of resources
     let mut late_resources = LateResources::new();
-    let mut locations = Locations::new();
     if !app.late_resources.is_empty() {
         let mut resources = app.late_resources.keys().cloned().collect::<BTreeSet<_>>();
         let mut rest = None;
@@ -26,37 +24,13 @@ pub(crate) fn app(app: &App) -> Analysis {
                 let late_resources = late_resources.entry(core).or_default();
 
                 for name in &init.args.late {
-                    // (a)
                     late_resources.insert(name.clone());
                     resources.remove(name);
-
-                    // (b)
-                    if let Some(loc) = locations.get_mut(name) {
-                        if loc.is_some() && loc.as_ref() != Some(&core) {
-                            // cross-initialization
-                            *loc = None;
-                        }
-                    } else {
-                        locations.insert(name.clone(), Some(core));
-                    }
                 }
             }
         }
 
         if let Some(rest) = rest {
-            for name in &resources {
-                // (b)
-                if let Some(loc) = locations.get_mut(name) {
-                    if loc.is_some() && loc.as_ref() != Some(&rest) {
-                        // cross-initialization
-                        *loc = None;
-                    }
-                } else {
-                    locations.insert(name.clone(), Some(rest));
-                }
-            }
-
-            // (a)
             late_resources.insert(rest, resources);
         }
     }
@@ -66,9 +40,10 @@ pub(crate) fn app(app: &App) -> Analysis {
     // e. Location of resources
     // f. Cross initialization needs a post-initialization synchronization barrier
     let mut initialization_barriers = InitializationBarriers::new();
+    let mut locations = Locations::new();
     let mut ownerships = Ownerships::new();
-    let mut sync_types = Set::new();
     let mut ro_accesses = HashMap::new();
+    let mut sync_types = Set::new();
     for (core, prio, name) in app.resource_accesses() {
         let res = app.resource(name).expect("UNREACHABLE").0;
 
@@ -87,14 +62,28 @@ pub(crate) fn app(app: &App) -> Analysis {
 
         // (e)
         if let Some(loc) = locations.get_mut(name) {
-            if loc.is_some() && loc.as_ref() != Some(&core) {
-                // shared between different cores
-                *loc = None;
-            } else {
-                locations.insert(name.clone(), Some(core));
+            match *loc {
+                Location::Owned {
+                    core: other_core, ..
+                } => {
+                    if core != other_core {
+                        // sanity check: only `static` variables can be shared between cores
+                        debug_assert!(res.mutability.is_none());
+
+                        *loc = Location::Shared;
+                    }
+                }
+
+                Location::Shared => {}
             }
         } else {
-            locations.insert(name.clone(), Some(core));
+            locations.insert(
+                name.clone(),
+                Location::Owned {
+                    core,
+                    cross_initialized: false,
+                },
+            );
         }
 
         // (c)
@@ -143,12 +132,29 @@ pub(crate) fn app(app: &App) -> Analysis {
         }
     }
 
+    for (name, loc) in &mut locations {
+        if let Location::Owned {
+            core,
+            cross_initialized,
+        } = loc
+        {
+            for (&initializer, resources) in &late_resources {
+                if resources.contains(name) && *core != initializer {
+                    *cross_initialized = true;
+                }
+            }
+        }
+    }
+
     // Most late resources need to be `Send`
     let mut send_types = Set::new();
     let owned_by_idle = Ownership::Owned { priority: 0 };
     for (name, res) in app.late_resources.iter() {
         // cross-initialized || not owned by idle
-        if locations[name].is_none()
+        if locations
+            .get(name)
+            .map(|loc| loc.cross_initialized())
+            .unwrap_or(false)
             || ownerships
                 .get(name)
                 .map(|ownership| *ownership != owned_by_idle)
@@ -472,7 +478,7 @@ pub type FreeQueues = IndexMap<Task, BTreeMap<Sender, Ceiling>>;
 pub type LateResources = BTreeMap<Core, BTreeSet<Resource>>;
 
 /// Location of all *used* resources
-pub type Locations = IndexMap<Resource, Option<Core>>;
+pub type Locations = IndexMap<Resource, Location>;
 
 /// Resource ownership
 pub type Ownerships = IndexMap<Resource, Ownership>;
@@ -569,6 +575,42 @@ impl Ownership {
         match self {
             Ownership::Owned { .. } => true,
             _ => false,
+        }
+    }
+}
+
+/// Resource location
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Location {
+    /// `static [mut]` resource that resides in `core`
+    Owned {
+        /// Core on which this resource is located
+        core: u8,
+
+        /// Whether this resource is cross initialized
+        cross_initialized: bool,
+    },
+
+    /// `static` resource shared between different cores
+    Shared,
+}
+
+impl Location {
+    /// If resource is owned this returns the core on which is located
+    pub fn core(&self) -> Option<u8> {
+        match *self {
+            Location::Owned { core, .. } => Some(core),
+
+            Location::Shared => None,
+        }
+    }
+
+    fn cross_initialized(&self) -> bool {
+        match *self {
+            Location::Owned {
+                cross_initialized, ..
+            } => cross_initialized,
+            Location::Shared => false,
         }
     }
 }

@@ -1,7 +1,7 @@
 use syn::{Expr, Ident};
 
 use crate::{
-    analyze::Priority,
+    analyze::{Analysis, Location, Priority},
     ast::{App, HardwareTaskArgs, LateResource},
     Context, Core, Set,
 };
@@ -42,16 +42,16 @@ impl App {
             })
     }
 
-    /// Returns an iterator over all resources
-    pub fn resources(&self) -> impl Iterator<Item = (&Ident, &LateResource, Option<&Expr>)> {
-        self.late_resources
-            .iter()
-            .map(|(name, res)| (name, res, None))
-            .chain(
-                self.resources
-                    .iter()
-                    .map(|(name, res)| (name, &res.late, Some(&*res.expr))),
-            )
+    /// Returns an iterator over all *live* resources
+    pub fn resources<'a>(
+        &'a self,
+        analysis: &'a Analysis,
+    ) -> impl Iterator<Item = (&'a Ident, &'a LateResource, Option<&'a Expr>, Location)> {
+        analysis.locations.iter().map(move |(name, loc)| {
+            let (res, expr) = self.resource(name).expect("UNREACHABLE");
+
+            (name, res, expr, *loc)
+        })
     }
 
     /// Iterates over all spawn callers
