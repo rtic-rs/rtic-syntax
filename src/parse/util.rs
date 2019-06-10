@@ -233,7 +233,7 @@ pub fn type_is_bottom(ty: &ReturnType) -> bool {
     }
 }
 
-pub fn type_is_late_resources(ty: &ReturnType) -> Result<bool, ()> {
+pub fn type_is_late_resources(ty: &ReturnType, name: &str) -> Result<bool, ()> {
     match ty {
         ReturnType::Default => Ok(false),
 
@@ -247,7 +247,7 @@ pub fn type_is_late_resources(ty: &ReturnType) -> Result<bool, ()> {
             }
 
             Type::Path(_) => {
-                if type_is_path(ty, &["init", "LateResources"]) {
+                if type_is_path(ty, &[name, "LateResources"]) {
                     Ok(true)
                 } else {
                     Err(())
