@@ -1,7 +1,7 @@
 //! RTFM application analysis
 
 use core::cmp;
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{btree_map::Entry, BTreeMap, BTreeSet, HashMap};
 
 use indexmap::IndexMap;
 use syn::{Ident, Type};
@@ -292,7 +292,7 @@ pub(crate) fn app(app: &App) -> Analysis {
     // k. Ceiling analysis of free queues (consumer end point) -- second pass
     // l. Ceiling analysis of the channels (producer end point) -- second pass
     // m. Ceiling analysis of the timer queue
-    // n. Schedule barriers analysis (TODO)
+    // n. Spawn barriers analysis (schedule edition)
     // o. Send analysis
     for (scheduler_core, scheduler_prio, name) in app.schedule_calls() {
         let schedulee = &app.software_tasks[name];
@@ -301,6 +301,21 @@ pub(crate) fn app(app: &App) -> Analysis {
 
         let mut must_be_send = false;
         if scheduler_core != schedulee_core {
+            // (n)
+            match spawn_barriers
+                .entry(schedulee_core)
+                .or_default()
+                .entry(scheduler_core)
+            {
+                // NOTE `schedule`s always send messages from the timer queue handler so they never
+                // send messages during `init`
+                Entry::Vacant(entry) => {
+                    entry.insert(false);
+                }
+
+                Entry::Occupied(..) => {}
+            }
+
             // (o) messages that cross the core boundary need to be `Send`
             must_be_send = true;
         }
@@ -460,7 +475,7 @@ pub struct Analysis {
     /// Cross-core initialization barriers
     pub initialization_barriers: InitializationBarriers,
 
-    /// Spawn barriers
+    /// Cross-core spawn barriers
     pub spawn_barriers: SpawnBarriers,
 
     /// Timer queues
@@ -487,7 +502,7 @@ pub type Ownerships = IndexMap<Resource, Ownership>;
 pub type InitializationBarriers =
     BTreeMap</* user */ Receiver, BTreeSet</* initializer */ Sender>>;
 
-/// Spawn barriers
+/// Cross-core spawn barriers
 pub type SpawnBarriers =
     BTreeMap</* spawnee */ Receiver, BTreeMap</* spawner */ Sender, /* before_init */ bool>>;
 
