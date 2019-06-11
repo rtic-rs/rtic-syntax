@@ -1,19 +1,17 @@
 use std::collections::{BTreeMap, HashSet};
 
 use indexmap::map::Entry;
-#[cfg(feature = "device")]
-use proc_macro2::Span;
 use proc_macro2::TokenStream as TokenStream2;
 use syn::{
     parse::{self, ParseStream, Parser},
     spanned::Spanned,
-    ForeignItem, Ident, IntSuffix, Item, LitInt, Path, Token,
+    ForeignItem, Ident, IntSuffix, Item, LitBool, LitInt, Path, Token,
 };
 
 use super::Input;
 use crate::{
     ast::{
-        App, AppArgs, ExternInterrupt, ExternInterrupts, HardwareTask, HardwareTaskArgs,
+        App, AppArgs, CustomArg, ExternInterrupt, ExternInterrupts, HardwareTask, HardwareTaskArgs,
         HardwareTaskKind, Idle, IdleArgs, Init, InitArgs, LateResource, Resource, SoftwareTask,
         SoftwareTaskArgs,
     },
@@ -25,7 +23,8 @@ impl AppArgs {
     pub(crate) fn parse(tokens: TokenStream2, settings: &Settings) -> parse::Result<Self> {
         (|input: ParseStream<'_>| -> parse::Result<Self> {
             let mut cores = None;
-            let mut device = None::<Path>;
+            let mut custom = Map::new();
+
             loop {
                 if input.is_empty() {
                     break;
@@ -64,19 +63,33 @@ impl AppArgs {
                         cores = Some(val as u8);
                     }
 
-                    "device" if cfg!(feature = "device") => {
-                        if device.is_some() {
+                    _ => {
+                        if custom.contains_key(&ident) {
                             return Err(parse::Error::new(
                                 ident.span(),
                                 "argument appears more than once",
                             ));
                         }
 
-                        device = Some(input.parse()?);
-                    }
-
-                    _ => {
-                        return Err(parse::Error::new(ident.span(), "unexpected argument"));
+                        if let Ok(lit) = input.parse::<LitBool>() {
+                            custom.insert(ident, CustomArg::Bool(lit.value));
+                        } else if let Ok(lit) = input.parse::<LitInt>() {
+                            if lit.suffix() == IntSuffix::None {
+                                custom.insert(ident, CustomArg::UInt(lit.value()));
+                            } else {
+                                return Err(parse::Error::new(
+                                    ident.span(),
+                                    "argument has unexpected value",
+                                ));
+                            }
+                        } else if let Ok(p) = input.parse::<Path>() {
+                            custom.insert(ident, CustomArg::Path(p));
+                        } else {
+                            return Err(parse::Error::new(
+                                ident.span(),
+                                "argument has unexpected value",
+                            ));
+                        }
                     }
                 }
 
@@ -91,13 +104,7 @@ impl AppArgs {
             Ok(AppArgs {
                 cores: cores.unwrap_or(1),
 
-                #[cfg(feature = "device")]
-                device: device.ok_or(parse::Error::new(
-                    Span::call_site(),
-                    "`device` argument is required",
-                ))?,
-
-                _extensible: (),
+                custom,
             })
         })
         .parse2(tokens)

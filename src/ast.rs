@@ -3,9 +3,7 @@
 use core::ops::Deref;
 use std::collections::BTreeMap;
 
-#[cfg(feature = "device")]
-use syn::Path;
-use syn::{ArgCaptured, Attribute, Expr, Ident, Pat, Stmt, Token, Type};
+use syn::{ArgCaptured, Attribute, Expr, Ident, Pat, Path, Stmt, Token, Type};
 
 use crate::{Core, Map, Set};
 
@@ -52,11 +50,21 @@ pub struct AppArgs {
     /// The number of cores the application will use
     pub cores: u8,
 
-    /// Path to a "device" crate
-    #[cfg(feature = "device")]
-    pub device: Path,
+    /// Custom arguments
+    pub custom: Map<CustomArg>,
+}
 
-    pub(crate) _extensible: (),
+/// A custom argument
+#[derive(Debug)]
+pub enum CustomArg {
+    /// A boolean: `true` or `false`
+    Bool(bool),
+
+    /// An unsigned integer
+    UInt(u64),
+
+    /// An item path
+    Path(Path),
 }
 
 /// Per-core `init` functions
