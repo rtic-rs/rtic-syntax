@@ -7,9 +7,6 @@ matrix:
 
 before_install: set -e
 
-install:
-  - bash ci/install.sh
-
 script:
   - bash ci/script.sh
 

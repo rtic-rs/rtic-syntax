@@ -1,8 +1,8 @@
 #![no_main]
 
-#[mock::app]
+#[mock::app(parse_exception)]
 const APP: () = {
-    #[init]
+    #[exception]
     fn foo(_: foo::Context) {}
 
     // name collides with `#[idle]` function

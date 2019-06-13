@@ -1,5 +1,5 @@
-error: this identifier has already been used
-  --> $DIR/task-init.rs:10:8
+error: this task is defined multiple times
+  --> $DIR/task-exception.rs:10:8
    |
 10 |     fn foo(_: foo::Context) {}
    |        ^^^

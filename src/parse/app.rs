@@ -1,20 +1,19 @@
 use std::collections::{BTreeMap, HashSet};
 
 use indexmap::map::Entry;
-#[cfg(feature = "device")]
-use proc_macro2::Span;
 use proc_macro2::TokenStream as TokenStream2;
 use syn::{
     parse::{self, ParseStream, Parser},
     spanned::Spanned,
-    ForeignItem, Ident, IntSuffix, Item, LitInt, Path, Token,
+    ForeignItem, Ident, IntSuffix, Item, LitBool, LitInt, Path, Token,
 };
 
 use super::Input;
 use crate::{
     ast::{
-        App, AppArgs, ExternInterrupt, HardwareTask, HardwareTaskArgs, HardwareTaskKind, Idle,
-        IdleArgs, Init, InitArgs, LateResource, Resource, SoftwareTask, SoftwareTaskArgs,
+        App, AppArgs, CustomArg, ExternInterrupt, ExternInterrupts, HardwareTask, HardwareTaskArgs,
+        HardwareTaskKind, Idle, IdleArgs, Init, InitArgs, LateResource, Resource, SoftwareTask,
+        SoftwareTaskArgs,
     },
     parse::util,
     Map, Settings,
@@ -24,7 +23,8 @@ impl AppArgs {
     pub(crate) fn parse(tokens: TokenStream2, settings: &Settings) -> parse::Result<Self> {
         (|input: ParseStream<'_>| -> parse::Result<Self> {
             let mut cores = None;
-            let mut device = None::<Path>;
+            let mut custom = Map::new();
+
             loop {
                 if input.is_empty() {
                     break;
@@ -63,19 +63,33 @@ impl AppArgs {
                         cores = Some(val as u8);
                     }
 
-                    "device" if cfg!(feature = "device") => {
-                        if device.is_some() {
+                    _ => {
+                        if custom.contains_key(&ident) {
                             return Err(parse::Error::new(
                                 ident.span(),
                                 "argument appears more than once",
                             ));
                         }
 
-                        device = Some(input.parse()?);
-                    }
-
-                    _ => {
-                        return Err(parse::Error::new(ident.span(), "unexpected argument"));
+                        if let Ok(lit) = input.parse::<LitBool>() {
+                            custom.insert(ident, CustomArg::Bool(lit.value));
+                        } else if let Ok(lit) = input.parse::<LitInt>() {
+                            if lit.suffix() == IntSuffix::None {
+                                custom.insert(ident, CustomArg::UInt(lit.value()));
+                            } else {
+                                return Err(parse::Error::new(
+                                    ident.span(),
+                                    "argument has unexpected value",
+                                ));
+                            }
+                        } else if let Ok(p) = input.parse::<Path>() {
+                            custom.insert(ident, CustomArg::Path(p));
+                        } else {
+                            return Err(parse::Error::new(
+                                ident.span(),
+                                "argument has unexpected value",
+                            ));
+                        }
                     }
                 }
 
@@ -90,13 +104,7 @@ impl AppArgs {
             Ok(AppArgs {
                 cores: cores.unwrap_or(1),
 
-                #[cfg(feature = "device")]
-                device: device.ok_or(parse::Error::new(
-                    Span::call_site(),
-                    "`device` argument is required",
-                ))?,
-
-                _extensible: (),
+                custom,
             })
         })
         .parse2(tokens)
@@ -115,9 +123,28 @@ impl App {
         let mut hardware_tasks = Map::new();
         let mut software_tasks = Map::new();
 
-        let mut extern_interrupts = Map::new();
+        let mut extern_interrupts = ExternInterrupts::new();
 
         let mut seen_idents = BTreeMap::<u8, HashSet<Ident>>::new();
+        let mut bindings = BTreeMap::<u8, HashSet<Ident>>::new();
+        let mut check_binding = |core: u8, ident: &Ident| {
+            let bindings = bindings.entry(core).or_default();
+
+            if bindings.contains(ident) {
+                return Err(parse::Error::new(
+                    ident.span(),
+                    if cores == 1 {
+                        "a task has already been bound to this exception / interrupt"
+                    } else {
+                        "a task has already been bound to this exception / interrupt on this core"
+                    },
+                ));
+            } else {
+                bindings.insert(ident.clone());
+            }
+
+            Ok(())
+        };
         let mut check_ident = |core: u8, ident: &Ident| {
             let seen_idents = seen_idents.entry(core).or_default();
 
@@ -209,6 +236,7 @@ impl App {
                             span,
                         )?;
 
+                        check_binding(args.core, args.binds.as_ref().unwrap_or(&item.ident))?;
                         check_ident(args.core, &item.ident)?;
 
                         hardware_tasks.insert(
@@ -278,18 +306,37 @@ impl App {
 
                     for item in mod_.items {
                         match item {
-                            ForeignItem::Fn(ref item) if settings.parse_extern_interrupt => {
-                                match extern_interrupts.entry(item.ident.clone()) {
-                                    Entry::Occupied(..) => {
-                                        return Err(parse::Error::new(
-                                            item.ident.span(),
-                                            "this extern interrupt is listed more than once",
-                                        ));
-                                    }
+                            ForeignItem::Fn(item) => {
+                                if settings.parse_extern_interrupt {
+                                    let (core, ident, extern_interrupt) =
+                                        ExternInterrupt::parse(item, cores)?;
 
-                                    Entry::Vacant(entry) => {
-                                        entry.insert(ExternInterrupt::parse(item)?);
+                                    let extern_interrupts =
+                                        extern_interrupts.entry(core).or_default();
+
+                                    let span = ident.span();
+                                    match extern_interrupts.entry(ident) {
+                                        Entry::Occupied(..) => {
+                                            return Err(parse::Error::new(
+                                                span,
+                                                if cores == 1 {
+                                                    "this extern interrupt is listed more than once"
+                                                } else {
+                                                    "this extern interrupt is listed more than once on \
+                                                 this core"
+                                                },
+                                            ));
+                                        }
+
+                                        Entry::Vacant(entry) => {
+                                            entry.insert(extern_interrupt);
+                                        }
                                     }
+                                } else {
+                                    return Err(parse::Error::new(
+                                        item.ident.span(),
+                                        "this item must live outside the `#[app]` module",
+                                    ));
                                 }
                             }
 
@@ -307,7 +354,12 @@ impl App {
                                     .insert(item.ident.clone(), LateResource::parse(item)?);
                             }
 
-                            _ => {}
+                            _ => {
+                                return Err(parse::Error::new(
+                                    item.span(),
+                                    "this item must live outside the `#[app]` module",
+                                ))
+                            }
                         }
                     }
                 }

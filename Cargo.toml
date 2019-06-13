@@ -23,9 +23,6 @@ mock = { path = "mock" }
 compiletest_rs = "0.3.22"
 quote = "0.6.12"
 
-[features]
-device = []
-
 [workspace]
 members = [
   "mock",

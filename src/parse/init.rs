@@ -28,7 +28,9 @@ impl Init {
         let name = item.ident.to_string();
 
         if valid_signature {
-            if let Ok(returns_late_resources) = util::type_is_late_resources(&item.decl.output) {
+            if let Ok(returns_late_resources) =
+                util::type_is_late_resources(&item.decl.output, &name)
+            {
                 if let Some((context, Ok(rest))) = util::parse_inputs(item.decl.inputs, &name) {
                     if rest.is_empty() {
                         if !returns_late_resources && !args.late.is_empty() {
@@ -59,7 +61,7 @@ impl Init {
         Err(parse::Error::new(
             span,
             &format!(
-                "this `#[init]` must have type signature `fn({}::Context) [-> {0}::LateResources]`",
+                "this `#[init]` function must have signature `fn({}::Context) [-> {0}::LateResources]`",
                 name
             ),
         ))

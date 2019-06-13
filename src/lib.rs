@@ -114,6 +114,46 @@ impl<'a> Context<'a> {
     pub fn runs_once(&self) -> bool {
         self.is_init() || self.is_idle()
     }
+
+    /// Whether this context has local `static` variables
+    pub fn has_locals(&self, app: &App) -> bool {
+        match *self {
+            Context::HardwareTask(name) => !app.hardware_tasks[name].locals.is_empty(),
+            Context::Idle(core) => !app.idles[&core].locals.is_empty(),
+            Context::Init(core) => !app.inits[&core].locals.is_empty(),
+            Context::SoftwareTask(name) => !app.software_tasks[name].locals.is_empty(),
+        }
+    }
+
+    /// Whether this context has resources
+    pub fn has_resources(&self, app: &App) -> bool {
+        match *self {
+            Context::HardwareTask(name) => !app.hardware_tasks[name].args.resources.is_empty(),
+            Context::Idle(core) => !app.idles[&core].args.resources.is_empty(),
+            Context::Init(core) => !app.inits[&core].args.resources.is_empty(),
+            Context::SoftwareTask(name) => !app.software_tasks[name].args.resources.is_empty(),
+        }
+    }
+
+    /// Whether this context may use the `schedule` API
+    pub fn uses_schedule(&self, app: &App) -> bool {
+        match *self {
+            Context::HardwareTask(name) => !app.hardware_tasks[name].args.schedule.is_empty(),
+            Context::Idle(core) => !app.idles[&core].args.schedule.is_empty(),
+            Context::Init(core) => !app.inits[&core].args.schedule.is_empty(),
+            Context::SoftwareTask(name) => !app.software_tasks[name].args.schedule.is_empty(),
+        }
+    }
+
+    /// Whether this context may use the `spawn` API
+    pub fn uses_spawn(&self, app: &App) -> bool {
+        match *self {
+            Context::HardwareTask(name) => !app.hardware_tasks[name].args.spawn.is_empty(),
+            Context::Idle(core) => !app.idles[&core].args.spawn.is_empty(),
+            Context::Init(core) => !app.inits[&core].args.spawn.is_empty(),
+            Context::SoftwareTask(name) => !app.software_tasks[name].args.spawn.is_empty(),
+        }
+    }
 }
 
 /// Parser and optimizer configuration
@@ -143,7 +183,8 @@ pub fn parse(
     parse2(args.into(), input.into(), settings)
 }
 
-fn parse2(
+/// `proc_macro2::TokenStream` version of `parse`
+pub fn parse2(
     args: TokenStream2,
     input: TokenStream2,
     ref settings: Settings,

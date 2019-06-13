@@ -1,8 +1,9 @@
 use std::collections::HashSet;
 
+use proc_macro2::Span;
 use syn::{
     bracketed,
-    parse::{self, ParseStream},
+    parse::{self, Parse, ParseStream},
     punctuated::Punctuated,
     Abi, ArgCaptured, AttrStyle, Attribute, FnArg, ForeignItemFn, Ident, IntSuffix, Item, ItemFn,
     ItemStatic, LitInt, Pat, PathArguments, ReturnType, Stmt, Token, Type, Visibility,
@@ -69,6 +70,54 @@ pub fn extract_cfgs(attrs: Vec<Attribute>) -> (Vec<Attribute>, Vec<Attribute>) {
     }
 
     (cfgs, not_cfgs)
+}
+
+/// `#[core = 0]`
+pub fn extract_core(
+    mut attrs: Vec<Attribute>,
+    cores: u8,
+    span: Span,
+) -> parse::Result<(u8, Vec<Attribute>)> {
+    struct Rhs {
+        _eq: Token![=],
+        lit: LitInt,
+    }
+
+    impl Parse for Rhs {
+        fn parse(input: ParseStream<'_>) -> parse::Result<Self> {
+            Ok(Rhs {
+                _eq: input.parse()?,
+                lit: input.parse()?,
+            })
+        }
+    }
+
+    let mut res = None;
+    for (pos, attr) in attrs.iter().enumerate() {
+        if attr_eq(attr, "core") {
+            if let Ok(rhs) = syn::parse2::<Rhs>(attr.tts.clone()) {
+                if rhs.lit.suffix() == IntSuffix::None {
+                    let core = rhs.lit.value();
+
+                    if core < u64::from(cores) {
+                        res = Some((pos, core as u8));
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    let (pos, core) = res.ok_or_else(|| {
+        parse::Error::new(
+            span,
+            "core needs to be specified using the `#[core = 0]` attribute",
+        )
+    })?;
+
+    attrs.remove(pos);
+
+    Ok((core, attrs))
 }
 
 pub fn extract_locals(stmts: Vec<Stmt>) -> parse::Result<(Vec<ItemStatic>, Vec<Stmt>)> {
@@ -184,7 +233,7 @@ pub fn type_is_bottom(ty: &ReturnType) -> bool {
     }
 }
 
-pub fn type_is_late_resources(ty: &ReturnType) -> Result<bool, ()> {
+pub fn type_is_late_resources(ty: &ReturnType, name: &str) -> Result<bool, ()> {
     match ty {
         ReturnType::Default => Ok(false),
 
@@ -198,7 +247,7 @@ pub fn type_is_late_resources(ty: &ReturnType) -> Result<bool, ()> {
             }
 
             Type::Path(_) => {
-                if type_is_path(ty, &["init", "LateResources"]) {
+                if type_is_path(ty, &[name, "LateResources"]) {
                     Ok(true)
                 } else {
                     Err(())

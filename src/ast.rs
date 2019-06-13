@@ -3,11 +3,9 @@
 use core::ops::Deref;
 use std::collections::BTreeMap;
 
-#[cfg(feature = "device")]
-use syn::Path;
-use syn::{ArgCaptured, Attribute, Expr, Ident, Pat, Stmt, Token, Type};
+use syn::{ArgCaptured, Attribute, Expr, Ident, Pat, Path, Stmt, Token, Type};
 
-use crate::{Map, Set};
+use crate::{Core, Map, Set};
 
 /// The `#[app]` attribute
 #[derive(Debug)]
@@ -38,10 +36,13 @@ pub struct App {
     pub software_tasks: Map<SoftwareTask>,
 
     /// Interrupts used to dispatch software tasks
-    pub extern_interrupts: Map<ExternInterrupt>,
+    pub extern_interrupts: ExternInterrupts,
 
     pub(crate) _extensible: (),
 }
+
+/// Interrupts used to dispatch software tasks
+pub type ExternInterrupts = BTreeMap<Core, Map<ExternInterrupt>>;
 
 /// The arguments of the `#[app]` attribute
 #[derive(Debug)]
@@ -49,11 +50,21 @@ pub struct AppArgs {
     /// The number of cores the application will use
     pub cores: u8,
 
-    /// Path to a "device" crate
-    #[cfg(feature = "device")]
-    pub device: Path,
+    /// Custom arguments
+    pub custom: Map<CustomArg>,
+}
 
-    pub(crate) _extensible: (),
+/// A custom argument
+#[derive(Debug)]
+pub enum CustomArg {
+    /// A boolean: `true` or `false`
+    Bool(bool),
+
+    /// An unsigned integer
+    UInt(u64),
+
+    /// An item path
+    Path(Path),
 }
 
 /// Per-core `init` functions
@@ -255,7 +266,7 @@ pub struct HardwareTask {
 }
 
 /// The types of hardware task
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum HardwareTaskKind {
     /// A core owned exception
     Exception,

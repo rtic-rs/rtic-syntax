@@ -1,7 +1,7 @@
 //! RTFM application analysis
 
 use core::cmp;
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{btree_map::Entry, BTreeMap, BTreeSet, HashMap};
 
 use indexmap::IndexMap;
 use syn::{Ident, Type};
@@ -10,9 +10,7 @@ use crate::{ast::App, Core, Set};
 
 pub(crate) fn app(app: &App) -> Analysis {
     // a. Which core initializes which resources
-    // b. Location of resources
     let mut late_resources = LateResources::new();
-    let mut locations = Locations::new();
     if !app.late_resources.is_empty() {
         let mut resources = app.late_resources.keys().cloned().collect::<BTreeSet<_>>();
         let mut rest = None;
@@ -26,37 +24,13 @@ pub(crate) fn app(app: &App) -> Analysis {
                 let late_resources = late_resources.entry(core).or_default();
 
                 for name in &init.args.late {
-                    // (a)
                     late_resources.insert(name.clone());
                     resources.remove(name);
-
-                    // (b)
-                    if let Some(loc) = locations.get_mut(name) {
-                        if loc.is_some() && loc.as_ref() != Some(&core) {
-                            // cross-initialization
-                            *loc = None;
-                        }
-                    } else {
-                        locations.insert(name.clone(), Some(core));
-                    }
                 }
             }
         }
 
         if let Some(rest) = rest {
-            for name in &resources {
-                // (b)
-                if let Some(loc) = locations.get_mut(name) {
-                    if loc.is_some() && loc.as_ref() != Some(&rest) {
-                        // cross-initialization
-                        *loc = None;
-                    }
-                } else {
-                    locations.insert(name.clone(), Some(rest));
-                }
-            }
-
-            // (a)
             late_resources.insert(rest, resources);
         }
     }
@@ -66,9 +40,10 @@ pub(crate) fn app(app: &App) -> Analysis {
     // e. Location of resources
     // f. Cross initialization needs a post-initialization synchronization barrier
     let mut initialization_barriers = InitializationBarriers::new();
+    let mut locations = Locations::new();
     let mut ownerships = Ownerships::new();
-    let mut sync_types = Set::new();
     let mut ro_accesses = HashMap::new();
+    let mut sync_types = SyncTypes::new();
     for (core, prio, name) in app.resource_accesses() {
         let res = app.resource(name).expect("UNREACHABLE").0;
 
@@ -78,7 +53,11 @@ pub(crate) fn app(app: &App) -> Analysis {
                 if other_core != core {
                     // a resources accessed from different cores needs to be `Sync` regardless of
                     // priorities
-                    sync_types.insert(res.ty.clone());
+                    sync_types.entry(core).or_default().insert(res.ty.clone());
+                    sync_types
+                        .entry(other_core)
+                        .or_default()
+                        .insert(res.ty.clone());
                 }
             } else {
                 ro_accesses.insert(name, core);
@@ -87,14 +66,33 @@ pub(crate) fn app(app: &App) -> Analysis {
 
         // (e)
         if let Some(loc) = locations.get_mut(name) {
-            if loc.is_some() && loc.as_ref() != Some(&core) {
-                // shared between different cores
-                *loc = None;
-            } else {
-                locations.insert(name.clone(), Some(core));
+            match loc {
+                Location::Owned {
+                    core: other_core, ..
+                } => {
+                    if core != *other_core {
+                        // sanity check: only `static` variables can be shared between cores
+                        debug_assert!(res.mutability.is_none());
+
+                        let mut cores = BTreeSet::new();
+                        cores.insert(core);
+                        cores.insert(*other_core);
+                        *loc = Location::Shared { cores };
+                    }
+                }
+
+                Location::Shared { cores } => {
+                    cores.insert(core);
+                }
             }
         } else {
-            locations.insert(name.clone(), Some(core));
+            locations.insert(
+                name.clone(),
+                Location::Owned {
+                    core,
+                    cross_initialized: false,
+                },
+            );
         }
 
         // (c)
@@ -111,7 +109,7 @@ pub(crate) fn app(app: &App) -> Analysis {
                         };
 
                         if res.mutability.is_none() {
-                            sync_types.insert(res.ty.clone());
+                            sync_types.entry(core).or_default().insert(res.ty.clone());
                         }
                     }
 
@@ -143,18 +141,51 @@ pub(crate) fn app(app: &App) -> Analysis {
         }
     }
 
+    for (name, loc) in &mut locations {
+        if let Location::Owned {
+            core,
+            cross_initialized,
+        } = loc
+        {
+            for (&initializer, resources) in &late_resources {
+                if resources.contains(name) && *core != initializer {
+                    *cross_initialized = true;
+                }
+            }
+        }
+    }
+
     // Most late resources need to be `Send`
-    let mut send_types = Set::new();
+    let mut send_types = SendTypes::new();
     let owned_by_idle = Ownership::Owned { priority: 0 };
     for (name, res) in app.late_resources.iter() {
         // cross-initialized || not owned by idle
-        if locations[name].is_none()
+        if locations
+            .get(name)
+            .map(|loc| loc.cross_initialized())
+            .unwrap_or(false)
             || ownerships
                 .get(name)
                 .map(|ownership| *ownership != owned_by_idle)
                 .unwrap_or(false)
         {
-            send_types.insert((*res.ty).clone());
+            if let Some(loc) = locations.get(name) {
+                match loc {
+                    Location::Owned { core, .. } => {
+                        send_types
+                            .entry(*core)
+                            .or_default()
+                            .insert((*res.ty).clone());
+                    }
+
+                    Location::Shared { cores } => cores.iter().for_each(|&core| {
+                        send_types
+                            .entry(core)
+                            .or_default()
+                            .insert((*res.ty).clone());
+                    }),
+                }
+            }
         }
     }
 
@@ -162,7 +193,23 @@ pub(crate) fn app(app: &App) -> Analysis {
     for name in app.inits.values().flat_map(|init| &init.args.resources) {
         if let Some(ownership) = ownerships.get(name) {
             if *ownership != owned_by_idle {
-                send_types.insert((*app.resources[name].ty).clone());
+                if let Some(loc) = locations.get(name) {
+                    match loc {
+                        Location::Owned { core, .. } => {
+                            send_types
+                                .entry(*core)
+                                .or_default()
+                                .insert((*app.resources[name].ty).clone());
+                        }
+
+                        Location::Shared { cores } => cores.iter().for_each(|&core| {
+                            send_types
+                                .entry(core)
+                                .or_default()
+                                .insert((*app.resources[name].ty).clone());
+                        }),
+                    }
+                }
             }
         }
     }
@@ -277,6 +324,16 @@ pub(crate) fn app(app: &App) -> Analysis {
         }
 
         if must_be_send {
+            {
+                let send_types = send_types.entry(spawner_core).or_default();
+
+                spawnee.inputs.iter().for_each(|input| {
+                    send_types.insert(input.ty.clone());
+                });
+            }
+
+            let send_types = send_types.entry(spawnee_core).or_default();
+
             spawnee.inputs.iter().for_each(|input| {
                 send_types.insert(input.ty.clone());
             });
@@ -286,7 +343,7 @@ pub(crate) fn app(app: &App) -> Analysis {
     // k. Ceiling analysis of free queues (consumer end point) -- second pass
     // l. Ceiling analysis of the channels (producer end point) -- second pass
     // m. Ceiling analysis of the timer queue
-    // n. Schedule barriers analysis (TODO)
+    // n. Spawn barriers analysis (schedule edition)
     // o. Send analysis
     for (scheduler_core, scheduler_prio, name) in app.schedule_calls() {
         let schedulee = &app.software_tasks[name];
@@ -295,6 +352,21 @@ pub(crate) fn app(app: &App) -> Analysis {
 
         let mut must_be_send = false;
         if scheduler_core != schedulee_core {
+            // (n)
+            match spawn_barriers
+                .entry(schedulee_core)
+                .or_default()
+                .entry(scheduler_core)
+            {
+                // NOTE `schedule`s always send messages from the timer queue handler so they never
+                // send messages during `init`
+                Entry::Vacant(entry) => {
+                    entry.insert(false);
+                }
+
+                Entry::Occupied(..) => {}
+            }
+
             // (o) messages that cross the core boundary need to be `Send`
             must_be_send = true;
         }
@@ -344,6 +416,16 @@ pub(crate) fn app(app: &App) -> Analysis {
         }
 
         if must_be_send {
+            {
+                let send_types = send_types.entry(scheduler_core).or_default();
+
+                schedulee.inputs.iter().for_each(|input| {
+                    send_types.insert(input.ty.clone());
+                });
+            }
+
+            let send_types = send_types.entry(schedulee_core).or_default();
+
             schedulee.inputs.iter().for_each(|input| {
                 send_types.insert(input.ty.clone());
             });
@@ -446,15 +528,15 @@ pub struct Analysis {
     pub ownerships: Ownerships,
 
     /// These types must implement the `Send` trait
-    pub send_types: Set<Type>,
+    pub send_types: SendTypes,
 
     /// These types must implement the `Sync` trait
-    pub sync_types: Set<Box<Type>>,
+    pub sync_types: SyncTypes,
 
     /// Cross-core initialization barriers
     pub initialization_barriers: InitializationBarriers,
 
-    /// Spawn barriers
+    /// Cross-core spawn barriers
     pub spawn_barriers: SpawnBarriers,
 
     /// Timer queues
@@ -472,16 +554,22 @@ pub type FreeQueues = IndexMap<Task, BTreeMap<Sender, Ceiling>>;
 pub type LateResources = BTreeMap<Core, BTreeSet<Resource>>;
 
 /// Location of all *used* resources
-pub type Locations = IndexMap<Resource, Option<Core>>;
+pub type Locations = IndexMap<Resource, Location>;
 
 /// Resource ownership
 pub type Ownerships = IndexMap<Resource, Ownership>;
+
+/// These types must implement the `Send` trait
+pub type SendTypes = BTreeMap<Core, Set<Type>>;
+
+/// These types must implement the `Sync` trait
+pub type SyncTypes = BTreeMap<Core, Set<Box<Type>>>;
 
 /// Cross-core initialization barriers
 pub type InitializationBarriers =
     BTreeMap</* user */ Receiver, BTreeSet</* initializer */ Sender>>;
 
-/// Spawn barriers
+/// Cross-core spawn barriers
 pub type SpawnBarriers =
     BTreeMap</* spawnee */ Receiver, BTreeMap</* spawner */ Sender, /* before_init */ bool>>;
 
@@ -569,6 +657,45 @@ impl Ownership {
         match self {
             Ownership::Owned { .. } => true,
             _ => false,
+        }
+    }
+}
+
+/// Resource location
+#[derive(Clone, Debug, PartialEq)]
+pub enum Location {
+    /// `static [mut]` resource that resides in `core`
+    Owned {
+        /// Core on which this resource is located
+        core: u8,
+
+        /// Whether this resource is cross initialized
+        cross_initialized: bool,
+    },
+
+    /// `static` resource shared between different cores
+    Shared {
+        /// Cores that share access to this resource
+        cores: BTreeSet<Core>,
+    },
+}
+
+impl Location {
+    /// If resource is owned this returns the core on which is located
+    pub fn core(&self) -> Option<u8> {
+        match *self {
+            Location::Owned { core, .. } => Some(core),
+
+            Location::Shared { .. } => None,
+        }
+    }
+
+    fn cross_initialized(&self) -> bool {
+        match *self {
+            Location::Owned {
+                cross_initialized, ..
+            } => cross_initialized,
+            Location::Shared { .. } => false,
         }
     }
 }
