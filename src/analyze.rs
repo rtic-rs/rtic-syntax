@@ -43,7 +43,7 @@ pub(crate) fn app(app: &App) -> Analysis {
     let mut locations = Locations::new();
     let mut ownerships = Ownerships::new();
     let mut ro_accesses = HashMap::new();
-    let mut sync_types = Set::new();
+    let mut sync_types = SyncTypes::new();
     for (core, prio, name) in app.resource_accesses() {
         let res = app.resource(name).expect("UNREACHABLE").0;
 
@@ -53,7 +53,11 @@ pub(crate) fn app(app: &App) -> Analysis {
                 if other_core != core {
                     // a resources accessed from different cores needs to be `Sync` regardless of
                     // priorities
-                    sync_types.insert(res.ty.clone());
+                    sync_types.entry(core).or_default().insert(res.ty.clone());
+                    sync_types
+                        .entry(other_core)
+                        .or_default()
+                        .insert(res.ty.clone());
                 }
             } else {
                 ro_accesses.insert(name, core);
@@ -62,19 +66,24 @@ pub(crate) fn app(app: &App) -> Analysis {
 
         // (e)
         if let Some(loc) = locations.get_mut(name) {
-            match *loc {
+            match loc {
                 Location::Owned {
                     core: other_core, ..
                 } => {
-                    if core != other_core {
+                    if core != *other_core {
                         // sanity check: only `static` variables can be shared between cores
                         debug_assert!(res.mutability.is_none());
 
-                        *loc = Location::Shared;
+                        let mut cores = BTreeSet::new();
+                        cores.insert(core);
+                        cores.insert(*other_core);
+                        *loc = Location::Shared { cores };
                     }
                 }
 
-                Location::Shared => {}
+                Location::Shared { cores } => {
+                    cores.insert(core);
+                }
             }
         } else {
             locations.insert(
@@ -100,7 +109,7 @@ pub(crate) fn app(app: &App) -> Analysis {
                         };
 
                         if res.mutability.is_none() {
-                            sync_types.insert(res.ty.clone());
+                            sync_types.entry(core).or_default().insert(res.ty.clone());
                         }
                     }
 
@@ -147,7 +156,7 @@ pub(crate) fn app(app: &App) -> Analysis {
     }
 
     // Most late resources need to be `Send`
-    let mut send_types = Set::new();
+    let mut send_types = SendTypes::new();
     let owned_by_idle = Ownership::Owned { priority: 0 };
     for (name, res) in app.late_resources.iter() {
         // cross-initialized || not owned by idle
@@ -160,7 +169,23 @@ pub(crate) fn app(app: &App) -> Analysis {
                 .map(|ownership| *ownership != owned_by_idle)
                 .unwrap_or(false)
         {
-            send_types.insert((*res.ty).clone());
+            if let Some(loc) = locations.get(name) {
+                match loc {
+                    Location::Owned { core, .. } => {
+                        send_types
+                            .entry(*core)
+                            .or_default()
+                            .insert((*res.ty).clone());
+                    }
+
+                    Location::Shared { cores } => cores.iter().for_each(|&core| {
+                        send_types
+                            .entry(core)
+                            .or_default()
+                            .insert((*res.ty).clone());
+                    }),
+                }
+            }
         }
     }
 
@@ -168,7 +193,23 @@ pub(crate) fn app(app: &App) -> Analysis {
     for name in app.inits.values().flat_map(|init| &init.args.resources) {
         if let Some(ownership) = ownerships.get(name) {
             if *ownership != owned_by_idle {
-                send_types.insert((*app.resources[name].ty).clone());
+                if let Some(loc) = locations.get(name) {
+                    match loc {
+                        Location::Owned { core, .. } => {
+                            send_types
+                                .entry(*core)
+                                .or_default()
+                                .insert((*app.resources[name].ty).clone());
+                        }
+
+                        Location::Shared { cores } => cores.iter().for_each(|&core| {
+                            send_types
+                                .entry(core)
+                                .or_default()
+                                .insert((*app.resources[name].ty).clone());
+                        }),
+                    }
+                }
             }
         }
     }
@@ -283,6 +324,16 @@ pub(crate) fn app(app: &App) -> Analysis {
         }
 
         if must_be_send {
+            {
+                let send_types = send_types.entry(spawner_core).or_default();
+
+                spawnee.inputs.iter().for_each(|input| {
+                    send_types.insert(input.ty.clone());
+                });
+            }
+
+            let send_types = send_types.entry(spawnee_core).or_default();
+
             spawnee.inputs.iter().for_each(|input| {
                 send_types.insert(input.ty.clone());
             });
@@ -365,6 +416,16 @@ pub(crate) fn app(app: &App) -> Analysis {
         }
 
         if must_be_send {
+            {
+                let send_types = send_types.entry(scheduler_core).or_default();
+
+                schedulee.inputs.iter().for_each(|input| {
+                    send_types.insert(input.ty.clone());
+                });
+            }
+
+            let send_types = send_types.entry(schedulee_core).or_default();
+
             schedulee.inputs.iter().for_each(|input| {
                 send_types.insert(input.ty.clone());
             });
@@ -467,10 +528,10 @@ pub struct Analysis {
     pub ownerships: Ownerships,
 
     /// These types must implement the `Send` trait
-    pub send_types: Set<Type>,
+    pub send_types: SendTypes,
 
     /// These types must implement the `Sync` trait
-    pub sync_types: Set<Box<Type>>,
+    pub sync_types: SyncTypes,
 
     /// Cross-core initialization barriers
     pub initialization_barriers: InitializationBarriers,
@@ -497,6 +558,12 @@ pub type Locations = IndexMap<Resource, Location>;
 
 /// Resource ownership
 pub type Ownerships = IndexMap<Resource, Ownership>;
+
+/// These types must implement the `Send` trait
+pub type SendTypes = BTreeMap<Core, Set<Type>>;
+
+/// These types must implement the `Sync` trait
+pub type SyncTypes = BTreeMap<Core, Set<Box<Type>>>;
 
 /// Cross-core initialization barriers
 pub type InitializationBarriers =
@@ -595,7 +662,7 @@ impl Ownership {
 }
 
 /// Resource location
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Location {
     /// `static [mut]` resource that resides in `core`
     Owned {
@@ -607,7 +674,10 @@ pub enum Location {
     },
 
     /// `static` resource shared between different cores
-    Shared,
+    Shared {
+        /// Cores that share access to this resource
+        cores: BTreeSet<Core>,
+    },
 }
 
 impl Location {
@@ -616,7 +686,7 @@ impl Location {
         match *self {
             Location::Owned { core, .. } => Some(core),
 
-            Location::Shared => None,
+            Location::Shared { .. } => None,
         }
     }
 
@@ -625,7 +695,7 @@ impl Location {
             Location::Owned {
                 cross_initialized, ..
             } => cross_initialized,
-            Location::Shared => false,
+            Location::Shared { .. } => false,
         }
     }
 }

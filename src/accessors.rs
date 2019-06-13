@@ -46,11 +46,11 @@ impl App {
     pub fn resources<'a>(
         &'a self,
         analysis: &'a Analysis,
-    ) -> impl Iterator<Item = (&'a Ident, &'a LateResource, Option<&'a Expr>, Location)> {
+    ) -> impl Iterator<Item = (&'a Ident, &'a LateResource, Option<&'a Expr>, &'a Location)> {
         analysis.locations.iter().map(move |(name, loc)| {
             let (res, expr) = self.resource(name).expect("UNREACHABLE");
 
-            (name, res, expr, *loc)
+            (name, res, expr, loc)
         })
     }
 
