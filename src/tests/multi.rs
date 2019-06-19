@@ -1,6 +1,6 @@
 use quote::quote;
 
-use crate::Settings;
+use crate::{analyze::Location, Settings};
 
 #[test]
 fn ast_extern_interrupt_core() {
@@ -182,11 +182,23 @@ fn location_resource() {
 
     let (name, loc) = analysis.locations.get_index(0).unwrap();
     assert_eq!(name.to_string(), "X");
-    assert_eq!(*loc, Some(0));
+    assert_eq!(
+        *loc,
+        Location::Owned {
+            core: 0,
+            cross_initialized: false
+        }
+    );
 
     let (name, loc) = analysis.locations.get_index(1).unwrap();
     assert_eq!(name.to_string(), "Y");
-    assert_eq!(*loc, Some(1));
+    assert_eq!(
+        *loc,
+        Location::Owned {
+            core: 1,
+            cross_initialized: false
+        }
+    );
 }
 
 #[test]
@@ -248,8 +260,8 @@ fn send_spawn() {
     )
     .unwrap();
 
-    assert_eq!(analysis.send_types.len(), 1);
-    let ty = analysis.send_types.iter().next().unwrap();
+    assert_eq!(analysis.send_types[&1].len(), 1);
+    let ty = analysis.send_types[&1].iter().next().unwrap();
     assert_eq!(quote!(#ty).to_string(), "X");
 }
 
@@ -279,8 +291,8 @@ fn send_schedule() {
     )
     .unwrap();
 
-    assert_eq!(analysis.send_types.len(), 1);
-    let ty = analysis.send_types.iter().next().unwrap();
+    assert_eq!(analysis.send_types[&1].len(), 1);
+    let ty = analysis.send_types[&1].iter().next().unwrap();
     assert_eq!(quote!(#ty).to_string(), "X");
 }
 
@@ -311,7 +323,10 @@ fn sync() {
     )
     .unwrap();
 
-    let ty = analysis.sync_types.iter().next().unwrap();
+    let ty = analysis.sync_types[&0].iter().next().unwrap();
+    assert_eq!(quote!(#ty).to_string(), "i32");
+
+    let ty = analysis.sync_types[&1].iter().next().unwrap();
     assert_eq!(quote!(#ty).to_string(), "i32");
 }
 
