@@ -202,7 +202,7 @@ fn send_spawn() {
     )
     .unwrap();
 
-    let ty = analysis.send_types.iter().next().unwrap();
+    let ty = analysis.send_types[&0].iter().next().unwrap();
     assert_eq!(quote!(#ty).to_string(), "X");
 }
 
@@ -227,7 +227,7 @@ fn send_schedule() {
     )
     .unwrap();
 
-    let ty = analysis.send_types.iter().next().unwrap();
+    let ty = analysis.send_types[&0].iter().next().unwrap();
     assert_eq!(quote!(#ty).to_string(), "X");
 }
 
@@ -255,7 +255,7 @@ fn send_late_resource() {
     )
     .unwrap();
 
-    let ty = analysis.send_types.iter().next().unwrap();
+    let ty = analysis.send_types[&0].iter().next().unwrap();
     assert_eq!(quote!(#ty).to_string(), "X");
 }
 
@@ -279,7 +279,7 @@ fn send_shared_with_init() {
     )
     .unwrap();
 
-    let ty = analysis.send_types.iter().next().unwrap();
+    let ty = analysis.send_types[&0].iter().next().unwrap();
     assert_eq!(quote!(#ty).to_string(), "i32");
 }
 
@@ -326,7 +326,7 @@ fn sync() {
     )
     .unwrap();
 
-    let ty = analysis.sync_types.iter().next().unwrap();
+    let ty = analysis.sync_types[&0].iter().next().unwrap();
     assert_eq!(quote!(#ty).to_string(), "i32");
 }
 
