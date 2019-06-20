@@ -144,8 +144,8 @@ pub fn app(app: &App) -> parse::Result<()> {
     }
 
     // check that external interrupts are not used as hardware tasks
-    for (name, task) in &app.hardware_tasks {
-        let binds = task.args.binds(name);
+    for task in app.hardware_tasks.values() {
+        let binds = &task.args.binds;
 
         if let Some(extern_interrupts) = app.extern_interrupts.get(&task.args.core) {
             if extern_interrupts.contains_key(binds) {

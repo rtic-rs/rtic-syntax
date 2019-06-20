@@ -2,7 +2,7 @@ use syn::{Expr, Ident};
 
 use crate::{
     analyze::{Analysis, Location, Priority},
-    ast::{App, HardwareTaskArgs, LateResource},
+    ast::{App, LateResource},
     Context, Core, Set,
 };
 
@@ -239,12 +239,5 @@ impl App {
                     .values()
                     .flat_map(|task| task.args.spawn.iter().chain(&task.args.schedule)),
             )
-    }
-}
-
-impl HardwareTaskArgs {
-    /// Returns the name of the exception / interrupt this handler binds to
-    pub fn binds<'a>(&'a self, handler: &'a Ident) -> &'a Ident {
-        self.binds.as_ref().unwrap_or(handler)
     }
 }

@@ -1,8 +1,8 @@
-error: a task has already been bound to this exception / interrupt
- --> $DIR/interrupt-double.rs:8:25
+error: a task has already been bound to this interrupt
+ --> $DIR/interrupt-double.rs:8:20
   |
-8 |     #[interrupt(binds = UART0)]
-  |                         ^^^^^
+8 |     #[task(binds = UART0)]
+  |                    ^^^^^
 
 error: aborting due to previous error
 

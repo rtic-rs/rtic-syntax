@@ -29,7 +29,7 @@ pub struct App {
     /// Early (compile time initialized) resources
     pub resources: Map<Resource>,
 
-    /// Hardware tasks: `#[exception]`s & `#[interrupt]`s
+    /// Hardware tasks: `#[task(binds = ..)]`s
     pub hardware_tasks: Map<HardwareTask>,
 
     /// Software tasks: `#[task]`
@@ -243,11 +243,23 @@ pub struct SoftwareTaskArgs {
     pub(crate) _extensible: (),
 }
 
+impl Default for SoftwareTaskArgs {
+    fn default() -> Self {
+        Self {
+            core: 0,
+            capacity: 1,
+            priority: 1,
+            resources: Set::new(),
+            spawn: Set::new(),
+            schedule: Set::new(),
+            _extensible: (),
+        }
+    }
+}
+
 /// A hardware task
 #[derive(Debug)]
 pub struct HardwareTask {
-    /// What kind of hardware task this is
-    pub kind: HardwareTaskKind,
     /// Hardware task metadata
     pub args: HardwareTaskArgs,
 
@@ -265,16 +277,6 @@ pub struct HardwareTask {
     pub(crate) _extensible: (),
 }
 
-/// The types of hardware task
-#[derive(Debug, PartialEq)]
-pub enum HardwareTaskKind {
-    /// A core owned exception
-    Exception,
-
-    /// A device shared interrupt
-    Interrupt,
-}
-
 /// Hardware task metadata
 #[derive(Debug)]
 pub struct HardwareTaskArgs {
@@ -282,7 +284,7 @@ pub struct HardwareTaskArgs {
     pub core: u8,
 
     /// The interrupt or exception that this task is bound to
-    pub(crate) binds: Option<Ident>,
+    pub binds: Ident,
 
     /// The priority of this task
     pub priority: u8,

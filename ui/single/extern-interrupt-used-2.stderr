@@ -1,8 +1,0 @@
-error: `extern` interrupts can't be used as hardware tasks
- --> $DIR/extern-interrupt-used-2.rs:6:8
-  |
-6 |     fn EXTI0(_: EXTI0::Context) {}
-  |        ^^^^^
-
-error: aborting due to previous error
-

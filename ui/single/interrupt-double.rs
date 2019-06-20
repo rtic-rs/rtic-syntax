@@ -1,10 +1,10 @@
 #![no_main]
 
-#[mock::app(parse_interrupt)]
+#[mock::app(parse_binds)]
 const APP: () = {
-    #[interrupt(binds = UART0)]
+    #[task(binds = UART0)]
     fn foo(_: foo::Context) {}
 
-    #[interrupt(binds = UART0)]
+    #[task(binds = UART0)]
     fn bar(_: bar::Context) {}
 };
