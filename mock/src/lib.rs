@@ -14,12 +14,10 @@ pub fn app(args: TokenStream, input: TokenStream) -> TokenStream {
     for arg in args.to_string().split(',') {
         if arg.trim() == "parse_cores" {
             settings.parse_cores = true;
-        } else if arg.trim() == "parse_exception" {
-            settings.parse_exception = true;
+        } else if arg.trim() == "parse_binds" {
+            settings.parse_binds = true;
         } else if arg.trim() == "parse_extern_interrupt" {
             settings.parse_extern_interrupt = true;
-        } else if arg.trim() == "parse_interrupt" {
-            settings.parse_interrupt = true;
         } else if arg.trim() == "parse_schedule" {
             settings.parse_schedule = true;
         } else {

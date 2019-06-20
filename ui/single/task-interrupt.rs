@@ -1,11 +1,10 @@
 #![no_main]
 
-#[mock::app(parse_exception)]
+#[mock::app(parse_binds)]
 const APP: () = {
-    #[exception]
+    #[task(binds = SysTick)]
     fn foo(_: foo::Context) {}
 
-    // name collides with `#[idle]` function
     #[task]
     fn foo(_: foo::Context) {}
 };

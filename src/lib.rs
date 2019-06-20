@@ -159,12 +159,10 @@ impl<'a> Context<'a> {
 /// Parser and optimizer configuration
 #[derive(Default)]
 pub struct Settings {
+    /// Whether to accept the `binds` argument in `#[task]` or not
+    pub parse_binds: bool,
     /// Whether to accept the `cores`, `core` and `late` arguments or not
     pub parse_cores: bool,
-    /// Whether to accept the `#[exception]` attribute or not
-    pub parse_exception: bool,
-    /// Whether to accept the `#[interrupt]` attribute or not
-    pub parse_interrupt: bool,
     /// Whether to parse `extern` interrupts (functions) or not
     pub parse_extern_interrupt: bool,
     /// Whether to accept the `schedule` argument or not
@@ -172,6 +170,8 @@ pub struct Settings {
 
     /// Whether to "compress" priorities or not
     pub optimize_priorities: bool,
+
+    _extensible: (),
 }
 
 /// Parses the input of the `#[app]` attribute
@@ -195,4 +195,9 @@ pub fn parse2(
     let analysis = analyze::app(&app);
 
     Ok((P::new(app), P::new(analysis)))
+}
+
+enum Either<A, B> {
+    Left(A),
+    Right(B),
 }

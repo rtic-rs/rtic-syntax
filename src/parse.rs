@@ -18,8 +18,8 @@ use syn::{
 };
 
 use crate::{
-    ast::{App, AppArgs, InitArgs},
-    Set, Settings,
+    ast::{App, AppArgs, HardwareTaskArgs, InitArgs, SoftwareTaskArgs},
+    Either, Set, Settings,
 };
 
 pub fn app(args: TokenStream2, input: TokenStream2, settings: &Settings) -> parse::Result<App> {
@@ -217,41 +217,22 @@ fn init_idle_args(
     .parse2(tokens)
 }
 
-#[derive(Debug)]
-pub(crate) struct TaskArgs {
-    pub binds: Option<Ident>,
-    pub capacity: Option<u8>,
-    pub core: Option<u8>,
-    pub priority: u8,
-    pub resources: Set<Ident>,
-    pub schedule: Set<Ident>,
-    pub spawn: Set<Ident>,
-}
-
-impl Default for TaskArgs {
-    fn default() -> Self {
-        Self {
-            core: None,
-            binds: None,
-            capacity: None,
-            priority: 1,
-            resources: Set::new(),
-            schedule: Set::new(),
-            spawn: Set::new(),
-        }
-    }
-}
-
 fn task_args(
     tokens: TokenStream2,
     cores: u8,
     settings: &Settings,
-    accepts_binds: bool,
-    accepts_capacity: bool,
-) -> parse::Result<TaskArgs> {
-    (|input: ParseStream<'_>| -> parse::Result<TaskArgs> {
+    span: Span,
+) -> parse::Result<Either<HardwareTaskArgs, SoftwareTaskArgs>> {
+    (|input: ParseStream<'_>| -> parse::Result<Either<HardwareTaskArgs, SoftwareTaskArgs>> {
         if input.is_empty() {
-            return Ok(TaskArgs::default());
+            if cores != 1 {
+                return Err(parse::Error::new(
+                    span,
+                    "this task must be assigned to a core",
+                ));
+            } else {
+                return Ok(Either::Right(SoftwareTaskArgs::default()));
+            }
         }
 
         let mut binds = None;
@@ -275,11 +256,18 @@ fn task_args(
 
             let ident_s = ident.to_string();
             match &*ident_s {
-                "binds" if accepts_binds => {
+                "binds" if settings.parse_binds => {
                     if binds.is_some() {
                         return Err(parse::Error::new(
                             ident.span(),
                             "argument appears more than once",
+                        ));
+                    }
+
+                    if capacity.is_some() {
+                        return Err(parse::Error::new(
+                            ident.span(),
+                            "hardware tasks can't use the `capacity` argument",
                         ));
                     }
 
@@ -289,11 +277,18 @@ fn task_args(
                     binds = Some(ident);
                 }
 
-                "capacity" if accepts_capacity => {
+                "capacity" => {
                     if capacity.is_some() {
                         return Err(parse::Error::new(
                             ident.span(),
                             "argument appears more than once",
+                        ));
+                    }
+
+                    if binds.is_some() {
+                        return Err(parse::Error::new(
+                            ident.span(),
+                            "hardware tasks can't use the `capacity` argument",
                         ));
                     }
 
@@ -417,14 +412,44 @@ fn task_args(
             let _: Token![,] = content.parse()?;
         }
 
-        Ok(TaskArgs {
-            core,
-            binds,
-            capacity,
-            priority: priority.unwrap_or(1),
-            resources: resources.unwrap_or(Set::new()),
-            schedule: schedule.unwrap_or(Set::new()),
-            spawn: spawn.unwrap_or(Set::new()),
+        let core = if cores == 1 {
+            0
+        } else {
+            if let Some(core) = core {
+                core
+            } else {
+                return Err(parse::Error::new(
+                    span,
+                    "this task must be assigned to a core",
+                ));
+            }
+        };
+
+        let priority = priority.unwrap_or(1);
+        let resources = resources.unwrap_or(Set::new());
+        let schedule = schedule.unwrap_or(Set::new());
+        let spawn = spawn.unwrap_or(Set::new());
+
+        Ok(if let Some(binds) = binds {
+            Either::Left(HardwareTaskArgs {
+                core,
+                binds,
+                priority,
+                resources,
+                schedule,
+                spawn,
+                _extensible: (),
+            })
+        } else {
+            Either::Right(SoftwareTaskArgs {
+                core,
+                capacity: capacity.unwrap_or(1),
+                priority,
+                resources,
+                schedule,
+                spawn,
+                _extensible: (),
+            })
         })
     })
     .parse2(tokens)

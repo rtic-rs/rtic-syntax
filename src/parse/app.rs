@@ -11,12 +11,11 @@ use syn::{
 use super::Input;
 use crate::{
     ast::{
-        App, AppArgs, CustomArg, ExternInterrupt, ExternInterrupts, HardwareTask, HardwareTaskArgs,
-        HardwareTaskKind, Idle, IdleArgs, Init, InitArgs, LateResource, Resource, SoftwareTask,
-        SoftwareTaskArgs,
+        App, AppArgs, CustomArg, ExternInterrupt, ExternInterrupts, HardwareTask, Idle, IdleArgs,
+        Init, InitArgs, LateResource, Resource, SoftwareTask,
     },
     parse::util,
-    Map, Settings,
+    Either, Map, Settings,
 };
 
 impl AppArgs {
@@ -134,9 +133,9 @@ impl App {
                 return Err(parse::Error::new(
                     ident.span(),
                     if cores == 1 {
-                        "a task has already been bound to this exception / interrupt"
+                        "a task has already been bound to this interrupt"
                     } else {
-                        "a task has already been bound to this exception / interrupt on this core"
+                        "a task has already been bound to this interrupt on this core"
                     },
                 ));
             } else {
@@ -164,7 +163,6 @@ impl App {
             Ok(())
         };
         for item in input.items {
-            let mut is_exception = false;
             match item {
                 Item::Fn(mut item) => {
                     let span = item.ident.span();
@@ -212,45 +210,6 @@ impl App {
                         check_ident(args.core, &item.ident)?;
 
                         idles.insert(args.core, Idle::parse(args, item)?);
-                    } else if let Some(pos) = item.attrs.iter().position(|attr| {
-                        if settings.parse_exception && util::attr_eq(attr, "exception") {
-                            is_exception = true;
-                            true
-                        } else {
-                            settings.parse_interrupt && util::attr_eq(attr, "interrupt")
-                        }
-                    }) {
-                        if hardware_tasks.contains_key(&item.ident)
-                            || software_tasks.contains_key(&item.ident)
-                        {
-                            return Err(parse::Error::new(
-                                span,
-                                "this task is defined multiple times",
-                            ));
-                        }
-
-                        let args = HardwareTaskArgs::parse(
-                            cores,
-                            item.attrs.remove(pos).tts,
-                            settings,
-                            span,
-                        )?;
-
-                        check_binding(args.core, args.binds.as_ref().unwrap_or(&item.ident))?;
-                        check_ident(args.core, &item.ident)?;
-
-                        hardware_tasks.insert(
-                            item.ident.clone(),
-                            HardwareTask::parse(
-                                args,
-                                if is_exception {
-                                    HardwareTaskKind::Exception
-                                } else {
-                                    HardwareTaskKind::Interrupt
-                                },
-                                item,
-                            )?,
-                        );
                     } else if let Some(pos) = item
                         .attrs
                         .iter()
@@ -265,16 +224,27 @@ impl App {
                             ));
                         }
 
-                        let args = SoftwareTaskArgs::parse(
-                            cores,
+                        match crate::parse::task_args(
                             item.attrs.remove(pos).tts,
+                            cores,
                             settings,
                             span,
-                        )?;
+                        )? {
+                            Either::Left(args) => {
+                                check_binding(args.core, &args.binds)?;
+                                check_ident(args.core, &item.ident)?;
 
-                        check_ident(args.core, &item.ident)?;
+                                hardware_tasks
+                                    .insert(item.ident.clone(), HardwareTask::parse(args, item)?);
+                            }
 
-                        software_tasks.insert(item.ident.clone(), SoftwareTask::parse(args, item)?);
+                            Either::Right(args) => {
+                                check_ident(args.core, &item.ident)?;
+
+                                software_tasks
+                                    .insert(item.ident.clone(), SoftwareTask::parse(args, item)?);
+                            }
+                        }
                     } else {
                         return Err(parse::Error::new(
                             span,

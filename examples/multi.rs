@@ -1,6 +1,6 @@
 //! Full syntax for multi core
 
-#[mock::app(cores = 2, parse_cores, parse_exception, parse_interrupt)]
+#[mock::app(cores = 2, parse_cores, parse_binds)]
 const APP: () = {
     extern "C" {
         static A: u32;
@@ -49,15 +49,15 @@ const APP: () = {
         static mut X: u32 = 0;
     }
 
-    #[exception(core = 0, binds = SysTick)]
+    #[task(core = 0, binds = SysTick)]
     fn e0(_: e0::Context) {}
 
-    #[exception(core = 1, binds = SysTick)]
+    #[task(core = 1, binds = SysTick)]
     fn e1(_: e1::Context) {}
 
-    #[interrupt(core = 0, binds = UART0)]
+    #[task(core = 0, binds = UART0)]
     fn i0(_: i0::Context) {}
 
-    #[interrupt(core = 1, binds = UART0)]
+    #[task(core = 1, binds = UART0)]
     fn i1(_: i1::Context) {}
 };

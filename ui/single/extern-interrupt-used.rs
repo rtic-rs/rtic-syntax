@@ -1,8 +1,8 @@
 #![no_main]
 
-#[mock::app(parse_extern_interrupt, parse_interrupt)]
+#[mock::app(parse_extern_interrupt, parse_binds)]
 const APP: () = {
-    #[interrupt(binds = EXTI0)]
+    #[task(binds = EXTI0)]
     fn foo(_: foo::Context) {}
 
     extern "C" {
