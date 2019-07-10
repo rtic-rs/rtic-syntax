@@ -42,16 +42,20 @@ pub fn app(app: &App) -> parse::Result<()> {
         }
     }
 
+    // Check that init only has `Access::Exclusive` resources
     // Check that late resources have NOT been assigned to `init`
-    for res in app
-        .inits
-        .values()
-        .flat_map(|init| init.args.resources.keys())
-    {
-        if app.late_resources.contains_key(res) {
+    for (name, access) in app.inits.values().flat_map(|init| &init.args.resources) {
+        if app.late_resources.contains_key(name) {
             return Err(parse::Error::new(
-                res.span(),
+                name.span(),
                 "late resources can NOT be assigned to `init`",
+            ));
+        }
+
+        if access.is_shared() {
+            return Err(parse::Error::new(
+                name.span(),
+                "`init` has direct exclusive access to resources; use `x` instead of `&x` ",
             ));
         }
     }
