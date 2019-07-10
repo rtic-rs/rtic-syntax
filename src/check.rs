@@ -33,8 +33,20 @@ pub fn app(app: &App) -> parse::Result<()> {
 
     // Check that no resource has both types of access (`Exclusive` & `Shared`)
     // TODO we want to allow this in the future (but behind a `Settings` feature gate)
+    // accesses from `init` are not consider `Exclusive` accesses because `init` doesn't use the
+    // `lock` API
+    let exclusive_accesses = app
+        .resource_accesses()
+        .filter_map(|(_, priority, name, access)| {
+            if priority.is_some() && access.is_exclusive() {
+                Some(name)
+            } else {
+                None
+            }
+        })
+        .collect::<HashSet<_>>();
     for (_, _, name, access) in app.resource_accesses() {
-        if access.is_shared() && owners.contains_key(name) {
+        if access.is_shared() && exclusive_accesses.contains(name) {
             return Err(parse::Error::new(
                 name.span(),
                 "this implementation doesn't support shared (`&-`) - exclusive (`&mut-`) locks; use `x` instead of `&x`",

@@ -5,7 +5,8 @@ use proc_macro2::TokenStream as TokenStream2;
 use syn::{
     parse::{self, ParseStream, Parser},
     spanned::Spanned,
-    Fields, ForeignItem, Ident, IntSuffix, Item, LitBool, LitInt, Path, Token, Visibility,
+    ExprParen, Fields, ForeignItem, Ident, IntSuffix, Item, LitBool, LitInt, Path, Token,
+    Visibility,
 };
 
 use super::Input;
@@ -279,7 +280,6 @@ impl App {
                                 ));
                             }
 
-                            let late = LateResource::parse(field, ident.span())?;
                             if let Some(pos) = field
                                 .attrs
                                 .iter()
@@ -287,14 +287,18 @@ impl App {
                             {
                                 let attr = field.attrs.remove(pos);
 
+                                let late = LateResource::parse(field, ident.span())?;
+
                                 resources.insert(
                                     ident.clone(),
                                     Resource {
                                         late,
-                                        expr: syn::parse2(attr.tts)?,
+                                        expr: syn::parse2::<ExprParen>(attr.tts)?.expr,
                                     },
                                 );
                             } else {
+                                let late = LateResource::parse(field, ident.span())?;
+
                                 late_resources.insert(ident.clone(), late);
                             }
                         }
