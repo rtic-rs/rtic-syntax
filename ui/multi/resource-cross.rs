@@ -2,11 +2,13 @@
 
 #[mock::app(cores = 2, parse_cores)]
 const APP: () = {
-    static mut X: u32 = 0;
+    struct Resources {
+        x: u32,
+    }
 
-    #[task(core = 0, resources = [X])]
+    #[task(core = 0, resources = [x])]
     fn foo(_: foo::Context) {}
 
-    #[task(core = 1, resources = [X])]
+    #[task(core = 1, resources = [x])]
     fn bar(_: bar::Context) {}
 };

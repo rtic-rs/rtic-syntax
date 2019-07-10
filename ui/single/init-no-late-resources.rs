@@ -2,8 +2,8 @@
 
 #[mock::app]
 const APP: () = {
-    extern "C" {
-        static X: u32;
+    struct Resources {
+        x: u32,
     }
 
     #[init]

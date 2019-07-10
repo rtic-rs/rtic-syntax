@@ -10,6 +10,10 @@ name = "rtfm-syntax"
 repository = "https://github.com/japaric/rtfm-syntax"
 version = "0.4.0-alpha.1"
 
+[[test]]
+name = "ui"
+required-features = ["compiletest_rs"]
+
 [dependencies]
 indexmap = "1.0.2"
 proc-macro2 = "0.4.30"
@@ -20,8 +24,11 @@ version = "0.15.34"
 
 [dev-dependencies]
 mock = { path = "mock" }
-compiletest_rs = "0.3.22"
 quote = "0.6.12"
+
+[dependencies.compiletest_rs]
+optional = true
+version = "0.3.22"
 
 [workspace]
 members = [

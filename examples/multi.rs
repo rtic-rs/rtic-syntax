@@ -2,49 +2,50 @@
 
 #[mock::app(cores = 2, parse_cores, parse_binds)]
 const APP: () = {
-    extern "C" {
-        static A: u32;
-        static mut B: u32;
+    struct Resources {
+        a: u32,
+        b: u32,
+        #[init(0)]
+        c: u32,
+        #[init(0)]
+        d: u32,
     }
 
-    static C: u32 = 0;
-    static mut D: u32 = 0;
-
-    #[init(core = 0, late = [A], spawn = [foo, bar])]
+    #[init(core = 0, late = [a], spawn = [foo, bar])]
     fn init(_: init::Context) -> init::LateResources {
         #[cfg(debug_assertions)]
         static mut X: u32 = 0;
 
-        init::LateResources { A: 0 }
+        init::LateResources { a: 0 }
     }
 
     #[init(core = 1, spawn = [foo, bar])]
     fn init(_: init::Context) -> init::LateResources {
         static mut X: u32 = 0;
 
-        init::LateResources { B: 0 }
+        init::LateResources { b: 0 }
     }
 
-    #[idle(core = 0, spawn = [foo, bar])]
+    #[idle(core = 0, spawn = [foo, bar], resources = [&a, b, &c])]
     fn idle(_: idle::Context) -> ! {
         static mut X: u32 = 0;
 
         loop {}
     }
 
-    #[idle(core = 1, spawn = [foo, bar])]
+    #[idle(core = 1, spawn = [foo, bar], resources = [&a, &c, d])]
     fn idle(_: idle::Context) -> ! {
         static mut X: u32 = 0;
 
         loop {}
     }
 
-    #[task(core = 0, spawn = [bar])]
+    #[task(core = 0, spawn = [bar], resources = [b])]
     fn foo(_: foo::Context, _: u32) {
         static mut X: u32 = 0;
     }
 
-    #[task(core = 1, spawn = [foo])]
+    #[task(core = 1, spawn = [foo], resources = [d])]
     fn bar(_: bar::Context) {
         static mut X: u32 = 0;
     }

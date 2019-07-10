@@ -5,7 +5,7 @@ use proc_macro2::TokenStream as TokenStream2;
 use syn::{
     parse::{self, ParseStream, Parser},
     spanned::Spanned,
-    ForeignItem, Ident, IntSuffix, Item, LitBool, LitInt, Path, Token,
+    Fields, ForeignItem, Ident, IntSuffix, Item, LitBool, LitInt, Path, Token, Visibility,
 };
 
 use super::Input;
@@ -162,7 +162,7 @@ impl App {
 
             Ok(())
         };
-        for item in input.items {
+        for mut item in input.items {
             match item {
                 Item::Fn(mut item) => {
                     let span = item.ident.span();
@@ -253,17 +253,57 @@ impl App {
                     }
                 }
 
-                Item::Static(item) => {
-                    if late_resources.contains_key(&item.ident)
-                        || resources.contains_key(&item.ident)
-                    {
+                Item::Struct(ref mut item) if item.ident.to_string() == "Resources" => {
+                    if item.vis != Visibility::Inherited {
                         return Err(parse::Error::new(
-                            item.ident.span(),
-                            "this resource is listed more than once",
+                            item.span(),
+                            "this item must have inherited / private visibility",
                         ));
                     }
 
-                    resources.insert(item.ident.clone(), Resource::parse(item)?);
+                    if !item.attrs.is_empty() {
+                        return Err(parse::Error::new(
+                            item.span(),
+                            "this item must have no attributes",
+                        ));
+                    }
+
+                    if let Fields::Named(fields) = &mut item.fields {
+                        for field in &mut fields.named {
+                            let ident = field.ident.as_ref().expect("UNREACHABLE");
+
+                            if late_resources.contains_key(ident) || resources.contains_key(ident) {
+                                return Err(parse::Error::new(
+                                    ident.span(),
+                                    "this resource is listed more than once",
+                                ));
+                            }
+
+                            let late = LateResource::parse(field, ident.span())?;
+                            if let Some(pos) = field
+                                .attrs
+                                .iter()
+                                .position(|attr| util::attr_eq(attr, "init"))
+                            {
+                                let attr = field.attrs.remove(pos);
+
+                                resources.insert(
+                                    ident.clone(),
+                                    Resource {
+                                        late,
+                                        expr: syn::parse2(attr.tts)?,
+                                    },
+                                );
+                            } else {
+                                late_resources.insert(ident.clone(), late);
+                            }
+                        }
+                    } else {
+                        return Err(parse::Error::new(
+                            item.span(),
+                            "this `struct` must have named fields",
+                        ));
+                    }
                 }
 
                 Item::ForeignMod(mod_) => {
@@ -275,61 +315,42 @@ impl App {
                     }
 
                     for item in mod_.items {
-                        match item {
-                            ForeignItem::Fn(item) => {
-                                if settings.parse_extern_interrupt {
-                                    let (core, ident, extern_interrupt) =
-                                        ExternInterrupt::parse(item, cores)?;
+                        if let ForeignItem::Fn(item) = item {
+                            if settings.parse_extern_interrupt {
+                                let (core, ident, extern_interrupt) =
+                                    ExternInterrupt::parse(item, cores)?;
 
-                                    let extern_interrupts =
-                                        extern_interrupts.entry(core).or_default();
+                                let extern_interrupts = extern_interrupts.entry(core).or_default();
 
-                                    let span = ident.span();
-                                    match extern_interrupts.entry(ident) {
-                                        Entry::Occupied(..) => {
-                                            return Err(parse::Error::new(
-                                                span,
-                                                if cores == 1 {
-                                                    "this extern interrupt is listed more than once"
-                                                } else {
-                                                    "this extern interrupt is listed more than once on \
+                                let span = ident.span();
+                                match extern_interrupts.entry(ident) {
+                                    Entry::Occupied(..) => {
+                                        return Err(parse::Error::new(
+                                            span,
+                                            if cores == 1 {
+                                                "this extern interrupt is listed more than once"
+                                            } else {
+                                                "this extern interrupt is listed more than once on \
                                                  this core"
-                                                },
-                                            ));
-                                        }
-
-                                        Entry::Vacant(entry) => {
-                                            entry.insert(extern_interrupt);
-                                        }
+                                            },
+                                        ));
                                     }
-                                } else {
-                                    return Err(parse::Error::new(
-                                        item.ident.span(),
-                                        "this item must live outside the `#[app]` module",
-                                    ));
+
+                                    Entry::Vacant(entry) => {
+                                        entry.insert(extern_interrupt);
+                                    }
                                 }
-                            }
-
-                            ForeignItem::Static(item) => {
-                                if late_resources.contains_key(&item.ident)
-                                    || resources.contains_key(&item.ident)
-                                {
-                                    return Err(parse::Error::new(
-                                        item.ident.span(),
-                                        "this resource is listed more than once",
-                                    ));
-                                }
-
-                                late_resources
-                                    .insert(item.ident.clone(), LateResource::parse(item)?);
-                            }
-
-                            _ => {
+                            } else {
                                 return Err(parse::Error::new(
-                                    item.span(),
+                                    item.ident.span(),
                                     "this item must live outside the `#[app]` module",
-                                ))
+                                ));
                             }
+                        } else {
+                            return Err(parse::Error::new(
+                                item.span(),
+                                "this item must live outside the `#[app]` module",
+                            ));
                         }
                     }
                 }

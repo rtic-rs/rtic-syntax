@@ -5,11 +5,12 @@ use syn::{
     bracketed,
     parse::{self, Parse, ParseStream},
     punctuated::Punctuated,
-    Abi, ArgCaptured, AttrStyle, Attribute, FnArg, ForeignItemFn, Ident, IntSuffix, Item, ItemFn,
-    ItemStatic, LitInt, Pat, PathArguments, ReturnType, Stmt, Token, Type, Visibility,
+    spanned::Spanned,
+    Abi, ArgCaptured, AttrStyle, Attribute, Expr, FnArg, ForeignItemFn, Ident, IntSuffix, Item,
+    ItemFn, ItemStatic, LitInt, Pat, PathArguments, ReturnType, Stmt, Token, Type, Visibility,
 };
 
-use crate::Set;
+use crate::{ast::Access, Map, Set};
 
 pub fn abi_is_c(abi: &Abi) -> bool {
     match &abi.name {
@@ -185,7 +186,7 @@ pub fn parse_idents(content: ParseStream<'_>) -> parse::Result<Set<Ident>> {
         if idents.contains(&ident) {
             return Err(parse::Error::new(
                 ident.span(),
-                "element appears more than once in list",
+                "identifier appears more than once in list",
             ));
         }
 
@@ -193,6 +194,53 @@ pub fn parse_idents(content: ParseStream<'_>) -> parse::Result<Set<Ident>> {
     }
 
     Ok(idents)
+}
+
+pub fn parse_resources(content: ParseStream<'_>) -> parse::Result<Map<Access>> {
+    let inner;
+    bracketed!(inner in content);
+
+    let mut resources = Map::new();
+    for e in inner.call(Punctuated::<Expr, Token![,]>::parse_terminated)? {
+        let err = Err(parse::Error::new(
+            e.span(),
+            "identifier appears more than once in list",
+        ));
+        let (access, path) = match e {
+            Expr::Path(e) => (Access::Exclusive, e.path),
+
+            Expr::Reference(ref r) if r.mutability.is_none() => match &*r.expr {
+                Expr::Path(e) => (Access::Shared, e.path.clone()),
+
+                _ => return err,
+            },
+
+            _ => return err,
+        };
+
+        let ident = if path.leading_colon.is_some()
+            || path.segments.len() != 1
+            || path.segments[0].arguments != PathArguments::None
+        {
+            return Err(parse::Error::new(
+                path.span(),
+                "resource must be an identifier, not a path",
+            ));
+        } else {
+            path.segments[0].ident.clone()
+        };
+
+        if resources.contains_key(&ident) {
+            return Err(parse::Error::new(
+                ident.span(),
+                "resource appears more than once in list",
+            ));
+        }
+
+        resources.insert(ident, access);
+    }
+
+    Ok(resources)
 }
 
 pub fn parse_inputs(

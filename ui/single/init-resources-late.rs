@@ -2,10 +2,10 @@
 
 #[mock::app]
 const APP: () = {
-    extern "C" {
-        static mut X: u32;
+    struct Resources {
+        x: u32,
     }
 
-    #[init(resources = [X])]
+    #[init(resources = [x])]
     fn init(_: init::Context) {}
 };

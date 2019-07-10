@@ -2,29 +2,28 @@
 
 #[mock::app]
 const APP: () = {
-    // late resources
-    extern "C" {
-        static A: u32;
-        static mut B: u32;
+    struct Resources {
+        a: u32,
+        b: u32,
+        #[init(0)]
+        c: u32,
+        #[init(0)]
+        d: u32,
     }
 
-    // early resources
-    static C: u32 = 0;
-    static mut D: u32 = 0;
-
     #[init(
-        resources = [C],
+        resources = [&c],
         spawn = [foo],
     )]
     fn init(_: init::Context) -> init::LateResources {
         #[cfg(debug_assertions)]
         static mut X: u32 = 0;
 
-        init::LateResources { A: 0, B: 0 }
+        init::LateResources { a: 0, b: 0 }
     }
 
     #[idle(
-        resources = [D],
+        resources = [&a, d],
         spawn = [foo],
     )]
     fn idle(_: idle::Context) -> ! {
@@ -34,7 +33,7 @@ const APP: () = {
     }
 
     #[task(
-        resources = [C],
+        resources = [b, &c],
         spawn = [bar],
     )]
     fn foo(_: foo::Context) {
@@ -46,7 +45,7 @@ const APP: () = {
     #[task(
         capacity = 2,
         priority = 2,
-        resources = [D],
+        resources = [d],
         spawn = [foo],
     )]
     fn bar(_: bar::Context, _: u32) {

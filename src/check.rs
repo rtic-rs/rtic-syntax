@@ -13,9 +13,9 @@ pub fn app(app: &App) -> parse::Result<()> {
         .collect::<HashSet<_>>();
 
     // Check that all referenced resources have been declared
-    // Check that `static mut` resources are NOT shared between cores
+    // Check that resources are NOT `Exclusive`-ly shared between cores
     let mut owners = HashMap::new();
-    for (core, _, name) in app.resource_accesses() {
+    for (core, _, name, access) in app.resource_accesses() {
         if app.resource(name).is_none() {
             return Err(parse::Error::new(
                 name.span(),
@@ -23,18 +23,12 @@ pub fn app(app: &App) -> parse::Result<()> {
             ));
         }
 
-        if app
-            .resource(name)
-            .expect("UNREACHABLE")
-            .0
-            .mutability
-            .is_some()
-        {
+        if access.is_exclusive() {
             if let Some(owner) = owners.get(name) {
                 if core != *owner {
                     return Err(parse::Error::new(
                         name.span(),
-                        "`static mut` resources can NOT be accessed from different cores",
+                        "resources can NOT be exclusively accessed (`&mut-`) from different cores",
                     ));
                 }
             } else {
@@ -43,8 +37,23 @@ pub fn app(app: &App) -> parse::Result<()> {
         }
     }
 
+    // Check that no resource has both types of access (`Exclusive` & `Shared`)
+    // TODO we want to allow this in the future (but behind a `Settings` feature gate)
+    for (_, _, name, access) in app.resource_accesses() {
+        if access.is_shared() && owners.contains_key(name) {
+            return Err(parse::Error::new(
+                name.span(),
+                "this implementation doesn't support shared (`&-`) - exclusive (`&mut-`) locks; use `x` instead of `&x`",
+            ));
+        }
+    }
+
     // Check that late resources have NOT been assigned to `init`
-    for res in app.inits.values().flat_map(|init| &init.args.resources) {
+    for res in app
+        .inits
+        .values()
+        .flat_map(|init| init.args.resources.keys())
+    {
         if app.late_resources.contains_key(res) {
             return Err(parse::Error::new(
                 res.span(),

@@ -2,8 +2,8 @@
 
 #[mock::app(cores = 2, parse_cores)]
 const APP: () = {
-    extern "C" {
-        static A: u32;
+    struct Resources {
+        a: u32,
     }
 
     #[init(core = 0)]

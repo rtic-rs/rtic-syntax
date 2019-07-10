@@ -1,7 +1,7 @@
 error: this is not a late resource
   --> $DIR/init-late-is-not.rs:11:30
    |
-11 |     #[init(core = 0, late = [B])]
+11 |     #[init(core = 0, late = [b])]
    |                              ^
 
 error: aborting due to previous error

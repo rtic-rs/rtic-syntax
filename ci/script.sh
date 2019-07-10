@@ -1,9 +1,8 @@
 set -euxo pipefail
 
 main() {
-
     if [ $TRAVIS_RUST_VERSION = nightly ]; then
-        cargo test --test ui
+        cargo test --features compiletest_rs --test ui
     else
         cargo test --lib --examples
     fi
