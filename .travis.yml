@@ -6,7 +6,8 @@ matrix:
       rust: stable
 
     - env: TARGET=x86_64-unknown-linux-gnu
-      rust: nightly
+      # TODO revert to nightly when rustc bug is fixed
+      rust: nightly-2019-07-10
 
 before_install: set -e
 
