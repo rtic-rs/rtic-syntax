@@ -12,7 +12,7 @@ const APP: () = {
     }
 
     #[init(
-        resources = [&c],
+        resources = [c],
         spawn = [foo],
     )]
     fn init(_: init::Context) -> init::LateResources {
