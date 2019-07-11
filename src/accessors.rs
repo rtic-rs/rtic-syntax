@@ -2,7 +2,7 @@ use syn::{Expr, Ident};
 
 use crate::{
     analyze::{Analysis, Location, Priority},
-    ast::{App, LateResource},
+    ast::{Access, App, LateResource},
     Context, Core, Set,
 };
 
@@ -124,32 +124,30 @@ impl App {
 
     pub(crate) fn resource_accesses(
         &self,
-    ) -> impl Iterator<Item = (Core, Option<Priority>, &Ident)> {
+    ) -> impl Iterator<Item = (Core, Option<Priority>, &Ident, Access)> {
         self.inits
             .iter()
             .flat_map(|(core, init)| {
                 init.args
                     .resources
                     .iter()
-                    .map(move |res| (*core, None, res))
+                    .map(move |(name, access)| (*core, None, name, *access))
             })
             .chain(self.idles.iter().flat_map(|(core, idle)| {
                 idle.args
                     .resources
                     .iter()
-                    .map(move |res| (*core, Some(0), res))
+                    .map(move |(name, access)| (*core, Some(0), name, *access))
             }))
             .chain(self.hardware_tasks.values().flat_map(|task| {
-                task.args
-                    .resources
-                    .iter()
-                    .map(move |res| (task.args.core, Some(task.args.priority), res))
+                task.args.resources.iter().map(move |(name, access)| {
+                    (task.args.core, Some(task.args.priority), name, *access)
+                })
             }))
             .chain(self.software_tasks.values().flat_map(|task| {
-                task.args
-                    .resources
-                    .iter()
-                    .map(move |res| (task.args.core, Some(task.args.priority), res))
+                task.args.resources.iter().map(move |(name, access)| {
+                    (task.args.core, Some(task.args.priority), name, *access)
+                })
             }))
     }
 

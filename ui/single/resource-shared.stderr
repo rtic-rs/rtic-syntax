@@ -1,0 +1,8 @@
+error: `#[shared]` can only be used in multi-core mode
+ --> $DIR/resource-shared.rs:6:9
+  |
+6 |         #[shared]
+  |         ^
+
+error: aborting due to previous error
+

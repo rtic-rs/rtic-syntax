@@ -3,7 +3,7 @@
 use core::ops::Deref;
 use std::collections::BTreeMap;
 
-use syn::{ArgCaptured, Attribute, Expr, Ident, Pat, Path, Stmt, Token, Type};
+use syn::{ArgCaptured, Attribute, Expr, Ident, Pat, Path, Stmt, Type};
 
 use crate::{Core, Map, Set};
 
@@ -110,7 +110,7 @@ pub struct InitArgs {
     pub late: Set<Ident>,
 
     /// Resources that can be accessed from this context
-    pub resources: Set<Ident>,
+    pub resources: Resources,
 
     /// Software tasks that can be spawned from this context
     pub spawn: Set<Ident>,
@@ -152,7 +152,7 @@ pub struct IdleArgs {
     pub core: u8,
 
     /// Resources that can be accessed from this context
-    pub resources: Set<Ident>,
+    pub resources: Resources,
 
     /// Software tasks that can be spawned from this context
     pub spawn: Set<Ident>,
@@ -184,13 +184,17 @@ impl Deref for Resource {
 pub struct LateResource {
     /// `#[cfg]` attributes like `#[cfg(debug_assertions)]`
     pub cfgs: Vec<Attribute>,
+
     /// Attributes that will apply to this resource
     pub attrs: Vec<Attribute>,
 
-    /// Whether this resource is mutable or not
-    pub mutability: Option<Token![mut]>,
+    /// Whether this contains the `#[shared]` attribute or not
+    ///
+    /// NOTE: Always `false` in single core mode
+    pub shared: bool,
+
     /// The type of this resource
-    pub ty: Box<Type>,
+    pub ty: Type,
 
     pub(crate) _extensible: (),
 }
@@ -232,7 +236,7 @@ pub struct SoftwareTaskArgs {
     pub priority: u8,
 
     /// Resources that can be accessed from this context
-    pub resources: Set<Ident>,
+    pub resources: Resources,
 
     /// Software tasks that can be spawned from this context
     pub spawn: Set<Ident>,
@@ -249,7 +253,7 @@ impl Default for SoftwareTaskArgs {
             core: 0,
             capacity: 1,
             priority: 1,
-            resources: Set::new(),
+            resources: Resources::new(),
             spawn: Set::new(),
             schedule: Set::new(),
             _extensible: (),
@@ -290,7 +294,7 @@ pub struct HardwareTaskArgs {
     pub priority: u8,
 
     /// Resources that can be accessed from this context
-    pub resources: Set<Ident>,
+    pub resources: Resources,
 
     /// Software tasks that can be spawned from this context
     pub spawn: Set<Ident>,
@@ -319,6 +323,11 @@ pub struct Local {
     /// `#[cfg]` attributes like `#[cfg(debug_assertions)]`
     pub cfgs: Vec<Attribute>,
 
+    /// Whether this contains the `#[shared]` attribute or not
+    ///
+    /// NOTE: Always `false` in single core mode
+    pub shared: bool,
+
     /// Type
     pub ty: Box<Type>,
 
@@ -327,3 +336,28 @@ pub struct Local {
 
     pub(crate) _extensible: (),
 }
+
+/// Resource access
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Access {
+    /// `[x]`
+    Exclusive,
+
+    /// `[&x]`
+    Shared,
+}
+
+impl Access {
+    /// Is this enum in the `Exclusive` variant?
+    pub fn is_exclusive(&self) -> bool {
+        *self == Access::Exclusive
+    }
+
+    /// Is this enum in the `Shared` variant?
+    pub fn is_shared(&self) -> bool {
+        *self == Access::Shared
+    }
+}
+
+/// Resource access list
+pub type Resources = Map<Access>;

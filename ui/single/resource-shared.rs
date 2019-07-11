@@ -3,9 +3,7 @@
 #[mock::app]
 const APP: () = {
     struct Resources {
+        #[shared]
         x: u32,
     }
-
-    #[init(resources = [x])]
-    fn init(_: init::Context) {}
 };

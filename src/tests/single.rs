@@ -9,14 +9,17 @@ fn unused_resource() {
         quote!(),
         quote!(
             const APP: () = {
-                static mut X: i32 = 0;
+                struct Resources {
+                    #[init(0)]
+                    x: i32,
+                }
             };
         ),
         Settings::default(),
     )
     .unwrap();
 
-    // `X` shouldn't be listed in `locations`
+    // `x` shouldn't be listed in `locations`
     assert!(analysis.locations.is_empty());
 }
 
@@ -42,9 +45,12 @@ fn resource_owned() {
         quote!(),
         quote!(
             const APP: () = {
-                static mut X: i32 = 0;
+                struct Resources {
+                    #[init(0)]
+                    x: i32,
+                }
 
-                #[task(resources = [X])]
+                #[task(resources = [x])]
                 fn foo(_: foo::Context) {}
             };
         ),
@@ -53,7 +59,7 @@ fn resource_owned() {
     .unwrap();
 
     let (res, ownership) = analysis.ownerships.iter().next().unwrap();
-    assert_eq!(res.to_string(), "X");
+    assert_eq!(res.to_string(), "x");
     assert_eq!(*ownership, Ownership::Owned { priority: 1 });
 }
 
@@ -63,12 +69,15 @@ fn resource_coowned() {
         quote!(),
         quote!(
             const APP: () = {
-                static mut X: i32 = 0;
+                struct Resources {
+                    #[init(0)]
+                    x: i32,
+                }
 
-                #[task(resources = [X])]
+                #[task(resources = [x])]
                 fn foo(_: foo::Context) {}
 
-                #[task(resources = [X])]
+                #[task(resources = [x])]
                 fn bar(_: bar::Context) {}
             };
         ),
@@ -77,22 +86,25 @@ fn resource_coowned() {
     .unwrap();
 
     let (res, ownership) = analysis.ownerships.iter().next().unwrap();
-    assert_eq!(res.to_string(), "X");
+    assert_eq!(res.to_string(), "x");
     assert_eq!(*ownership, Ownership::CoOwned { priority: 1 });
 }
 
 #[test]
-fn resource_shared() {
+fn resource_contended() {
     let (_app, analysis) = crate::parse2(
         quote!(),
         quote!(
             const APP: () = {
-                static mut X: i32 = 0;
+                struct Resources {
+                    #[init(0)]
+                    x: i32,
+                }
 
-                #[task(resources = [X])]
+                #[task(resources = [x])]
                 fn foo(_: foo::Context) {}
 
-                #[task(priority = 2, resources = [X])]
+                #[task(priority = 2, resources = [x])]
                 fn bar(_: bar::Context) {}
             };
         ),
@@ -101,8 +113,8 @@ fn resource_shared() {
     .unwrap();
 
     let (res, ownership) = analysis.ownerships.iter().next().unwrap();
-    assert_eq!(res.to_string(), "X");
-    assert_eq!(*ownership, Ownership::Shared { ceiling: 2 });
+    assert_eq!(res.to_string(), "x");
+    assert_eq!(*ownership, Ownership::Contended { ceiling: 2 });
 }
 
 #[test]
@@ -112,8 +124,8 @@ fn no_send_late_resources_idle() {
         quote!(),
         quote!(
             const APP: () = {
-                extern "C" {
-                    static mut X: i32;
+                struct Resources {
+                    x: i32,
                 }
 
                 #[init]
@@ -121,7 +133,7 @@ fn no_send_late_resources_idle() {
                     ..
                 }
 
-                #[idle(resources = [X])]
+                #[idle(resources = [x])]
                 fn idle(_: idle::Context) -> ! {
                     loop {}
                 }
@@ -238,8 +250,8 @@ fn send_late_resource() {
         quote!(),
         quote!(
             const APP: () = {
-                extern "C" {
-                    static mut A: X;
+                struct Resources {
+                    a: X,
                 }
 
                 #[init]
@@ -247,7 +259,7 @@ fn send_late_resource() {
                     ..
                 }
 
-                #[task(resources = [A])]
+                #[task(resources = [a])]
                 fn foo(_: foo::Context) {}
             };
         ),
@@ -266,12 +278,15 @@ fn send_shared_with_init() {
         quote!(),
         quote!(
             const APP: () = {
-                static mut X: i32 = 0;
+                struct Resources {
+                    #[init(0)]
+                    x: i32,
+                }
 
-                #[init(resources = [X])]
+                #[init(resources = [x])]
                 fn init(_: init::Context) {}
 
-                #[task(resources = [X])]
+                #[task(resources = [x])]
                 fn foo(_: foo::Context) {}
             };
         ),
@@ -290,12 +305,15 @@ fn not_sync() {
         quote!(),
         quote!(
             const APP: () = {
-                static X: i32 = 0;
+                struct Resources {
+                    #[init(0)]
+                    x: i32,
+                }
 
-                #[task(resources = [X])]
+                #[task(resources = [x])]
                 fn foo(_: foo::Context) {}
 
-                #[task(resources = [X])]
+                #[task(resources = [x])]
                 fn bar(_: bar::Context) {}
             };
         ),
@@ -313,12 +331,15 @@ fn sync() {
         quote!(),
         quote!(
             const APP: () = {
-                static X: i32 = 0;
+                struct Resources {
+                    #[init(0)]
+                    x: i32,
+                }
 
-                #[task(resources = [X])]
+                #[task(resources = [&x])]
                 fn foo(_: foo::Context) {}
 
-                #[task(priority = 2, resources = [X])]
+                #[task(priority = 2, resources = [&x])]
                 fn bar(_: bar::Context) {}
             };
         ),
@@ -337,9 +358,8 @@ fn late_resources() {
         quote!(),
         quote!(
             const APP: () = {
-                extern "C" {
-                    static X: i32;
-                    static mut Y: i32;
+                struct Resources {
+                    x: i32,
                 }
 
                 #[init]
@@ -353,7 +373,7 @@ fn late_resources() {
     .unwrap();
 
     let late = &analysis.late_resources[&0];
-    assert_eq!(late.len(), 2);
+    assert_eq!(late.len(), 1);
 }
 
 #[test]

@@ -4,7 +4,7 @@ use syn::{parse, ItemStatic};
 use crate::{ast::Local, parse::util, Map};
 
 impl Local {
-    pub(crate) fn parse(items: Vec<ItemStatic>) -> parse::Result<Map<Local>> {
+    pub(crate) fn parse(items: Vec<ItemStatic>, cores: u8) -> parse::Result<Map<Local>> {
         let mut locals = Map::new();
 
         for item in items {
@@ -18,11 +18,14 @@ impl Local {
                 }
 
                 Entry::Vacant(entry) => {
-                    let (cfgs, attrs) = util::extract_cfgs(item.attrs);
+                    let (cfgs, mut attrs) = util::extract_cfgs(item.attrs);
+
+                    let shared = util::extract_shared(&mut attrs, cores)?;
 
                     entry.insert(Local {
                         attrs,
                         cfgs,
+                        shared,
                         expr: item.expr,
                         ty: item.ty,
                         _extensible: (),

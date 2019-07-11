@@ -3,9 +3,10 @@
 #[mock::app]
 const APP: () = {
     struct Resources {
-        x: u32,
+        #[init(0)]
+        x: i32,
     }
 
-    #[init(resources = [x])]
+    #[init(resources = [&x])]
     fn init(_: init::Context) {}
 };

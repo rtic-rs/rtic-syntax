@@ -2,5 +2,8 @@
 
 #[mock::app]
 const APP: () = {
-    pub static X: u32 = 0;
+    struct Resources {
+        #[init(0)]
+        pub x: u32,
+    }
 };

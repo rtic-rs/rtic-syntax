@@ -35,21 +35,37 @@ pub(crate) fn app(app: &App) -> Analysis {
         }
     }
 
-    // c. Ceiling analysis of R/W resources
-    // d. Sync-ness of RO resources
+    // c. Ceiling analysis of Exclusive resources
+    // d. Sync-ness of Access::Shared resources
     // e. Location of resources
     // f. Cross initialization needs a post-initialization synchronization barrier
     let mut initialization_barriers = InitializationBarriers::new();
-    let mut locations = Locations::new();
+    let mut locations = app
+        .late_resources
+        .iter()
+        .chain(app.resources.iter().map(|(name, res)| (name, &res.late)))
+        .filter_map(|(name, lr)| {
+            if lr.shared {
+                Some((
+                    name.clone(),
+                    Location::Shared {
+                        cores: BTreeSet::new(),
+                    },
+                ))
+            } else {
+                None
+            }
+        })
+        .collect::<Locations>();
     let mut ownerships = Ownerships::new();
-    let mut ro_accesses = HashMap::new();
+    let mut shared_accesses = HashMap::new();
     let mut sync_types = SyncTypes::new();
-    for (core, prio, name) in app.resource_accesses() {
+    for (core, prio, name, access) in app.resource_accesses() {
         let res = app.resource(name).expect("UNREACHABLE").0;
 
         // (d)
-        if res.mutability.is_none() {
-            if let Some(&other_core) = ro_accesses.get(name) {
+        if access.is_shared() {
+            if let Some(&other_core) = shared_accesses.get(name) {
                 if other_core != core {
                     // a resources accessed from different cores needs to be `Sync` regardless of
                     // priorities
@@ -60,7 +76,7 @@ pub(crate) fn app(app: &App) -> Analysis {
                         .insert(res.ty.clone());
                 }
             } else {
-                ro_accesses.insert(name, core);
+                shared_accesses.insert(name, core);
             }
         }
 
@@ -71,9 +87,6 @@ pub(crate) fn app(app: &App) -> Analysis {
                     core: other_core, ..
                 } => {
                     if core != *other_core {
-                        // sanity check: only `static` variables can be shared between cores
-                        debug_assert!(res.mutability.is_none());
-
                         let mut cores = BTreeSet::new();
                         cores.insert(core);
                         cores.insert(*other_core);
@@ -101,14 +114,14 @@ pub(crate) fn app(app: &App) -> Analysis {
                 match *ownership {
                     Ownership::Owned { priority: ceiling }
                     | Ownership::CoOwned { priority: ceiling }
-                    | Ownership::Shared { ceiling }
+                    | Ownership::Contended { ceiling }
                         if priority != ceiling =>
                     {
-                        *ownership = Ownership::Shared {
+                        *ownership = Ownership::Contended {
                             ceiling: cmp::max(ceiling, priority),
                         };
 
-                        if res.mutability.is_none() {
+                        if access.is_shared() {
                             sync_types.entry(core).or_default().insert(res.ty.clone());
                         }
                     }
@@ -172,17 +185,11 @@ pub(crate) fn app(app: &App) -> Analysis {
             if let Some(loc) = locations.get(name) {
                 match loc {
                     Location::Owned { core, .. } => {
-                        send_types
-                            .entry(*core)
-                            .or_default()
-                            .insert((*res.ty).clone());
+                        send_types.entry(*core).or_default().insert(res.ty.clone());
                     }
 
                     Location::Shared { cores } => cores.iter().for_each(|&core| {
-                        send_types
-                            .entry(core)
-                            .or_default()
-                            .insert((*res.ty).clone());
+                        send_types.entry(core).or_default().insert(res.ty.clone());
                     }),
                 }
             }
@@ -190,7 +197,11 @@ pub(crate) fn app(app: &App) -> Analysis {
     }
 
     // All resources shared with `init` (ownership != None) need to be `Send`
-    for name in app.inits.values().flat_map(|init| &init.args.resources) {
+    for name in app
+        .inits
+        .values()
+        .flat_map(|init| init.args.resources.keys())
+    {
         if let Some(ownership) = ownerships.get(name) {
             if *ownership != owned_by_idle {
                 if let Some(loc) = locations.get(name) {
@@ -199,14 +210,14 @@ pub(crate) fn app(app: &App) -> Analysis {
                             send_types
                                 .entry(*core)
                                 .or_default()
-                                .insert((*app.resources[name].ty).clone());
+                                .insert(app.resources[name].ty.clone());
                         }
 
                         Location::Shared { cores } => cores.iter().for_each(|&core| {
                             send_types
                                 .entry(core)
                                 .or_default()
-                                .insert((*app.resources[name].ty).clone());
+                                .insert(app.resources[name].ty.clone());
                         }),
                     }
                 }
@@ -563,7 +574,7 @@ pub type Ownerships = IndexMap<Resource, Ownership>;
 pub type SendTypes = BTreeMap<Core, Set<Type>>;
 
 /// These types must implement the `Sync` trait
-pub type SyncTypes = BTreeMap<Core, Set<Box<Type>>>;
+pub type SyncTypes = BTreeMap<Core, Set<Type>>;
 
 /// Cross-core initialization barriers
 pub type InitializationBarriers =
@@ -631,8 +642,8 @@ pub enum Ownership {
         priority: u8,
     },
 
-    /// Shared by more than one task; the tasks have different priorities
-    Shared {
+    /// Contended by more than one task; the tasks have different priorities
+    Contended {
         /// Priority ceiling
         ceiling: u8,
     },
@@ -644,7 +655,7 @@ impl Ownership {
         match self {
             Ownership::Owned { .. } | Ownership::CoOwned { .. } => false,
 
-            Ownership::Shared { ceiling } => {
+            Ownership::Contended { ceiling } => {
                 debug_assert!(*ceiling >= priority);
 
                 priority < *ceiling
@@ -664,7 +675,7 @@ impl Ownership {
 /// Resource location
 #[derive(Clone, Debug, PartialEq)]
 pub enum Location {
-    /// `static [mut]` resource that resides in `core`
+    /// resource that resides in `core`
     Owned {
         /// Core on which this resource is located
         core: u8,
@@ -673,7 +684,7 @@ pub enum Location {
         cross_initialized: bool,
     },
 
-    /// `static` resource shared between different cores
+    /// `Access::Shared` resource shared between different cores
     Shared {
         /// Cores that share access to this resource
         cores: BTreeSet<Core>,

@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use quote::quote;
 
 use crate::{analyze::Location, Settings};
@@ -53,7 +55,10 @@ fn unused_resource() {
         quote!(cores = 2),
         quote!(
             const APP: () = {
-                static mut X: i32 = 0;
+                struct Resources {
+                    #[init(0)]
+                    x: i32,
+                }
             };
         ),
         Settings {
@@ -93,12 +98,12 @@ fn late_resources_split() {
         quote!(cores = 2),
         quote!(
             const APP: () = {
-                extern "C" {
-                    static mut X: i32;
-                    static mut Y: i32;
+                struct Resources {
+                    x: i32,
+                    y: i32,
                 }
 
-                #[init(core = 0, late = [X])]
+                #[init(core = 0, late = [x])]
                 fn init(_: init::Context) -> init::LateResources {
                     ..
                 }
@@ -119,10 +124,10 @@ fn late_resources_split() {
     let late0 = &analysis.late_resources[&0];
     let late1 = &analysis.late_resources[&1];
     assert_eq!(late0.len(), 1);
-    assert_eq!(late0.iter().next().unwrap().to_string(), "X");
+    assert_eq!(late0.iter().next().unwrap().to_string(), "x");
 
     assert_eq!(late1.len(), 1);
-    assert_eq!(late1.iter().next().unwrap().to_string(), "Y");
+    assert_eq!(late1.iter().next().unwrap().to_string(), "y");
 }
 
 #[test]
@@ -132,9 +137,8 @@ fn late_resources() {
         quote!(cores = 2),
         quote!(
             const APP: () = {
-                extern "C" {
-                    static X: i32;
-                    static mut Y: i32;
+                struct Resources {
+                    x: i32,
                 }
 
                 #[init(core = 0)]
@@ -151,7 +155,7 @@ fn late_resources() {
     .unwrap();
 
     let late = &analysis.late_resources[&0];
-    assert_eq!(late.len(), 2);
+    assert_eq!(late.len(), 1);
 }
 
 #[test]
@@ -161,13 +165,17 @@ fn location_resource() {
         quote!(cores = 2),
         quote!(
             const APP: () = {
-                static mut X: i32 = 0;
-                static mut Y: i32 = 0;
+                struct Resources {
+                    #[init(0)]
+                    x: i32,
+                    #[init(0)]
+                    y: i32,
+                }
 
-                #[task(core = 0, resources = [X])]
+                #[task(core = 0, resources = [x])]
                 fn foo(_: foo::Context) {}
 
-                #[task(core = 1, resources = [Y])]
+                #[task(core = 1, resources = [y])]
                 fn bar(_: bar::Context) {}
             };
         ),
@@ -181,7 +189,7 @@ fn location_resource() {
     assert_eq!(analysis.locations.len(), 2);
 
     let (name, loc) = analysis.locations.get_index(0).unwrap();
-    assert_eq!(name.to_string(), "X");
+    assert_eq!(name.to_string(), "x");
     assert_eq!(
         *loc,
         Location::Owned {
@@ -191,7 +199,7 @@ fn location_resource() {
     );
 
     let (name, loc) = analysis.locations.get_index(1).unwrap();
-    assert_eq!(name.to_string(), "Y");
+    assert_eq!(name.to_string(), "y");
     assert_eq!(
         *loc,
         Location::Owned {
@@ -208,8 +216,8 @@ fn initialization_barrier() {
         quote!(cores = 2),
         quote!(
             const APP: () = {
-                extern "C" {
-                    static mut X: i32;
+                struct Resources {
+                    x: i32,
                 }
 
                 #[init(core = 0)]
@@ -217,7 +225,7 @@ fn initialization_barrier() {
                     ..
                 }
 
-                #[idle(core = 1, resources = [X])]
+                #[idle(core = 1, resources = [x])]
                 fn idle(_: idle::Context) -> ! {
                     ..
                 }
@@ -303,14 +311,17 @@ fn sync() {
         quote!(cores = 2),
         quote!(
             const APP: () = {
-                static X: i32 = 0;
+                struct Resources {
+                    #[init(0)]
+                    x: i32,
+                }
 
-                #[idle(core = 0, resources = [X])]
+                #[idle(core = 0, resources = [&x])]
                 fn idle(_: idle::Context) -> ! {
                     ..
                 }
 
-                #[idle(core = 1, resources = [X])]
+                #[idle(core = 1, resources = [&x])]
                 fn idle(_: idle::Context) -> ! {
                     ..
                 }
@@ -356,4 +367,44 @@ fn timer_queue() {
     .unwrap();
 
     assert_eq!(analysis.timer_queues[&0].priority, 3);
+}
+
+#[test]
+fn shared() {
+    let (app, analysis) = crate::parse2(
+        quote!(cores = 2),
+        quote!(
+            const APP: () = {
+                struct Resources {
+                    #[init(0)]
+                    #[shared]
+                    x: u32,
+                }
+
+                #[init(core = 0)]
+                fn init(cx: init::Context) {
+                    #[shared]
+                    static mut Y: [u8; 128] = [0; 128];
+                }
+            };
+        ),
+        Settings {
+            parse_cores: true,
+            ..Settings::default()
+        },
+    )
+    .unwrap();
+
+    let (name, loc) = analysis.locations.get_index(0).unwrap();
+    assert_eq!(name.to_string(), "x");
+    assert_eq!(
+        *loc,
+        Location::Shared {
+            cores: BTreeSet::new()
+        }
+    );
+
+    let (name, local) = app.inits[&0].locals.get_index(0).unwrap();
+    assert_eq!(name.to_string(), "Y");
+    assert!(local.shared);
 }

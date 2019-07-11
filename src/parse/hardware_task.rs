@@ -6,7 +6,7 @@ use crate::{
 };
 
 impl HardwareTask {
-    pub(crate) fn parse(args: HardwareTaskArgs, item: ItemFn) -> parse::Result<Self> {
+    pub(crate) fn parse(args: HardwareTaskArgs, item: ItemFn, cores: u8) -> parse::Result<Self> {
         let span = item.ident.span();
         let valid_signature = util::check_fn_signature(&item)
             && item.decl.inputs.len() == 1
@@ -31,7 +31,7 @@ impl HardwareTask {
                         args,
                         attrs,
                         context,
-                        locals: Local::parse(locals)?,
+                        locals: Local::parse(locals, cores)?,
                         stmts,
                         _extensible: (),
                     });

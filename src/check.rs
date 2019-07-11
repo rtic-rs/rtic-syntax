@@ -6,16 +6,10 @@ use syn::parse;
 use crate::ast::App;
 
 pub fn app(app: &App) -> parse::Result<()> {
-    let tasks_set = app
-        .hardware_tasks
-        .keys()
-        .chain(app.software_tasks.keys())
-        .collect::<HashSet<_>>();
-
     // Check that all referenced resources have been declared
-    // Check that `static mut` resources are NOT shared between cores
+    // Check that resources are NOT `Exclusive`-ly shared between cores
     let mut owners = HashMap::new();
-    for (core, _, name) in app.resource_accesses() {
+    for (core, _, name, access) in app.resource_accesses() {
         if app.resource(name).is_none() {
             return Err(parse::Error::new(
                 name.span(),
@@ -23,18 +17,12 @@ pub fn app(app: &App) -> parse::Result<()> {
             ));
         }
 
-        if app
-            .resource(name)
-            .expect("UNREACHABLE")
-            .0
-            .mutability
-            .is_some()
-        {
+        if access.is_exclusive() {
             if let Some(owner) = owners.get(name) {
                 if core != *owner {
                     return Err(parse::Error::new(
                         name.span(),
-                        "`static mut` resources can NOT be accessed from different cores",
+                        "resources can NOT be exclusively accessed (`&mut-`) from different cores",
                     ));
                 }
             } else {
@@ -43,12 +31,43 @@ pub fn app(app: &App) -> parse::Result<()> {
         }
     }
 
-    // Check that late resources have NOT been assigned to `init`
-    for res in app.inits.values().flat_map(|init| &init.args.resources) {
-        if app.late_resources.contains_key(res) {
+    // Check that no resource has both types of access (`Exclusive` & `Shared`)
+    // TODO we want to allow this in the future (but behind a `Settings` feature gate)
+    // accesses from `init` are not consider `Exclusive` accesses because `init` doesn't use the
+    // `lock` API
+    let exclusive_accesses = app
+        .resource_accesses()
+        .filter_map(|(_, priority, name, access)| {
+            if priority.is_some() && access.is_exclusive() {
+                Some(name)
+            } else {
+                None
+            }
+        })
+        .collect::<HashSet<_>>();
+    for (_, _, name, access) in app.resource_accesses() {
+        if access.is_shared() && exclusive_accesses.contains(name) {
             return Err(parse::Error::new(
-                res.span(),
+                name.span(),
+                "this implementation doesn't support shared (`&-`) - exclusive (`&mut-`) locks; use `x` instead of `&x`",
+            ));
+        }
+    }
+
+    // Check that init only has `Access::Exclusive` resources
+    // Check that late resources have NOT been assigned to `init`
+    for (name, access) in app.inits.values().flat_map(|init| &init.args.resources) {
+        if app.late_resources.contains_key(name) {
+            return Err(parse::Error::new(
+                name.span(),
                 "late resources can NOT be assigned to `init`",
+            ));
+        }
+
+        if access.is_shared() {
+            return Err(parse::Error::new(
+                name.span(),
+                "`init` has direct exclusive access to resources; use `x` instead of `&x` ",
             ));
         }
     }
@@ -159,10 +178,15 @@ pub fn app(app: &App) -> parse::Result<()> {
 
     // Check that all referenced tasks have been declared
     for task in app.task_references() {
-        if !tasks_set.contains(task) {
+        if app.hardware_tasks.contains_key(task) {
             return Err(parse::Error::new(
                 task.span(),
-                "this task has NOT been declared",
+                "hardware tasks can NOT be spawned",
+            ));
+        } else if !app.software_tasks.contains_key(task) {
+            return Err(parse::Error::new(
+                task.span(),
+                "this software task has NOT been declared",
             ));
         }
     }

@@ -5,7 +5,6 @@ mod idle;
 mod init;
 mod late_resource;
 mod local;
-mod resource;
 mod software_task;
 mod util;
 
@@ -18,7 +17,7 @@ use syn::{
 };
 
 use crate::{
-    ast::{App, AppArgs, HardwareTaskArgs, InitArgs, SoftwareTaskArgs},
+    ast::{App, AppArgs, HardwareTaskArgs, InitArgs, Resources, SoftwareTaskArgs},
     Either, Set, Settings,
 };
 
@@ -132,22 +131,22 @@ fn init_idle_args(
                     late = Some(idents);
                 }
 
-                "resources" | "spawn" | "schedule" => {
+                "resources" => {
+                    if resources.is_some() {
+                        return Err(parse::Error::new(
+                            ident.span(),
+                            "argument appears more than once",
+                        ));
+                    }
+
+                    resources = Some(util::parse_resources(&content)?);
+                }
+
+                "spawn" | "schedule" => {
                     let idents = util::parse_idents(&content)?;
 
                     let ident_s = ident.to_string();
                     match &*ident_s {
-                        "resources" => {
-                            if resources.is_some() {
-                                return Err(parse::Error::new(
-                                    ident.span(),
-                                    "argument appears more than once",
-                                ));
-                            }
-
-                            resources = Some(idents);
-                        }
-
                         "spawn" => {
                             if spawn.is_some() {
                                 return Err(parse::Error::new(
@@ -206,7 +205,7 @@ fn init_idle_args(
 
             late: late.unwrap_or(Set::new()),
 
-            resources: resources.unwrap_or(Set::new()),
+            resources: resources.unwrap_or(Resources::new()),
             spawn: spawn.unwrap_or(Set::new()),
 
             schedule: schedule.unwrap_or(Set::new()),
@@ -354,7 +353,18 @@ fn task_args(
                     priority = Some(value as u8);
                 }
 
-                "resources" | "schedule" | "spawn" => {
+                "resources" => {
+                    if resources.is_some() {
+                        return Err(parse::Error::new(
+                            ident.span(),
+                            "argument appears more than once",
+                        ));
+                    }
+
+                    resources = Some(util::parse_resources(&content)?);
+                }
+
+                "schedule" | "spawn" => {
                     if !settings.parse_schedule && ident_s == "schedule" {
                         return Err(parse::Error::new(ident.span(), "unexpected argument"));
                     }
@@ -362,17 +372,6 @@ fn task_args(
                     // .. [#(#idents)*]
                     let idents = util::parse_idents(&content)?;
                     match &*ident_s {
-                        "resources" => {
-                            if resources.is_some() {
-                                return Err(parse::Error::new(
-                                    ident.span(),
-                                    "argument appears more than once",
-                                ));
-                            }
-
-                            resources = Some(idents);
-                        }
-
                         "schedule" => {
                             if schedule.is_some() {
                                 return Err(parse::Error::new(
@@ -426,7 +425,7 @@ fn task_args(
         };
 
         let priority = priority.unwrap_or(1);
-        let resources = resources.unwrap_or(Set::new());
+        let resources = resources.unwrap_or(Resources::new());
         let schedule = schedule.unwrap_or(Set::new());
         let spawn = spawn.unwrap_or(Set::new());
 

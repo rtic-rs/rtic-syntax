@@ -1,23 +1,26 @@
-use syn::{parse, spanned::Spanned, ForeignItemStatic, Visibility};
+use proc_macro2::Span;
+use syn::{parse, Field, Visibility};
 
 use crate::{ast::LateResource, parse::util};
 
 impl LateResource {
-    pub(crate) fn parse(item: ForeignItemStatic) -> parse::Result<Self> {
+    pub(crate) fn parse(item: &Field, span: Span, cores: u8) -> parse::Result<Self> {
         if item.vis != Visibility::Inherited {
             return Err(parse::Error::new(
-                item.span(),
-                "resources must have inherited / private visibility",
+                span,
+                "this field must have inherited / private visibility",
             ));
         }
 
-        let (cfgs, attrs) = util::extract_cfgs(item.attrs);
+        let (cfgs, mut attrs) = util::extract_cfgs(item.attrs.clone());
+
+        let shared = util::extract_shared(&mut attrs, cores)?;
 
         Ok(LateResource {
             cfgs,
             attrs,
-            mutability: item.mutability,
-            ty: item.ty,
+            shared,
+            ty: item.ty.clone(),
             _extensible: (),
         })
     }
