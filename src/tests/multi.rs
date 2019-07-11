@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use quote::quote;
 
 use crate::{analyze::Location, Settings};
@@ -365,4 +367,44 @@ fn timer_queue() {
     .unwrap();
 
     assert_eq!(analysis.timer_queues[&0].priority, 3);
+}
+
+#[test]
+fn shared() {
+    let (app, analysis) = crate::parse2(
+        quote!(cores = 2),
+        quote!(
+            const APP: () = {
+                struct Resources {
+                    #[init(0)]
+                    #[shared]
+                    x: u32,
+                }
+
+                #[init(core = 0)]
+                fn init(cx: init::Context) {
+                    #[shared]
+                    static mut Y: [u8; 128] = [0; 128];
+                }
+            };
+        ),
+        Settings {
+            parse_cores: true,
+            ..Settings::default()
+        },
+    )
+    .unwrap();
+
+    let (name, loc) = analysis.locations.get_index(0).unwrap();
+    assert_eq!(name.to_string(), "x");
+    assert_eq!(
+        *loc,
+        Location::Shared {
+            cores: BTreeSet::new()
+        }
+    );
+
+    let (name, local) = app.inits[&0].locals.get_index(0).unwrap();
+    assert_eq!(name.to_string(), "Y");
+    assert!(local.shared);
 }

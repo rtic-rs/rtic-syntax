@@ -40,7 +40,23 @@ pub(crate) fn app(app: &App) -> Analysis {
     // e. Location of resources
     // f. Cross initialization needs a post-initialization synchronization barrier
     let mut initialization_barriers = InitializationBarriers::new();
-    let mut locations = Locations::new();
+    let mut locations = app
+        .late_resources
+        .iter()
+        .chain(app.resources.iter().map(|(name, res)| (name, &res.late)))
+        .filter_map(|(name, lr)| {
+            if lr.shared {
+                Some((
+                    name.clone(),
+                    Location::Shared {
+                        cores: BTreeSet::new(),
+                    },
+                ))
+            } else {
+                None
+            }
+        })
+        .collect::<Locations>();
     let mut ownerships = Ownerships::new();
     let mut shared_accesses = HashMap::new();
     let mut sync_types = SyncTypes::new();

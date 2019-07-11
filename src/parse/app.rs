@@ -188,7 +188,7 @@ impl App {
 
                         check_ident(args.core, &item.ident)?;
 
-                        inits.insert(args.core, Init::parse(args, item)?);
+                        inits.insert(args.core, Init::parse(args, item, cores)?);
                     } else if let Some(pos) = item
                         .attrs
                         .iter()
@@ -210,7 +210,7 @@ impl App {
 
                         check_ident(args.core, &item.ident)?;
 
-                        idles.insert(args.core, Idle::parse(args, item)?);
+                        idles.insert(args.core, Idle::parse(args, item, cores)?);
                     } else if let Some(pos) = item
                         .attrs
                         .iter()
@@ -235,15 +235,19 @@ impl App {
                                 check_binding(args.core, &args.binds)?;
                                 check_ident(args.core, &item.ident)?;
 
-                                hardware_tasks
-                                    .insert(item.ident.clone(), HardwareTask::parse(args, item)?);
+                                hardware_tasks.insert(
+                                    item.ident.clone(),
+                                    HardwareTask::parse(args, item, cores)?,
+                                );
                             }
 
                             Either::Right(args) => {
                                 check_ident(args.core, &item.ident)?;
 
-                                software_tasks
-                                    .insert(item.ident.clone(), SoftwareTask::parse(args, item)?);
+                                software_tasks.insert(
+                                    item.ident.clone(),
+                                    SoftwareTask::parse(args, item, cores)?,
+                                );
                             }
                         }
                     } else {
@@ -287,7 +291,7 @@ impl App {
                             {
                                 let attr = field.attrs.remove(pos);
 
-                                let late = LateResource::parse(field, ident.span())?;
+                                let late = LateResource::parse(field, ident.span(), cores)?;
 
                                 resources.insert(
                                     ident.clone(),
@@ -297,7 +301,7 @@ impl App {
                                     },
                                 );
                             } else {
-                                let late = LateResource::parse(field, ident.span())?;
+                                let late = LateResource::parse(field, ident.span(), cores)?;
 
                                 late_resources.insert(ident.clone(), late);
                             }

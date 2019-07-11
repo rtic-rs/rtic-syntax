@@ -25,7 +25,7 @@ impl IdleArgs {
 }
 
 impl Idle {
-    pub(crate) fn parse(args: IdleArgs, item: ItemFn) -> parse::Result<Self> {
+    pub(crate) fn parse(args: IdleArgs, item: ItemFn, cores: u8) -> parse::Result<Self> {
         let valid_signature = util::check_fn_signature(&item)
             && item.decl.inputs.len() == 1
             && util::type_is_bottom(&item.decl.output);
@@ -41,7 +41,7 @@ impl Idle {
                         args,
                         attrs: item.attrs,
                         context,
-                        locals: Local::parse(locals)?,
+                        locals: Local::parse(locals, cores)?,
                         name: item.ident,
                         stmts,
                         _extensible: (),

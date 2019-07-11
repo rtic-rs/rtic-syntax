@@ -158,6 +158,23 @@ pub fn extract_locals(stmts: Vec<Stmt>) -> parse::Result<(Vec<ItemStatic>, Vec<S
     Ok((locals, stmts))
 }
 
+pub fn extract_shared(attrs: &mut Vec<Attribute>, cores: u8) -> parse::Result<bool> {
+    if let Some(pos) = attrs.iter().position(|attr| attr_eq(attr, "shared")) {
+        if cores == 1 {
+            Err(parse::Error::new(
+                attrs[pos].span(),
+                "`#[shared]` can only be used in multi-core mode",
+            ))
+        } else {
+            attrs.remove(pos);
+
+            Ok(true)
+        }
+    } else {
+        Ok(false)
+    }
+}
+
 pub fn parse_core(lit: LitInt, cores: u8) -> parse::Result<u8> {
     if lit.suffix() != IntSuffix::None {
         return Err(parse::Error::new(
