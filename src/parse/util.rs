@@ -6,8 +6,8 @@ use syn::{
     parse::{self, Parse, ParseStream},
     punctuated::Punctuated,
     spanned::Spanned,
-    Abi, ArgCaptured, AttrStyle, Attribute, Expr, FnArg, ForeignItemFn, Ident, IntSuffix, Item,
-    ItemFn, ItemStatic, LitInt, Pat, PathArguments, ReturnType, Stmt, Token, Type, Visibility,
+    Abi, AttrStyle, Attribute, Expr, FnArg, ForeignItemFn, Ident, Item, ItemFn, ItemStatic, LitInt,
+    Pat, PatType, PathArguments, ReturnType, Stmt, Token, Type, Visibility,
 };
 
 use crate::{ast::Access, Map, Set};
@@ -21,8 +21,7 @@ pub fn abi_is_c(abi: &Abi) -> bool {
 
 pub fn attr_eq(attr: &Attribute, name: &str) -> bool {
     attr.style == AttrStyle::Outer && attr.path.segments.len() == 1 && {
-        let pair = attr.path.segments.first().unwrap();
-        let segment = pair.value();
+        let segment = attr.path.segments.first().unwrap();
         segment.arguments == PathArguments::None && segment.ident.to_string() == name
     }
 }
@@ -38,13 +37,13 @@ pub fn attr_eq(attr: &Attribute, name: &str) -> bool {
 /// - uses the Rust ABI (and not e.g. "C")
 pub fn check_fn_signature(item: &ItemFn) -> bool {
     item.vis == Visibility::Inherited
-        && item.constness.is_none()
-        && item.asyncness.is_none()
-        && item.abi.is_none()
-        && item.unsafety.is_none()
-        && item.decl.generics.params.is_empty()
-        && item.decl.generics.where_clause.is_none()
-        && item.decl.variadic.is_none()
+        && item.sig.constness.is_none()
+        && item.sig.asyncness.is_none()
+        && item.sig.abi.is_none()
+        && item.sig.unsafety.is_none()
+        && item.sig.generics.params.is_empty()
+        && item.sig.generics.where_clause.is_none()
+        && item.sig.variadic.is_none()
 }
 
 pub fn check_foreign_fn_signature(item: &ForeignItemFn) -> bool {
@@ -53,9 +52,9 @@ pub fn check_foreign_fn_signature(item: &ForeignItemFn) -> bool {
         // && item.asyncness.is_none()
         // && item.abi.is_none()
         // && item.unsafety.is_none()
-        && item.decl.generics.params.is_empty()
-        && item.decl.generics.where_clause.is_none()
-        && item.decl.variadic.is_none()
+        && item.sig.generics.params.is_empty()
+        && item.sig.generics.where_clause.is_none()
+        && item.sig.variadic.is_none()
 }
 
 pub fn extract_cfgs(attrs: Vec<Attribute>) -> (Vec<Attribute>, Vec<Attribute>) {
@@ -96,12 +95,12 @@ pub fn extract_core(
     let mut res = None;
     for (pos, attr) in attrs.iter().enumerate() {
         if attr_eq(attr, "core") {
-            if let Ok(rhs) = syn::parse2::<Rhs>(attr.tts.clone()) {
-                if rhs.lit.suffix() == IntSuffix::None {
-                    let core = rhs.lit.value();
+            if let Ok(rhs) = syn::parse2::<Rhs>(attr.tokens.clone()) {
+                if rhs.lit.suffix().is_empty() {
+                    let core = rhs.lit.base10_parse::<u8>()?;
 
-                    if core < u64::from(cores) {
-                        res = Some((pos, core as u8));
+                    if core < cores {
+                        res = Some((pos, core));
                         break;
                     }
                 }
@@ -176,22 +175,23 @@ pub fn extract_shared(attrs: &mut Vec<Attribute>, cores: u8) -> parse::Result<bo
 }
 
 pub fn parse_core(lit: LitInt, cores: u8) -> parse::Result<u8> {
-    if lit.suffix() != IntSuffix::None {
+    if !lit.suffix().is_empty() {
         return Err(parse::Error::new(
             lit.span(),
             "this integer must be unsuffixed",
         ));
     }
 
-    let val = lit.value();
-    if val >= u64::from(cores) {
-        return Err(parse::Error::new(
-            lit.span(),
-            &format!("core number must be in the range 0..{}", cores),
-        ));
+    if let Ok(val) = lit.base10_parse::<u8>() {
+        if val < cores {
+            return Ok(val);
+        }
     }
 
-    Ok(val as u8)
+    Err(parse::Error::new(
+        lit.span(),
+        &format!("core number must be in the range 0..{}", cores),
+    ))
 }
 
 pub fn parse_idents(content: ParseStream<'_>) -> parse::Result<Set<Ident>> {
@@ -263,15 +263,15 @@ pub fn parse_resources(content: ParseStream<'_>) -> parse::Result<Map<Access>> {
 pub fn parse_inputs(
     inputs: Punctuated<FnArg, Token![,]>,
     name: &str,
-) -> Option<(Pat, Result<Vec<ArgCaptured>, FnArg>)> {
+) -> Option<(Box<Pat>, Result<Vec<PatType>, FnArg>)> {
     let mut inputs = inputs.into_iter();
 
     match inputs.next() {
-        Some(FnArg::Captured(first)) => {
+        Some(FnArg::Typed(first)) => {
             if type_is_path(&first.ty, &[name, "Context"]) {
                 let rest = inputs
                     .map(|arg| match arg {
-                        FnArg::Captured(arg) => Ok(arg),
+                        FnArg::Typed(arg) => Ok(arg),
                         _ => Err(arg),
                     })
                     .collect::<Result<Vec<_>, _>>();

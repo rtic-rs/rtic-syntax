@@ -5,8 +5,7 @@ use proc_macro2::TokenStream as TokenStream2;
 use syn::{
     parse::{self, ParseStream, Parser},
     spanned::Spanned,
-    ExprParen, Fields, ForeignItem, Ident, IntSuffix, Item, LitBool, LitInt, Path, Token,
-    Visibility,
+    ExprParen, Fields, ForeignItem, Ident, Item, LitBool, LitInt, Path, Token, Visibility,
 };
 
 use super::Input;
@@ -45,22 +44,22 @@ impl AppArgs {
                         }
 
                         let lit = input.parse::<LitInt>()?;
-                        if lit.suffix() != IntSuffix::None {
+                        if !lit.suffix().is_empty() {
                             return Err(parse::Error::new(
                                 lit.span(),
                                 "this integer must be unsuffixed",
                             ));
                         }
 
-                        let val = lit.value();
-                        if val < 2 || val > u64::from(u8::max_value()) {
+                        let val = lit.base10_parse::<u8>().ok();
+                        if val.is_none() || val.unwrap() < 2 {
                             return Err(parse::Error::new(
                                 lit.span(),
                                 "number of cores must be in the range 2..=255",
                             ));
                         }
 
-                        cores = Some(val as u8);
+                        cores = Some(val.unwrap());
                     }
 
                     _ => {
@@ -74,8 +73,11 @@ impl AppArgs {
                         if let Ok(lit) = input.parse::<LitBool>() {
                             custom.insert(ident, CustomArg::Bool(lit.value));
                         } else if let Ok(lit) = input.parse::<LitInt>() {
-                            if lit.suffix() == IntSuffix::None {
-                                custom.insert(ident, CustomArg::UInt(lit.value()));
+                            if lit.suffix().is_empty() {
+                                custom.insert(
+                                    ident,
+                                    CustomArg::UInt(lit.base10_digits().to_string()),
+                                );
                             } else {
                                 return Err(parse::Error::new(
                                     ident.span(),
@@ -166,14 +168,14 @@ impl App {
         for mut item in input.items {
             match item {
                 Item::Fn(mut item) => {
-                    let span = item.ident.span();
+                    let span = item.sig.ident.span();
                     if let Some(pos) = item
                         .attrs
                         .iter()
                         .position(|attr| util::attr_eq(attr, "init"))
                     {
                         let args =
-                            InitArgs::parse(cores, item.attrs.remove(pos).tts, settings, span)?;
+                            InitArgs::parse(cores, item.attrs.remove(pos).tokens, settings, span)?;
 
                         if inits.contains_key(&args.core) {
                             return Err(parse::Error::new(
@@ -186,7 +188,7 @@ impl App {
                             ));
                         }
 
-                        check_ident(args.core, &item.ident)?;
+                        check_ident(args.core, &item.sig.ident)?;
 
                         inits.insert(args.core, Init::parse(args, item, cores)?);
                     } else if let Some(pos) = item
@@ -195,7 +197,7 @@ impl App {
                         .position(|attr| util::attr_eq(attr, "idle"))
                     {
                         let args =
-                            IdleArgs::parse(cores, item.attrs.remove(pos).tts, settings, span)?;
+                            IdleArgs::parse(cores, item.attrs.remove(pos).tokens, settings, span)?;
 
                         if idles.contains_key(&args.core) {
                             return Err(parse::Error::new(
@@ -208,7 +210,7 @@ impl App {
                             ));
                         }
 
-                        check_ident(args.core, &item.ident)?;
+                        check_ident(args.core, &item.sig.ident)?;
 
                         idles.insert(args.core, Idle::parse(args, item, cores)?);
                     } else if let Some(pos) = item
@@ -216,8 +218,8 @@ impl App {
                         .iter()
                         .position(|attr| util::attr_eq(attr, "task"))
                     {
-                        if hardware_tasks.contains_key(&item.ident)
-                            || software_tasks.contains_key(&item.ident)
+                        if hardware_tasks.contains_key(&item.sig.ident)
+                            || software_tasks.contains_key(&item.sig.ident)
                         {
                             return Err(parse::Error::new(
                                 span,
@@ -226,26 +228,26 @@ impl App {
                         }
 
                         match crate::parse::task_args(
-                            item.attrs.remove(pos).tts,
+                            item.attrs.remove(pos).tokens,
                             cores,
                             settings,
                             span,
                         )? {
                             Either::Left(args) => {
                                 check_binding(args.core, &args.binds)?;
-                                check_ident(args.core, &item.ident)?;
+                                check_ident(args.core, &item.sig.ident)?;
 
                                 hardware_tasks.insert(
-                                    item.ident.clone(),
+                                    item.sig.ident.clone(),
                                     HardwareTask::parse(args, item, cores)?,
                                 );
                             }
 
                             Either::Right(args) => {
-                                check_ident(args.core, &item.ident)?;
+                                check_ident(args.core, &item.sig.ident)?;
 
                                 software_tasks.insert(
-                                    item.ident.clone(),
+                                    item.sig.ident.clone(),
                                     SoftwareTask::parse(args, item, cores)?,
                                 );
                             }
@@ -297,7 +299,7 @@ impl App {
                                     ident.clone(),
                                     Resource {
                                         late,
-                                        expr: syn::parse2::<ExprParen>(attr.tts)?.expr,
+                                        expr: syn::parse2::<ExprParen>(attr.tokens)?.expr,
                                     },
                                 );
                             } else {
@@ -350,7 +352,7 @@ impl App {
                                 }
                             } else {
                                 return Err(parse::Error::new(
-                                    item.ident.span(),
+                                    item.sig.ident.span(),
                                     "this item must live outside the `#[app]` module",
                                 ));
                             }

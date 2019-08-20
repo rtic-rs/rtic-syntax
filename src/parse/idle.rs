@@ -27,13 +27,13 @@ impl IdleArgs {
 impl Idle {
     pub(crate) fn parse(args: IdleArgs, item: ItemFn, cores: u8) -> parse::Result<Self> {
         let valid_signature = util::check_fn_signature(&item)
-            && item.decl.inputs.len() == 1
-            && util::type_is_bottom(&item.decl.output);
+            && item.sig.inputs.len() == 1
+            && util::type_is_bottom(&item.sig.output);
 
-        let name = item.ident.to_string();
+        let name = item.sig.ident.to_string();
 
         if valid_signature {
-            if let Some((context, Ok(rest))) = util::parse_inputs(item.decl.inputs, &name) {
+            if let Some((context, Ok(rest))) = util::parse_inputs(item.sig.inputs, &name) {
                 if rest.is_empty() {
                     let (locals, stmts) = util::extract_locals(item.block.stmts)?;
 
@@ -42,7 +42,7 @@ impl Idle {
                         attrs: item.attrs,
                         context,
                         locals: Local::parse(locals, cores)?,
-                        name: item.ident,
+                        name: item.sig.ident,
                         stmts,
                         _extensible: (),
                     });
@@ -51,7 +51,7 @@ impl Idle {
         }
 
         Err(parse::Error::new(
-            item.ident.span(),
+            item.sig.ident.span(),
             &format!(
                 "this `#[idle]` function must have signature `fn({}::Context) -> !`",
                 name

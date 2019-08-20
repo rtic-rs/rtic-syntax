@@ -3,7 +3,7 @@
 use core::ops::Deref;
 use std::collections::BTreeMap;
 
-use syn::{ArgCaptured, Attribute, Expr, Ident, Pat, Path, Stmt, Type};
+use syn::{Attribute, Expr, Ident, Pat, PatType, Path, Stmt, Type};
 
 use crate::{Core, Map, Set};
 
@@ -60,8 +60,8 @@ pub enum CustomArg {
     /// A boolean: `true` or `false`
     Bool(bool),
 
-    /// An unsigned integer
-    UInt(u64),
+    /// An unsuffixed, unsigned integer
+    UInt(String),
 
     /// An item path
     Path(Path),
@@ -85,7 +85,7 @@ pub struct Init {
     pub name: Ident,
 
     /// The context argument
-    pub context: Pat,
+    pub context: Box<Pat>,
 
     /// Whether this `init` function returns `LateResources` or not
     pub returns_late_resources: bool,
@@ -134,7 +134,7 @@ pub struct Idle {
     pub name: Ident,
 
     /// The context argument
-    pub context: Pat,
+    pub context: Box<Pat>,
 
     /// Static variables local to this context
     pub locals: Map<Local>,
@@ -194,7 +194,7 @@ pub struct LateResource {
     pub shared: bool,
 
     /// The type of this resource
-    pub ty: Type,
+    pub ty: Box<Type>,
 
     pub(crate) _extensible: (),
 }
@@ -211,9 +211,9 @@ pub struct SoftwareTask {
     pub attrs: Vec<Attribute>,
 
     /// The context argument
-    pub context: Pat,
+    pub context: Box<Pat>,
     /// The inputs of this software task
-    pub inputs: Vec<ArgCaptured>,
+    pub inputs: Vec<PatType>,
 
     /// Static variables local to this context
     pub locals: Map<Local>,
@@ -271,7 +271,7 @@ pub struct HardwareTask {
     pub attrs: Vec<Attribute>,
 
     /// The context argument
-    pub context: Pat,
+    pub context: Box<Pat>,
 
     /// Static variables local to this context
     pub locals: Map<Local>,
