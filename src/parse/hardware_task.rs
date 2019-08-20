@@ -7,12 +7,12 @@ use crate::{
 
 impl HardwareTask {
     pub(crate) fn parse(args: HardwareTaskArgs, item: ItemFn, cores: u8) -> parse::Result<Self> {
-        let span = item.ident.span();
+        let span = item.sig.ident.span();
         let valid_signature = util::check_fn_signature(&item)
-            && item.decl.inputs.len() == 1
-            && util::type_is_unit(&item.decl.output);
+            && item.sig.inputs.len() == 1
+            && util::type_is_unit(&item.sig.output);
 
-        let name = item.ident.to_string();
+        let name = item.sig.ident.to_string();
 
         if name == "init" || name == "idle" {
             return Err(parse::Error::new(
@@ -22,7 +22,7 @@ impl HardwareTask {
         }
 
         if valid_signature {
-            if let Some((context, Ok(rest))) = util::parse_inputs(item.decl.inputs, &name) {
+            if let Some((context, Ok(rest))) = util::parse_inputs(item.sig.inputs, &name) {
                 if rest.is_empty() {
                     let (locals, stmts) = util::extract_locals(item.block.stmts)?;
                     let attrs = item.attrs;

@@ -21,17 +21,17 @@ impl InitArgs {
 
 impl Init {
     pub(crate) fn parse(args: InitArgs, item: ItemFn, cores: u8) -> parse::Result<Self> {
-        let valid_signature = util::check_fn_signature(&item) && item.decl.inputs.len() == 1;
+        let valid_signature = util::check_fn_signature(&item) && item.sig.inputs.len() == 1;
 
-        let span = item.ident.span();
+        let span = item.sig.ident.span();
 
-        let name = item.ident.to_string();
+        let name = item.sig.ident.to_string();
 
         if valid_signature {
             if let Ok(returns_late_resources) =
-                util::type_is_late_resources(&item.decl.output, &name)
+                util::type_is_late_resources(&item.sig.output, &name)
             {
-                if let Some((context, Ok(rest))) = util::parse_inputs(item.decl.inputs, &name) {
+                if let Some((context, Ok(rest))) = util::parse_inputs(item.sig.inputs, &name) {
                     if rest.is_empty() {
                         if !returns_late_resources && !args.late.is_empty() {
                             return Err(parse::Error::new(
@@ -48,7 +48,7 @@ impl Init {
                             attrs: item.attrs,
                             context,
                             locals: Local::parse(locals, cores)?,
-                            name: item.ident,
+                            name: item.sig.ident,
                             returns_late_resources,
                             stmts,
                             _extensible: (),

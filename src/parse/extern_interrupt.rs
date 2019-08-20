@@ -8,25 +8,25 @@ impl ExternInterrupt {
         cores: u8,
     ) -> parse::Result<(Core, Ident, ExternInterrupt)> {
         let valid_signature = util::check_foreign_fn_signature(&item)
-            && item.decl.inputs.is_empty()
-            && util::type_is_unit(&item.decl.output);
+            && item.sig.inputs.is_empty()
+            && util::type_is_unit(&item.sig.output);
 
         if !valid_signature {
             return Err(parse::Error::new(
-                item.ident.span(),
+                item.sig.ident.span(),
                 "extern interrupts must have type signature `fn()`",
             ));
         }
 
         let (core, attrs) = if cores > 1 {
-            util::extract_core(item.attrs, cores, item.ident.span())?
+            util::extract_core(item.attrs, cores, item.sig.ident.span())?
         } else {
             (0, item.attrs)
         };
 
         Ok((
             core,
-            item.ident,
+            item.sig.ident,
             ExternInterrupt {
                 attrs,
                 _extensible: (),

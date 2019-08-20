@@ -571,10 +571,10 @@ pub type Locations = IndexMap<Resource, Location>;
 pub type Ownerships = IndexMap<Resource, Ownership>;
 
 /// These types must implement the `Send` trait
-pub type SendTypes = BTreeMap<Core, Set<Type>>;
+pub type SendTypes = BTreeMap<Core, Set<Box<Type>>>;
 
 /// These types must implement the `Sync` trait
-pub type SyncTypes = BTreeMap<Core, Set<Type>>;
+pub type SyncTypes = BTreeMap<Core, Set<Box<Type>>>;
 
 /// Cross-core initialization barriers
 pub type InitializationBarriers =

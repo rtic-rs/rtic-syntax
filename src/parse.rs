@@ -13,7 +13,7 @@ use syn::{
     braced, parenthesized,
     parse::{self, Parse, ParseStream, Parser},
     token::Brace,
-    Ident, IntSuffix, Item, LitInt, Token, TypeTuple,
+    Ident, Item, LitInt, Token, TypeTuple,
 };
 
 use crate::{
@@ -294,22 +294,22 @@ fn task_args(
                     // #lit
                     let lit: LitInt = content.parse()?;
 
-                    if lit.suffix() != IntSuffix::None {
+                    if !lit.suffix().is_empty() {
                         return Err(parse::Error::new(
                             lit.span(),
                             "this literal must be unsuffixed",
                         ));
                     }
 
-                    let value = lit.value();
-                    if value > u64::from(u8::max_value()) || value == 0 {
+                    let value = lit.base10_parse::<u8>().ok();
+                    if value.is_none() || value == Some(0) {
                         return Err(parse::Error::new(
                             lit.span(),
                             "this literal must be in the range 1...255",
                         ));
                     }
 
-                    capacity = Some(value as u8);
+                    capacity = Some(value.unwrap());
                 }
 
                 "core" if cores != 1 => {
@@ -335,22 +335,22 @@ fn task_args(
                     // #lit
                     let lit: LitInt = content.parse()?;
 
-                    if lit.suffix() != IntSuffix::None {
+                    if !lit.suffix().is_empty() {
                         return Err(parse::Error::new(
                             lit.span(),
                             "this literal must be unsuffixed",
                         ));
                     }
 
-                    let value = lit.value();
-                    if value > u64::from(u8::max_value()) || value == 0 {
+                    let value = lit.base10_parse::<u8>().ok();
+                    if value.is_none() || value == Some(0) {
                         return Err(parse::Error::new(
                             lit.span(),
                             "this literal must be in the range 1...255",
                         ));
                     }
 
-                    priority = Some(value as u8);
+                    priority = Some(value.unwrap());
                 }
 
                 "resources" => {

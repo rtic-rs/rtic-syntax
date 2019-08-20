@@ -20,7 +20,7 @@ impl LateResource {
             cfgs,
             attrs,
             shared,
-            ty: item.ty.clone(),
+            ty: Box::new(item.ty.clone()),
             _extensible: (),
         })
     }

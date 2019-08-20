@@ -8,14 +8,14 @@ use crate::{
 impl SoftwareTask {
     pub(crate) fn parse(args: SoftwareTaskArgs, item: ItemFn, cores: u8) -> parse::Result<Self> {
         let valid_signature =
-            util::check_fn_signature(&item) && util::type_is_unit(&item.decl.output);
+            util::check_fn_signature(&item) && util::type_is_unit(&item.sig.output);
 
-        let span = item.ident.span();
+        let span = item.sig.ident.span();
 
-        let name = item.ident.to_string();
+        let name = item.sig.ident.to_string();
 
         if valid_signature {
-            if let Some((context, Ok(inputs))) = util::parse_inputs(item.decl.inputs, &name) {
+            if let Some((context, Ok(inputs))) = util::parse_inputs(item.sig.inputs, &name) {
                 let (locals, stmts) = util::extract_locals(item.block.stmts)?;
                 let (cfgs, attrs) = util::extract_cfgs(item.attrs);
 
