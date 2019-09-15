@@ -8,7 +8,7 @@ keywords = []
 license = "MIT OR Apache-2.0"
 name = "rtfm-syntax"
 repository = "https://github.com/rtfm-rs/rtfm-syntax"
-version = "0.4.0-alpha.1"
+version = "0.4.0-beta.1"
 
 [[test]]
 name = "ui"
