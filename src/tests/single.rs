@@ -465,7 +465,7 @@ fn tq3() {
 
 #[test]
 fn gh183() {
-    // regression test for https://github.com/japaric/cortex-m-rtfm/pull/183
+    // regression test for https://github.com/rtfm-rs/cortex-m-rtfm/pull/183
     let (_app, analysis) = crate::parse2(
         quote!(),
         quote!(
