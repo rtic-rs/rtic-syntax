@@ -5,6 +5,20 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+## [v0.4.0] - 2019-09-??
+
+### Added
+
+- Several tests were ported from the cortex-m-rtfm repository (pre-v0.5.0 state)
+
+### Changed
+
+- [breaking-change] syn, quote and proc-macro2 dependencies were bumped to
+  version 1.0.
+
+- [breaking-change] syntax was changed to match RFCs approved for cortex-m-rtfm
+  v0.5.0 release. The field of most structures changed as well as their APIs.
+
 ## [v0.3.4] - 2018-08-28
 
 ### Fixed
