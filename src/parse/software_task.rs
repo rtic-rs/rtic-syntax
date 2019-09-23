@@ -8,7 +8,7 @@ use crate::{
 impl SoftwareTask {
     pub(crate) fn parse(args: SoftwareTaskArgs, item: ItemFn, cores: u8) -> parse::Result<Self> {
         let valid_signature =
-            util::check_fn_signature(&item) && util::type_is_unit(&item.sig.output);
+            util::check_fn_signature(&item) && util::return_type_is_unit(&item.sig.output);
 
         let span = item.sig.ident.span();
 

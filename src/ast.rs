@@ -273,6 +273,9 @@ pub struct HardwareTask {
     /// The context argument
     pub context: Box<Pat>,
 
+    /// `-> impl Generator<Yield = (), Return = !>`?
+    pub is_generator: bool,
+
     /// Static variables local to this context
     pub locals: Map<Local>,
     /// The statements that make up the task handler

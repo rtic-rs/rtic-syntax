@@ -1,6 +1,6 @@
 //! Full syntax for single core
 
-#[mock::app]
+#[mock::app(parse_binds, parse_impl_generator)]
 const APP: () = {
     struct Resources {
         a: u32,
@@ -52,5 +52,10 @@ const APP: () = {
         static mut X: u32 = 0;
 
         *X += 1;
+    }
+
+    #[task(binds = EXTI0)]
+    fn baz(_: baz::Context) -> impl Generator<Yield = (), Return = !> {
+        // ..
     }
 };

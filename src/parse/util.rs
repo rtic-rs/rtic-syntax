@@ -6,8 +6,9 @@ use syn::{
     parse::{self, Parse, ParseStream},
     punctuated::Punctuated,
     spanned::Spanned,
-    Abi, AttrStyle, Attribute, Expr, FnArg, ForeignItemFn, Ident, Item, ItemFn, ItemStatic, LitInt,
-    Pat, PatType, PathArguments, ReturnType, Stmt, Token, Type, Visibility,
+    Abi, AttrStyle, Attribute, Expr, FnArg, ForeignItemFn, GenericArgument, Ident, Item, ItemFn,
+    ItemStatic, LitInt, Pat, PatType, PathArguments, ReturnType, Stmt, Token, TraitBoundModifier,
+    Type, TypeParamBound, Visibility,
 };
 
 use crate::{ast::Access, Map, Set};
@@ -286,13 +287,17 @@ pub fn parse_inputs(
     }
 }
 
-pub fn type_is_bottom(ty: &ReturnType) -> bool {
+pub fn type_is_bottom(ty: &Type) -> bool {
+    if let Type::Never(_) = ty {
+        true
+    } else {
+        false
+    }
+}
+
+pub fn return_type_is_bottom(ty: &ReturnType) -> bool {
     if let ReturnType::Type(_, ty) = ty {
-        if let Type::Never(_) = **ty {
-            true
-        } else {
-            false
-        }
+        type_is_bottom(ty)
     } else {
         false
     }
@@ -340,14 +345,63 @@ pub fn type_is_path(ty: &Type, segments: &[&str]) -> bool {
     }
 }
 
-pub fn type_is_unit(ty: &ReturnType) -> bool {
+pub fn type_is_unit(ty: &Type) -> bool {
+    if let Type::Tuple(tuple) = ty {
+        tuple.elems.is_empty()
+    } else {
+        false
+    }
+}
+
+pub fn return_type_is_unit(ty: &ReturnType) -> bool {
     if let ReturnType::Type(_, ty) = ty {
-        if let Type::Tuple(ref tuple) = **ty {
-            tuple.elems.is_empty()
+        type_is_unit(ty)
+    } else {
+        true
+    }
+}
+
+pub fn type_is_impl_generator(ty: &ReturnType) -> bool {
+    if let ReturnType::Type(_, ty) = ty {
+        if let Type::ImplTrait(ref it) = **ty {
+            it.bounds.len() == 1 && {
+                if let TypeParamBound::Trait(tb) = &it.bounds[0] {
+                    tb.paren_token.is_none()
+                        && tb.modifier == TraitBoundModifier::None
+                        && tb.lifetimes.is_none()
+                        && tb.path.leading_colon.is_none()
+                        && tb.path.segments.len() == 1
+                        && {
+                            let segment = &tb.path.segments[0];
+                            segment.ident == "Generator"
+                                && if let PathArguments::AngleBracketed(abga) = &segment.arguments {
+                                    let mut has_correct_yield = false;
+                                    let mut has_correct_return = false;
+                                    abga.args.len() == 2 && {
+                                        for arg in &abga.args {
+                                            if let GenericArgument::Binding(b) = arg {
+                                                if b.ident == "Yield" {
+                                                    has_correct_yield = type_is_unit(&b.ty);
+                                                } else if b.ident == "Return" {
+                                                    has_correct_return = type_is_bottom(&b.ty);
+                                                }
+                                            }
+                                        }
+
+                                        has_correct_yield && has_correct_return
+                                    }
+                                } else {
+                                    false
+                                }
+                        }
+                } else {
+                    false
+                }
+            }
         } else {
             false
         }
     } else {
-        true
+        false
     }
 }

@@ -167,6 +167,8 @@ pub struct Settings {
     pub parse_extern_interrupt: bool,
     /// Whether to accept the `schedule` argument or not
     pub parse_schedule: bool,
+    /// Whether to accept `-> impl Generator` in tasks
+    pub parse_impl_generator: bool,
 
     /// Whether to "compress" priorities or not
     pub optimize_priorities: bool,

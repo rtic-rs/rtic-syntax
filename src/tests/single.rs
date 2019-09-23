@@ -488,3 +488,26 @@ fn gh183() {
     assert_eq!(tq.priority, 2);
     assert_eq!(tq.ceiling, 2);
 }
+
+#[test]
+fn impl_generator() {
+    let (app, _analysis) = crate::parse2(
+        quote!(),
+        quote!(
+            const APP: () = {
+                #[task(binds = EXTI0)]
+                fn foo(_: foo::Context) -> impl Generator<Yield = (), Return = !> {}
+            };
+        ),
+        Settings {
+            parse_binds: true,
+            parse_impl_generator: true,
+            ..Settings::default()
+        },
+    )
+    .unwrap();
+
+    let (name, task) = app.hardware_tasks.iter().next().unwrap();
+    assert_eq!(name.to_string(), "foo");
+    assert!(task.is_generator);
+}

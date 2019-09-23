@@ -239,7 +239,7 @@ impl App {
 
                                 hardware_tasks.insert(
                                     item.sig.ident.clone(),
-                                    HardwareTask::parse(args, item, cores)?,
+                                    HardwareTask::parse(args, item, cores, settings)?,
                                 );
                             }
 

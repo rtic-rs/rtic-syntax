@@ -20,6 +20,8 @@ pub fn app(args: TokenStream, input: TokenStream) -> TokenStream {
             settings.parse_extern_interrupt = true;
         } else if arg.trim() == "parse_schedule" {
             settings.parse_schedule = true;
+        } else if arg.trim() == "parse_impl_generator" {
+            settings.parse_impl_generator = true;
         } else {
             rtfm_args.push(arg.to_string());
         }

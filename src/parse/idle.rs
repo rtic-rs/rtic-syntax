@@ -28,7 +28,7 @@ impl Idle {
     pub(crate) fn parse(args: IdleArgs, item: ItemFn, cores: u8) -> parse::Result<Self> {
         let valid_signature = util::check_fn_signature(&item)
             && item.sig.inputs.len() == 1
-            && util::type_is_bottom(&item.sig.output);
+            && util::return_type_is_bottom(&item.sig.output);
 
         let name = item.sig.ident.to_string();
 

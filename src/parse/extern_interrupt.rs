@@ -9,7 +9,7 @@ impl ExternInterrupt {
     ) -> parse::Result<(Core, Ident, ExternInterrupt)> {
         let valid_signature = util::check_foreign_fn_signature(&item)
             && item.sig.inputs.is_empty()
-            && util::type_is_unit(&item.sig.output);
+            && util::return_type_is_unit(&item.sig.output);
 
         if !valid_signature {
             return Err(parse::Error::new(
