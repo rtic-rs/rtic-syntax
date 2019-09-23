@@ -340,14 +340,85 @@ pub fn type_is_path(ty: &Type, segments: &[&str]) -> bool {
     }
 }
 
-pub fn type_is_unit(ty: &ReturnType) -> bool {
-    if let ReturnType::Type(_, ty) = ty {
-        if let Type::Tuple(ref tuple) = **ty {
-            tuple.elems.is_empty()
+// pub fn path_is_segments(path: &syn::Path, segments: &[(&str, &str)]) -> bool {
+//     // if let syn::PathArguments::AngleBracketed(gen_args) = path.arguments {
+//     //     return true;
+//     // }
+//     path.segments.len() == segments.len()
+//         && path
+//             .segments
+//             .iter()
+//             .zip(segments)
+//             .all(|(lhs, rhs)| lhs.ident == rhs.0 && lhs.)
+// }
+
+pub fn path_is_generator(path: &syn::Path) -> bool {
+    path.segments.len() == 1
+        && path.segments[0].ident == "Generator"
+        && if let syn::PathArguments::AngleBracketed(abga) = &path.segments[0].arguments {
+            let g = &abga.args;
+            g.len() == 2
+                && match &g[0] {
+                    syn::GenericArgument::Binding(b) => {
+                        b.ident == "Yield"
+                            && match &b.ty {
+                                Type::Tuple(e) => e.elems.is_empty(),
+                                _ => false,
+                            }
+                    }
+                    _ => false,
+                }
+                && match &g[1] {
+                    syn::GenericArgument::Binding(b) => {
+                        b.ident == "Return"
+                            && match &b.ty {
+                                Type::Never(_) => true,
+                                _ => false,
+                            }
+                    }
+                    _ => false,
+                }
         } else {
             false
         }
+}
+
+pub fn type_is_unit(ty: &ReturnType) -> bool {
+    if let ReturnType::Type(_, ty) = ty {
+        if let Type::Tuple(ref tuple) = **ty {
+            // Ok, () return type
+            tuple.elems.is_empty()
+        } else {
+            // other return type, should be ()
+            false
+        }
     } else {
+        // Ok, no return type
         true
+    }
+}
+
+pub fn type_is_generator(ty: &ReturnType) -> bool {
+    if let ReturnType::Type(_, ty) = ty {
+        if let Type::ImplTrait(ref tit) = **ty {
+            if tit.bounds.len() == 1 {
+                if let Some(syn::TypeParamBound::Trait(tb)) = tit.bounds.first() {
+                    path_is_generator(&tb.path)
+                        && tb.paren_token == None
+                        && tb.modifier == syn::TraitBoundModifier::None
+                        && tb.lifetimes == None
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        } else {
+            // wrong return type, not ImplTrait
+            false
+        }
+    } else {
+        // no return type, not ImpleTrait
+        false
     }
 }

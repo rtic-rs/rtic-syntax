@@ -10,7 +10,7 @@ impl HardwareTask {
         let span = item.sig.ident.span();
         let valid_signature = util::check_fn_signature(&item)
             && item.sig.inputs.len() == 1
-            && util::type_is_unit(&item.sig.output);
+            && (util::type_is_unit(&item.sig.output) || util::type_is_generator(&item.sig.output));
 
         let name = item.sig.ident.to_string();
 
@@ -26,9 +26,11 @@ impl HardwareTask {
                 if rest.is_empty() {
                     let (locals, stmts) = util::extract_locals(item.block.stmts)?;
                     let attrs = item.attrs;
+                    let is_generator = util::type_is_generator(&item.sig.output);
 
                     return Ok(HardwareTask {
                         args,
+                        is_generator,
                         attrs,
                         context,
                         locals: Local::parse(locals, cores)?,

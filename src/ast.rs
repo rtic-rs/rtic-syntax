@@ -267,6 +267,9 @@ pub struct HardwareTask {
     /// Hardware task metadata
     pub args: HardwareTaskArgs,
 
+    /// The task implements a generator
+    pub is_generator: bool,
+
     /// Attributes that will apply to this interrupt handler
     pub attrs: Vec<Attribute>,
 
