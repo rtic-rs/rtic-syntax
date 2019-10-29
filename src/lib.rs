@@ -110,9 +110,17 @@ impl<'a> Context<'a> {
         }
     }
 
+    /// TODO
+    pub fn is_generator(&self, app: &App) -> bool {
+        match *self {
+            Context::HardwareTask(ident) => app.hardware_tasks[ident].is_generator,
+            _ => false,
+        }
+    }
+
     /// Whether this context runs only once
-    pub fn runs_once(&self) -> bool {
-        self.is_init() || self.is_idle()
+    pub fn runs_once(&self, app: &App) -> bool {
+        self.is_init() || self.is_idle() || self.is_generator(app)
     }
 
     /// Whether this context has local `static` variables
