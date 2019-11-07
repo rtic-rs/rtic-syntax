@@ -1,7 +1,7 @@
 set -euxo pipefail
 
 main() {
-    if [ $TRAVIS_RUST_VERSION == 1.*.* ]; then
+    if [[ $TRAVIS_RUST_VERSION == 1.*.* ]]; then
         # test on a fixed version (MSRV) to avoid problems with changes in rustc diagnostics
         cargo test --features compiletest_rs --test ui
     else
