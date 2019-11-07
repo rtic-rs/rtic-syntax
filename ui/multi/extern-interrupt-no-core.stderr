@@ -3,6 +3,3 @@ error: core needs to be specified using the `#[core = 0]` attribute
   |
 6 |         fn foo();
   |            ^^^
-
-error: aborting due to previous error
-

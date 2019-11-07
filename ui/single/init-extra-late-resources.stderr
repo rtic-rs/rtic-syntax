@@ -3,6 +3,3 @@ error: no late resources exist so this function must NOT return `LateResources`
   |
 6 |     fn init(_: init::Context) -> init::LateResources {}
   |        ^^^^
-
-error: aborting due to previous error
-

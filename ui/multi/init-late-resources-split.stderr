@@ -3,6 +3,3 @@ error: unclear how initialization of late resources is split between cores 0 and
    |
 13 |     fn init(_: init::Context) -> init::LateResources {}
    |        ^^^^
-
-error: aborting due to previous error
-

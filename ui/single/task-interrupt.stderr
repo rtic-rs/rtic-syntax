@@ -3,6 +3,3 @@ error: this task is defined multiple times
   |
 9 |     fn foo(_: foo::Context) {}
   |        ^^^
-
-error: aborting due to previous error
-

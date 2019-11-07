@@ -3,6 +3,3 @@ error: this resource has NOT been declared
   |
 5 |     #[task(resources = [A])]
   |                         ^
-
-error: aborting due to previous error
-

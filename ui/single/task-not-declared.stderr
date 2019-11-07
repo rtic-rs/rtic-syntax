@@ -3,6 +3,3 @@ error: this software task has NOT been declared
   |
 5 |     #[init(spawn = [foo])]
   |                     ^^^
-
-error: aborting due to previous error
-

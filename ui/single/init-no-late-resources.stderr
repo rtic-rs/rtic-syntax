@@ -3,6 +3,3 @@ error: late resources exist so `#[init]` must return `init::LateResources`
    |
 10 |     fn init(_: init::Context) {}
    |        ^^^^
-
-error: aborting due to previous error
-

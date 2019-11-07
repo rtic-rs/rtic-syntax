@@ -3,6 +3,3 @@ error: no more late resources to initialize; this function must NOT return `Late
    |
 13 |     fn init(_: init::Context) -> init::LateResources {}
    |        ^^^^
-
-error: aborting due to previous error
-

@@ -3,6 +3,3 @@ error: all `#[idle]` functions must specify the core they'll run on
   |
 6 |     fn idle(_: idle::Context) -> ! {
   |        ^^^^
-
-error: aborting due to previous error
-

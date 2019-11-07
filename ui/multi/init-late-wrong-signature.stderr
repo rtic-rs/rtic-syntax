@@ -3,6 +3,3 @@ error: the `late` argument can only be used on functions that return `LateResour
    |
 10 |     fn init(_: init::Context) {}
    |        ^^^^
-
-error: aborting due to previous error
-

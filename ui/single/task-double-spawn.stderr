@@ -3,6 +3,3 @@ error: argument appears more than once
   |
 5 |     #[task(spawn = [bar], spawn = [baz])]
   |                           ^^^^^
-
-error: aborting due to previous error
-
