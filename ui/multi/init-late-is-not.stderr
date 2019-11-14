@@ -3,6 +3,3 @@ error: this is not a late resource
    |
 11 |     #[init(core = 0, late = [b])]
    |                              ^
-
-error: aborting due to previous error
-

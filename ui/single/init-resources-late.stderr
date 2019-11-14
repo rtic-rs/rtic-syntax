@@ -3,6 +3,3 @@ error: late resources can NOT be assigned to `init`
   |
 9 |     #[init(resources = [x])]
   |                         ^
-
-error: aborting due to previous error
-

@@ -3,6 +3,3 @@ error: this resource is not being initialized
   |
 8 |         c: u32,
   |         ^
-
-error: aborting due to previous error
-

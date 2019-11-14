@@ -3,6 +3,3 @@ error: `#[shared]` can only be used in multi-core mode
   |
 7 |         #[shared]
   |         ^
-
-error: aborting due to previous error
-

@@ -3,6 +3,3 @@ error: this identifier has already been used
    |
 10 |     fn foo(_: foo::Context) {}
    |        ^^^
-
-error: aborting due to previous error
-

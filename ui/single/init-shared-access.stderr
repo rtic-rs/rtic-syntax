@@ -3,6 +3,3 @@ error: `init` has direct exclusive access to resources; use `x` instead of `&x`
    |
 10 |     #[init(resources = [&x])]
    |                          ^
-
-error: aborting due to previous error
-

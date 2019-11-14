@@ -13,10 +13,6 @@ name = "rtfm-syntax"
 repository = "https://github.com/rtfm-rs/rtfm-syntax"
 version = "0.4.0-beta.2"
 
-[[test]]
-name = "ui"
-required-features = ["compiletest_rs"]
-
 [dependencies]
 indexmap = "1.0.2"
 proc-macro2 = "1"
@@ -28,10 +24,7 @@ version = "1"
 [dev-dependencies]
 mock = { path = "mock" }
 quote = "1"
-
-[dependencies.compiletest_rs]
-optional = true
-version = "0.3.22"
+trybuild = "1"
 
 [workspace]
 members = [

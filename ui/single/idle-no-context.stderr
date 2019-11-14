@@ -3,6 +3,3 @@ error: this `#[idle]` function must have signature `fn(idle::Context) -> !`
   |
 6 |     fn idle() -> ! {
   |        ^^^^
-
-error: aborting due to previous error
-

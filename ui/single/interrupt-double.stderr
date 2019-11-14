@@ -3,6 +3,3 @@ error: a task has already been bound to this interrupt
   |
 8 |     #[task(binds = UART0)]
   |                    ^^^^^
-
-error: aborting due to previous error
-

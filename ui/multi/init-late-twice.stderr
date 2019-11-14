@@ -3,6 +3,3 @@ error: this resource is initialized by core 0
    |
 13 |     #[init(core = 1, late = [a])]
    |                              ^
-
-error: aborting due to previous error
-

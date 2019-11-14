@@ -3,6 +3,3 @@ error: this field must have inherited / private visibility
   |
 7 |         pub x: u32,
   |             ^
-
-error: aborting due to previous error
-

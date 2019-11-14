@@ -3,6 +3,3 @@ error: this task handler must have type signature `fn(foo::Context, ..)`
   |
 6 |     pub fn foo(_: foo::Context) {}
   |            ^^^
-
-error: aborting due to previous error
-

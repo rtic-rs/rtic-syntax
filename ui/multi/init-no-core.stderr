@@ -3,6 +3,3 @@ error: all `#[init]` functions must specify the core they'll run on
   |
 6 |     fn init(_: init::Context) {}
   |        ^^^^
-
-error: aborting due to previous error
-
