@@ -11,7 +11,7 @@ keywords = []
 license = "MIT OR Apache-2.0"
 name = "rtfm-syntax"
 repository = "https://github.com/rtfm-rs/rtfm-syntax"
-version = "0.4.0-beta.2"
+version = "0.4.0"
 
 [dependencies]
 indexmap = "1.0.2"
