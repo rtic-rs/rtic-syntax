@@ -5,7 +5,7 @@ use proc_macro2::TokenStream as TokenStream2;
 use syn::{
     parse::{self, ParseStream, Parser},
     spanned::Spanned,
-    ExprParen, Fields, ForeignItem, Ident, Item, LitBool, LitInt, Path, Token, Visibility,
+    ExprParen, Fields, ForeignItem, Ident, Item, Lit, LitInt, Path, Token, Visibility,
 };
 
 use super::Input;
@@ -70,27 +70,35 @@ impl AppArgs {
                             ));
                         }
 
-                        if let Ok(lit) = input.parse::<LitBool>() {
-                            custom.insert(ident, CustomArg::Bool(lit.value));
-                        } else if let Ok(lit) = input.parse::<LitInt>() {
-                            if lit.suffix().is_empty() {
-                                custom.insert(
-                                    ident,
-                                    CustomArg::UInt(lit.base10_digits().to_string()),
-                                );
-                            } else {
-                                return Err(parse::Error::new(
-                                    ident.span(),
-                                    "argument has unexpected value",
-                                ));
-                            }
-                        } else if let Ok(p) = input.parse::<Path>() {
+                        // Parse as path
+                        if let Ok(p) = input.parse::<Path>() {
                             custom.insert(ident, CustomArg::Path(p));
                         } else {
-                            return Err(parse::Error::new(
-                                ident.span(),
-                                "argument has unexpected value",
-                            ));
+                            // Parse as literal
+                            match input.parse::<Lit>()? {
+                                Lit::Bool(lit) => {
+                                    custom.insert(ident, CustomArg::Bool(lit.value));
+                                }
+                                Lit::Int(lit) => {
+                                    if lit.suffix().is_empty() {
+                                        custom.insert(
+                                            ident,
+                                            CustomArg::UInt(lit.base10_digits().to_string()),
+                                        );
+                                    } else {
+                                        return Err(parse::Error::new(
+                                            ident.span(),
+                                            "integer must be unsuffixed",
+                                        ));
+                                    }
+                                }
+                                _ => {
+                                    return Err(parse::Error::new(
+                                        ident.span(),
+                                        "argument has unexpected value",
+                                    ));
+                                }
+                            }
                         }
                     }
                 }
@@ -391,5 +399,59 @@ impl App {
 
             _extensible: (),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{ast::AppArgs, ast::CustomArg, Settings};
+
+    #[test]
+    fn parse_app_args_cores1() {
+        let s = "peripherals = true";
+
+        let stream: proc_macro2::TokenStream = s.parse().unwrap();
+        let settings = Settings::default();
+        let result = AppArgs::parse(stream, &settings).unwrap();
+
+        // Check cores
+        assert_eq!(result.cores, 1);
+
+        // Check map
+        for (ident, value) in result.custom {
+            match ident.to_string().as_ref() {
+                "peripherals" => match value {
+                    CustomArg::Bool(true) => {}
+                    _ => panic!("Expected peripherals = true"),
+                },
+                _ => panic!("Unexpected identifier"),
+            }
+        }
+    }
+
+    #[test]
+    fn parse_app_args_cores2() {
+        let s = "cores = 2, peripherals = 1";
+
+        let stream: proc_macro2::TokenStream = s.parse().unwrap();
+        let mut settings = Settings::default();
+        settings.parse_cores = true;
+        let result = AppArgs::parse(stream, &settings).unwrap();
+
+        // Check cores
+        assert_eq!(result.cores, 2);
+
+        // Check map
+        for (ident, value) in result.custom {
+            match ident.to_string().as_ref() {
+                "peripherals" => match value {
+                    CustomArg::UInt(int) => {
+                        assert_eq!(int, "1");
+                    }
+                    _ => panic!("Expected peripherals = 1"),
+                },
+                _ => panic!("Unexpected identifier"),
+            }
+        }
     }
 }
