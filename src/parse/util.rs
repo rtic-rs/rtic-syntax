@@ -174,6 +174,25 @@ pub fn extract_shared(attrs: &mut Vec<Attribute>, cores: u8) -> parse::Result<bo
     }
 }
 
+pub fn extract_task_local(attrs: &mut Vec<Attribute>) -> parse::Result<bool> {
+    if let Some(pos) = attrs.iter().position(|attr| attr_eq(attr, "task_local")) {
+        attrs.remove(pos);
+
+        Ok(true)
+    } else {
+        Ok(false)
+    }
+}
+
+pub fn extract_lock_free(attrs: &mut Vec<Attribute>) -> parse::Result<bool> {
+    if let Some(pos) = attrs.iter().position(|attr| attr_eq(attr, "lock_free")) {
+        attrs.remove(pos);
+        Ok(true)
+    } else {
+        Ok(false)
+    }
+}
+
 pub fn parse_core(lit: LitInt, cores: u8) -> parse::Result<u8> {
     if !lit.suffix().is_empty() {
         return Err(parse::Error::new(

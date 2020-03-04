@@ -1,7 +1,10 @@
 use proc_macro2::Span;
 use syn::{parse, Field, Visibility};
 
-use crate::{ast::LateResource, parse::util};
+use crate::{
+    ast::{LateResource, ResourceProperties},
+    parse::util,
+};
 
 impl LateResource {
     pub(crate) fn parse(item: &Field, span: Span, cores: u8) -> parse::Result<Self> {
@@ -16,11 +19,19 @@ impl LateResource {
 
         let shared = util::extract_shared(&mut attrs, cores)?;
 
+        let task_local = util::extract_task_local(&mut attrs)?;
+
+        let lock_free = util::extract_lock_free(&mut attrs)?;
+
         Ok(LateResource {
             cfgs,
             attrs,
             shared,
             ty: Box::new(item.ty.clone()),
+            properties: ResourceProperties {
+                task_local,
+                lock_free,
+            },
             _extensible: (),
         })
     }
