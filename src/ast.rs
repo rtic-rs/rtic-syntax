@@ -3,7 +3,7 @@
 use core::ops::Deref;
 use std::collections::BTreeMap;
 
-use syn::{Attribute, Expr, Ident, Pat, PatType, Path, Stmt, Type};
+use syn::{Attribute, Expr, Ident, Pat, PatType, Path, Stmt, Type, TypeArray};
 
 use crate::{Core, Map, Set};
 
@@ -244,6 +244,9 @@ pub struct SoftwareTaskArgs {
     /// Software tasks that can be scheduled from this context
     pub schedule: Set<Ident>,
 
+    /// Log
+    pub log: Vec<LogMsg>,
+
     pub(crate) _extensible: (),
 }
 
@@ -256,9 +259,19 @@ impl Default for SoftwareTaskArgs {
             resources: Resources::new(),
             spawn: Set::new(),
             schedule: Set::new(),
+            log: Vec::new(),
             _extensible: (),
         }
     }
+}
+
+/// Memory Lane
+#[derive(Debug)]
+pub struct LogMsg {
+    /// The identifier of the Log message
+    pub log_ident: Ident,
+    /// The array type [T; n] of the Log buffer
+    pub log_type: TypeArray,
 }
 
 /// A hardware task

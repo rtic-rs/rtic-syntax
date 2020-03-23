@@ -1,6 +1,6 @@
 #![deny(rust_2018_compatibility)]
-#![deny(rust_2018_idioms)]
-#![deny(warnings)]
+//#![deny(rust_2018_idioms)]
+//#![deny(warnings)]
 
 extern crate proc_macro;
 

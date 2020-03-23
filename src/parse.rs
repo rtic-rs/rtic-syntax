@@ -241,6 +241,7 @@ fn task_args(
         let mut resources = None;
         let mut schedule = None;
         let mut spawn = None;
+        let mut log = None;
 
         let content;
         parenthesized!(content in input);
@@ -274,6 +275,17 @@ fn task_args(
                     let ident = content.parse()?;
 
                     binds = Some(ident);
+                }
+
+                "log" => {
+                    if log.is_some() {
+                        return Err(parse::Error::new(
+                            ident.span(),
+                            "argument appears more than once",
+                        ));
+                    }
+
+                    log = Some(Vec::new());
                 }
 
                 "capacity" => {
@@ -428,6 +440,7 @@ fn task_args(
         let resources = resources.unwrap_or(Resources::new());
         let schedule = schedule.unwrap_or(Set::new());
         let spawn = spawn.unwrap_or(Set::new());
+        let log = log.unwrap_or(Vec::new());
 
         Ok(if let Some(binds) = binds {
             Either::Left(HardwareTaskArgs {
@@ -447,6 +460,7 @@ fn task_args(
                 resources,
                 schedule,
                 spawn,
+                log,
                 _extensible: (),
             })
         })
