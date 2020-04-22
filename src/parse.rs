@@ -13,7 +13,7 @@ use syn::{
     braced, parenthesized,
     parse::{self, Parse, ParseStream, Parser},
     token::Brace,
-    Ident, Item, LitInt, Token, TypeTuple,
+    Ident, Item, LitInt, Token,
 };
 
 use crate::{
@@ -29,14 +29,10 @@ pub fn app(args: TokenStream2, input: TokenStream2, settings: &Settings) -> pars
 }
 
 pub(crate) struct Input {
-    _const_token: Token![const],
+    _mod_token: Token![mod],
     pub ident: Ident,
-    _colon_token: Token![:],
-    _ty: TypeTuple,
-    _eq_token: Token![=],
     _brace_token: Brace,
     pub items: Vec<Item>,
-    _semi_token: Token![;],
 }
 
 impl Parse for Input {
@@ -53,14 +49,10 @@ impl Parse for Input {
 
         let content;
         Ok(Input {
-            _const_token: input.parse()?,
+            _mod_token: input.parse()?,
             ident: input.parse()?,
-            _colon_token: input.parse()?,
-            _ty: input.parse()?,
-            _eq_token: input.parse()?,
             _brace_token: braced!(content in input),
             items: content.call(parse_items)?,
-            _semi_token: input.parse()?,
         })
     }
 }
