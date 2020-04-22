@@ -1,9 +1,9 @@
 #![no_main]
 
 #[mock::app]
-const APP: () = {
+mod app {
     #[idle(resources = [A], resources = [B])]
     fn idle(_: idle::Context) -> ! {
         loop {}
     }
-};
+}

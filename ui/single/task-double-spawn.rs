@@ -1,7 +1,7 @@
 #![no_main]
 
 #[mock::app]
-const APP: () = {
+mod app {
     #[task(spawn = [bar], spawn = [baz])]
     fn foo(_: foo::Context) {}
-};
+}

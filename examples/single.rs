@@ -1,7 +1,7 @@
 //! Full syntax
 
 #[mock::app]
-const APP: () = {
+mod app {
     struct Resources {
         a: u32,
         b: u32,
@@ -53,4 +53,4 @@ const APP: () = {
 
         *X += 1;
     }
-};
+}

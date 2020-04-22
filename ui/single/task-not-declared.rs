@@ -1,7 +1,7 @@
 #![no_main]
 
 #[mock::app]
-const APP: () = {
+mod app {
     #[init(spawn = [foo])]
     fn init(_: init::Context) {}
-};
+}
