@@ -1,16 +1,16 @@
 [package]
 authors = [
-  "The Real Time For the Masses developers",
+  "The Real-Time Interrupt-driven Concurrency developers",
   "Jorge Aparicio <jorge@japaric.io>",
 ]
 categories = ["concurrency", "embedded", "no-std"]
-description = "The Real Time for The Masses (RTFM) meta language"
-documentation = "https://docs.rs/rtfm-syntax"
+description = "The Real-Time Interrupt-driven Concurrency (RTIC) meta language"
+documentation = "https://docs.rs/rtic-syntax"
 edition = "2018"
 keywords = []
 license = "MIT OR Apache-2.0"
-name = "rtfm-syntax"
-repository = "https://github.com/rtfm-rs/rtfm-syntax"
+name = "rtic-syntax"
+repository = "https://github.com/rtic-rs/rtic-syntax"
 version = "0.4.0"
 
 [dependencies]

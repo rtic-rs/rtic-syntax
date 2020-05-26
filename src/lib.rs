@@ -1,4 +1,4 @@
-//! The Real Time For the Masses (RTFM) meta language
+//! The Real-Time Interrupt-driven Concurrency (RTIC) meta language
 
 #![deny(missing_docs)]
 #![deny(rust_2018_compatibility)]

@@ -9,14 +9,14 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Added
 
-- Several tests were ported from the cortex-m-rtfm repository (pre-v0.5.0 state)
+- Several tests were ported from the cortex-m-rtic repository (pre-v0.5.0 state)
 
 ### Changed
 
 - [breaking-change] syn, quote and proc-macro2 dependencies were bumped to
   version 1.0.
 
-- [breaking-change] syntax was changed to match RFCs approved for cortex-m-rtfm
+- [breaking-change] syntax was changed to match RFCs approved for cortex-m-rtic
   v0.5.0 release. The field of most structures changed as well as their APIs.
 
 ## [v0.3.4] - 2018-08-28
@@ -70,12 +70,12 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 - Initial release
 
-[Unreleased]: https://github.com/rtfm-rs/rtfm-syntax/compare/v0.4.0...HEAD
-[v0.4.0]: https://github.com/rtfm-rs/rtfm-syntax/compare/v0.3.4...v0.4.0
-[v0.3.4]: https://github.com/rtfm-rs/rtfm-syntax/compare/v0.3.3...v0.3.4
-[v0.3.3]: https://github.com/rtfm-rs/rtfm-syntax/compare/v0.3.2...v0.3.3
-[v0.3.2]: https://github.com/rtfm-rs/rtfm-syntax/compare/v0.3.1...v0.3.2
-[v0.3.1]: https://github.com/rtfm-rs/rtfm-syntax/compare/v0.3.0...v0.3.1
-[v0.3.0]: https://github.com/rtfm-rs/rtfm-syntax/compare/v0.2.1...v0.3.0
-[v0.2.1]: https://github.com/rtfm-rs/rtfm-syntax/compare/v0.2.0...v0.2.1
-[v0.2.0]: https://github.com/rtfm-rs/rtfm-syntax/compare/v0.1.0...v0.2.0
+[Unreleased]: https://github.com/rtic-rs/rtic-syntax/compare/v0.4.0...HEAD
+[v0.4.0]: https://github.com/rtic-rs/rtic-syntax/compare/v0.3.4...v0.4.0
+[v0.3.4]: https://github.com/rtic-rs/rtic-syntax/compare/v0.3.3...v0.3.4
+[v0.3.3]: https://github.com/rtic-rs/rtic-syntax/compare/v0.3.2...v0.3.3
+[v0.3.2]: https://github.com/rtic-rs/rtic-syntax/compare/v0.3.1...v0.3.2
+[v0.3.1]: https://github.com/rtic-rs/rtic-syntax/compare/v0.3.0...v0.3.1
+[v0.3.0]: https://github.com/rtic-rs/rtic-syntax/compare/v0.2.1...v0.3.0
+[v0.2.1]: https://github.com/rtic-rs/rtic-syntax/compare/v0.2.0...v0.2.1
+[v0.2.0]: https://github.com/rtic-rs/rtic-syntax/compare/v0.1.0...v0.2.0

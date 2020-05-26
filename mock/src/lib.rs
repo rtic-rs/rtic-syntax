@@ -5,12 +5,12 @@
 extern crate proc_macro;
 
 use proc_macro::TokenStream;
-use rtfm_syntax::Settings;
+use rtic_syntax::Settings;
 
 #[proc_macro_attribute]
 pub fn app(args: TokenStream, input: TokenStream) -> TokenStream {
     let mut settings = Settings::default();
-    let mut rtfm_args = vec![];
+    let mut rtic_args = vec![];
     for arg in args.to_string().split(',') {
         if arg.trim() == "parse_cores" {
             settings.parse_cores = true;
@@ -21,11 +21,11 @@ pub fn app(args: TokenStream, input: TokenStream) -> TokenStream {
         } else if arg.trim() == "parse_schedule" {
             settings.parse_schedule = true;
         } else {
-            rtfm_args.push(arg.to_string());
+            rtic_args.push(arg.to_string());
         }
     }
 
-    if let Err(e) = rtfm_syntax::parse(rtfm_args.join(", ").parse().unwrap(), input, settings) {
+    if let Err(e) = rtic_syntax::parse(rtic_args.join(", ").parse().unwrap(), input, settings) {
         e.to_compile_error().into()
     } else {
         "fn main() {}".parse().unwrap()

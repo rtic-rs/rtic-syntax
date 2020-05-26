@@ -9,4 +9,4 @@ version = "0.0.0-alpha.0"
 proc-macro = true
 
 [dependencies]
-rtfm-syntax = { path = ".." }
+rtic-syntax = { path = ".." }
