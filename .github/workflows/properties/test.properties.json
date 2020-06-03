@@ -1,0 +1,6 @@
+{
+    "name": "Test",
+    "description": "Test with Cargo.",
+    "iconName": "rust",
+    "categories": ["Rust"]
+}
