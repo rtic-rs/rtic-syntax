@@ -45,6 +45,7 @@ fn resource_owned() {
         quote!(),
         quote!(
             mod app {
+                #[resources]
                 struct Resources {
                     #[init(0)]
                     x: i32,
@@ -69,6 +70,7 @@ fn resource_coowned() {
         quote!(),
         quote!(
             mod app {
+                #[resources]
                 struct Resources {
                     #[init(0)]
                     x: i32,
@@ -96,6 +98,7 @@ fn resource_contended() {
         quote!(),
         quote!(
             mod app {
+                #[resources]
                 struct Resources {
                     #[init(0)]
                     x: i32,
@@ -124,6 +127,7 @@ fn no_send_late_resources_idle() {
         quote!(),
         quote!(
             mod app {
+                #[resources]
                 struct Resources {
                     x: i32,
                 }
@@ -250,6 +254,7 @@ fn send_late_resource() {
         quote!(),
         quote!(
             mod app {
+                #[resources]
                 struct Resources {
                     a: X,
                 }
@@ -278,6 +283,7 @@ fn send_shared_with_init() {
         quote!(),
         quote!(
             mod app {
+                #[resources]
                 struct Resources {
                     #[init(0)]
                     x: i32,
@@ -305,6 +311,7 @@ fn not_sync() {
         quote!(),
         quote!(
             mod app {
+                #[resources]
                 struct Resources {
                     #[init(0)]
                     x: i32,
@@ -331,6 +338,7 @@ fn sync() {
         quote!(),
         quote!(
             mod app {
+                #[resources]
                 struct Resources {
                     #[init(0)]
                     x: i32,
@@ -358,6 +366,7 @@ fn late_resources() {
         quote!(),
         quote!(
             mod app {
+                #[resources]
                 struct Resources {
                     x: i32,
                 }
