@@ -1,5 +1,5 @@
 error: late resources exist so `#[init]` must return `init::LateResources`
-  --> $DIR/init-no-late-resources.rs:10:8
+  --> $DIR/init-no-late-resources.rs:11:8
    |
-10 |     fn init(_: init::Context) {}
+11 |     fn init(_: init::Context) {}
    |        ^^^^
