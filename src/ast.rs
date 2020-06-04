@@ -2,7 +2,7 @@
 
 use core::ops::Deref;
 
-use syn::{Attribute, Expr, Ident, ItemUse, Pat, PatType, Path, Stmt, Type};
+use syn::{Attribute, Expr, Ident, Item, ItemUse, Pat, PatType, Path, Stmt, Type};
 
 use crate::{Map, Set};
 
@@ -29,6 +29,9 @@ pub struct App {
 
     /// User imports
     pub user_imports: Vec<ItemUse>,
+
+    /// User code
+    pub user_code: Vec<Item>,
 
     /// Hardware tasks: `#[task(binds = ..)]`s
     pub hardware_tasks: Map<HardwareTask>,

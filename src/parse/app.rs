@@ -96,9 +96,11 @@ impl App {
 
         let mut late_resources = Map::new();
         let mut resources = Map::new();
+        let mut resource_struct = Map::new();
         let mut hardware_tasks = Map::new();
         let mut software_tasks = Map::new();
         let mut user_imports = vec![];
+        let mut user_code = vec![];
 
         let mut extern_interrupts = ExternInterrupts::new();
 
@@ -210,59 +212,76 @@ impl App {
                     }
                 }
 
-                Item::Struct(ref mut item) if item.ident.to_string() == "Resources" => {
-                    if item.vis != Visibility::Inherited {
-                        return Err(parse::Error::new(
-                            item.span(),
-                            "this item must have inherited / private visibility",
-                        ));
-                    }
+                Item::Struct(ref mut struct_item) => {
+                    // Match structures with the attribute #[resources], name of structure is not
+                    // important
+                    if let Some(_pos) = struct_item
+                        .attrs
+                        .iter()
+                        .position(|attr| util::attr_eq(attr, "resources"))
+                    {
+                        let span = struct_item.ident.span();
 
-                    if !item.attrs.is_empty() {
-                        return Err(parse::Error::new(
-                            item.span(),
-                            "this item must have no attributes",
-                        ));
-                    }
-
-                    if let Fields::Named(fields) = &mut item.fields {
-                        for field in &mut fields.named {
-                            let ident = field.ident.as_ref().expect("UNREACHABLE");
-
-                            if late_resources.contains_key(ident) || resources.contains_key(ident) {
-                                return Err(parse::Error::new(
-                                    ident.span(),
-                                    "this resource is listed more than once",
-                                ));
-                            }
-
-                            if let Some(pos) = field
-                                .attrs
-                                .iter()
-                                .position(|attr| util::attr_eq(attr, "init"))
-                            {
-                                let attr = field.attrs.remove(pos);
-
-                                let late = LateResource::parse(field, ident.span())?;
-
-                                resources.insert(
-                                    ident.clone(),
-                                    Resource {
-                                        late,
-                                        expr: syn::parse2::<ExprParen>(attr.tokens)?.expr,
-                                    },
-                                );
-                            } else {
-                                let late = LateResource::parse(field, ident.span())?;
-
-                                late_resources.insert(ident.clone(), late);
-                            }
+                        if resource_struct.contains_key(&struct_item.ident) {
+                            return Err(parse::Error::new(
+                                span,
+                                "`#[resources]` struct must appear at most once",
+                            ));
                         }
+
+                        if struct_item.vis != Visibility::Inherited {
+                            return Err(parse::Error::new(
+                                struct_item.span(),
+                                "this item must have inherited / private visibility",
+                            ));
+                        }
+
+                        if let Fields::Named(fields) = &mut struct_item.fields {
+                            for field in &mut fields.named {
+                                let ident = field.ident.as_ref().expect("UNREACHABLE");
+
+                                if late_resources.contains_key(ident)
+                                    || resources.contains_key(ident)
+                                {
+                                    return Err(parse::Error::new(
+                                        ident.span(),
+                                        "this resource is listed more than once",
+                                    ));
+                                }
+
+                                if let Some(pos) = field
+                                    .attrs
+                                    .iter()
+                                    .position(|attr| util::attr_eq(attr, "init"))
+                                {
+                                    let attr = field.attrs.remove(pos);
+
+                                    let late = LateResource::parse(field, ident.span())?;
+
+                                    resources.insert(
+                                        ident.clone(),
+                                        Resource {
+                                            late,
+                                            expr: syn::parse2::<ExprParen>(attr.tokens)?.expr,
+                                        },
+                                    );
+                                } else {
+                                    let late = LateResource::parse(field, ident.span())?;
+
+                                    late_resources.insert(ident.clone(), late);
+                                }
+                            }
+                        } else {
+                            return Err(parse::Error::new(
+                                struct_item.span(),
+                                "this `struct` must have named fields",
+                            ));
+                        }
+                        // resource_struct will be non-empty if #[resources] was encountered before
+                        resource_struct.insert(struct_item.ident.clone(), struct_item.clone());
                     } else {
-                        return Err(parse::Error::new(
-                            item.span(),
-                            "this `struct` must have named fields",
-                        ));
+                        // Structure without the #[resources] attribute should just be passed along
+                        user_code.push(item.clone());
                     }
                 }
 
@@ -311,10 +330,8 @@ impl App {
                     user_imports.push(itemuse_.clone());
                 }
                 _ => {
-                    return Err(parse::Error::new(
-                        item.span(),
-                        "this item must live outside the `#[app]` module",
-                    ));
+                    // Anything else within the module should not make any difference
+                    user_code.push(item.clone());
                 }
             }
         }
@@ -330,6 +347,7 @@ impl App {
             late_resources,
             resources,
             user_imports,
+            user_code,
             hardware_tasks,
             software_tasks,
 
