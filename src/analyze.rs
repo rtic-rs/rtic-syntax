@@ -1,4 +1,4 @@
-//! RTFM application analysis
+//! RTIC application analysis
 
 use core::cmp;
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet, HashMap};
@@ -512,7 +512,7 @@ pub type Sender = Core;
 /// Task name
 pub type Task = Ident;
 
-/// The result of analyzing an RTFM application
+/// The result of analyzing an RTIC application
 pub struct Analysis {
     /// Cores that have been assigned at least task, `#[init]` or `#[idle]`
     pub used_cores: BTreeSet<Core>,

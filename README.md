@@ -1,9 +1,9 @@
-# `rtfm-syntax`
+# `rtic-syntax`
 
-> Parser of the `#[app]` macro used by the Real Time For the Masses (RTFM)
+> Parser of the `#[app]` macro used by the Real-Time Interrupt-driven Concurrency (RTIC)
 > framework
 
-## [Documentation](https://docs.rs/rtfm-syntax)
+## [Documentation](https://docs.rs/rtic-syntax)
 
 ## License
 
