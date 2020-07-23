@@ -191,7 +191,7 @@ pub struct LateResource {
     /// Whether this contains the `#[shared]` attribute or not
     ///
     /// NOTE: Always `false` in single core mode
-    pub shared: bool,
+    //pub shared: bool,
 
     /// The type of this resource
     pub ty: Box<Type>,
@@ -326,7 +326,7 @@ pub struct Local {
     /// Whether this contains the `#[shared]` attribute or not
     ///
     /// NOTE: Always `false` in single core mode
-    pub shared: bool,
+    //pub shared: bool,
 
     /// Type
     pub ty: Box<Type>,

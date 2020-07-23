@@ -1,4 +1,4 @@
-use proc_macro2::{Span, TokenStream as TokenStream2};
+use proc_macro2::TokenStream as TokenStream2;
 
 use syn::{parse, ItemFn};
 
@@ -10,17 +10,16 @@ use crate::{
 
 impl InitArgs {
     pub(crate) fn parse(
-        cores: u8,
         tokens: TokenStream2,
         settings: &Settings,
-        span: Span,
+        //span: Span,
     ) -> parse::Result<Self> {
-        crate::parse::init_idle_args(tokens, cores, settings, cores != 1, span)
+        crate::parse::init_idle_args(tokens, settings)
     }
 }
 
 impl Init {
-    pub(crate) fn parse(args: InitArgs, item: ItemFn, cores: u8) -> parse::Result<Self> {
+    pub(crate) fn parse(args: InitArgs, item: ItemFn) -> parse::Result<Self> {
         let valid_signature = util::check_fn_signature(&item) && item.sig.inputs.len() == 1;
 
         let span = item.sig.ident.span();
@@ -47,7 +46,7 @@ impl Init {
                             args,
                             attrs: item.attrs,
                             context,
-                            locals: Local::parse(locals, cores)?,
+                            locals: Local::parse(locals)?,
                             name: item.sig.ident,
                             returns_late_resources,
                             stmts,

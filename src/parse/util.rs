@@ -157,43 +157,6 @@ pub fn extract_locals(stmts: Vec<Stmt>) -> parse::Result<(Vec<ItemStatic>, Vec<S
     Ok((locals, stmts))
 }
 
-pub fn extract_shared(attrs: &mut Vec<Attribute>, cores: u8) -> parse::Result<bool> {
-    if let Some(pos) = attrs.iter().position(|attr| attr_eq(attr, "shared")) {
-        if cores == 1 {
-            Err(parse::Error::new(
-                attrs[pos].span(),
-                "`#[shared]` can only be used in multi-core mode",
-            ))
-        } else {
-            attrs.remove(pos);
-
-            Ok(true)
-        }
-    } else {
-        Ok(false)
-    }
-}
-
-pub fn parse_core(lit: LitInt, cores: u8) -> parse::Result<u8> {
-    if !lit.suffix().is_empty() {
-        return Err(parse::Error::new(
-            lit.span(),
-            "this integer must be unsuffixed",
-        ));
-    }
-
-    if let Ok(val) = lit.base10_parse::<u8>() {
-        if val < cores {
-            return Ok(val);
-        }
-    }
-
-    Err(parse::Error::new(
-        lit.span(),
-        &format!("core number must be in the range 0..{}", cores),
-    ))
-}
-
 pub fn parse_idents(content: ParseStream<'_>) -> parse::Result<Set<Ident>> {
     let inner;
     bracketed!(inner in content);

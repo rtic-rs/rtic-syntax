@@ -8,7 +8,7 @@ mod local;
 mod software_task;
 mod util;
 
-use proc_macro2::{Span, TokenStream as TokenStream2};
+use proc_macro2::TokenStream as TokenStream2;
 use syn::{
     braced, parenthesized,
     parse::{self, Parse, ParseStream, Parser},
@@ -22,7 +22,7 @@ use crate::{
 };
 
 pub fn app(args: TokenStream2, input: TokenStream2, settings: &Settings) -> parse::Result<App> {
-    let args = AppArgs::parse(args, settings)?;
+    let args = AppArgs::parse(args)?;
     let input: Input = syn::parse2(input)?;
 
     App::parse(args, input, settings)
@@ -67,27 +67,13 @@ impl Parse for Input {
 
 fn init_idle_args(
     tokens: TokenStream2,
-    cores: u8,
     settings: &Settings,
-    accepts_late: bool,
-    span: Span,
 ) -> parse::Result<InitArgs> {
     (|input: ParseStream<'_>| -> parse::Result<InitArgs> {
         if input.is_empty() {
-            if cores == 1 {
-                return Ok(InitArgs::default());
-            } else {
-                return Err(parse::Error::new(
-                    span,
-                    &format!(
-                        "all `#[{}]` functions must specify the core they'll run on",
-                        if accepts_late { "init" } else { "idle" }
-                    ),
-                ));
-            }
+            return Ok(InitArgs::default());
         }
 
-        let mut core = None;
         let mut late = None;
         let mut resources = None;
         let mut spawn = None;
@@ -106,6 +92,7 @@ fn init_idle_args(
 
             let ident_s = ident.to_string();
             match &*ident_s {
+                /*
                 "core" if cores != 1 => {
                     if core.is_some() {
                         return Err(parse::Error::new(
@@ -117,8 +104,9 @@ fn init_idle_args(
                     let lit: LitInt = content.parse()?;
                     core = Some(util::parse_core(lit, cores)?);
                 }
+                */
 
-                "late" if accepts_late => {
+                "late" => {
                     if late.is_some() {
                         return Err(parse::Error::new(
                             ident.span(),
@@ -189,19 +177,7 @@ fn init_idle_args(
         }
 
         Ok(InitArgs {
-            core: if cores == 1 {
-                0
-            } else {
-                core.ok_or_else(|| {
-                    parse::Error::new(
-                        span,
-                        &format!(
-                            "all `#[{}]` functions must be assigned to a core",
-                            if accepts_late { "init" } else { "idle" }
-                        ),
-                    )
-                })?
-            },
+            core: 0,
 
             late: late.unwrap_or(Set::new()),
 
@@ -218,25 +194,15 @@ fn init_idle_args(
 
 fn task_args(
     tokens: TokenStream2,
-    cores: u8,
     settings: &Settings,
-    span: Span,
 ) -> parse::Result<Either<HardwareTaskArgs, SoftwareTaskArgs>> {
     (|input: ParseStream<'_>| -> parse::Result<Either<HardwareTaskArgs, SoftwareTaskArgs>> {
         if input.is_empty() {
-            if cores != 1 {
-                return Err(parse::Error::new(
-                    span,
-                    "this task must be assigned to a core",
-                ));
-            } else {
-                return Ok(Either::Right(SoftwareTaskArgs::default()));
-            }
+            return Ok(Either::Right(SoftwareTaskArgs::default()));
         }
 
         let mut binds = None;
         let mut capacity = None;
-        let mut core = None;
         let mut priority = None;
         let mut resources = None;
         let mut schedule = None;
@@ -312,6 +278,7 @@ fn task_args(
                     capacity = Some(value.unwrap());
                 }
 
+                /*
                 "core" if cores != 1 => {
                     if core.is_some() {
                         return Err(parse::Error::new(
@@ -323,6 +290,7 @@ fn task_args(
                     let lit: LitInt = content.parse()?;
                     core = Some(util::parse_core(lit, cores)?);
                 }
+                */
 
                 "priority" => {
                     if priority.is_some() {
@@ -411,18 +379,7 @@ fn task_args(
             let _: Token![,] = content.parse()?;
         }
 
-        let core = if cores == 1 {
-            0
-        } else {
-            if let Some(core) = core {
-                core
-            } else {
-                return Err(parse::Error::new(
-                    span,
-                    "this task must be assigned to a core",
-                ));
-            }
-        };
+        let core = 0;
 
         let priority = priority.unwrap_or(1);
         let resources = resources.unwrap_or(Resources::new());

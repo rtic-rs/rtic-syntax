@@ -44,7 +44,8 @@ pub(crate) fn app(app: &App) -> Analysis {
         .late_resources
         .iter()
         .chain(app.resources.iter().map(|(name, res)| (name, &res.late)))
-        .filter_map(|(name, lr)| {
+        .filter_map(|(_name, _lr)| {
+            /*
             if lr.shared {
                 Some((
                     name.clone(),
@@ -53,8 +54,9 @@ pub(crate) fn app(app: &App) -> Analysis {
                     },
                 ))
             } else {
+            */
                 None
-            }
+            //}
         })
         .collect::<Locations>();
     let mut ownerships = Ownerships::new();

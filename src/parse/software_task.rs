@@ -6,7 +6,7 @@ use crate::{
 };
 
 impl SoftwareTask {
-    pub(crate) fn parse(args: SoftwareTaskArgs, item: ItemFn, cores: u8) -> parse::Result<Self> {
+    pub(crate) fn parse(args: SoftwareTaskArgs, item: ItemFn) -> parse::Result<Self> {
         let valid_signature =
             util::check_fn_signature(&item) && util::type_is_unit(&item.sig.output);
 
@@ -25,7 +25,7 @@ impl SoftwareTask {
                     cfgs,
                     context,
                     inputs,
-                    locals: Local::parse(locals, cores)?,
+                    locals: Local::parse(locals)?,
                     stmts,
                     _extensible: (),
                 });

@@ -161,8 +161,6 @@ impl<'a> Context<'a> {
 pub struct Settings {
     /// Whether to accept the `binds` argument in `#[task]` or not
     pub parse_binds: bool,
-    /// Whether to accept the `cores`, `core` and `late` arguments or not
-    pub parse_cores: bool,
     /// Whether to parse `extern` interrupts (functions) or not
     pub parse_extern_interrupt: bool,
     /// Whether to accept the `schedule` argument or not
