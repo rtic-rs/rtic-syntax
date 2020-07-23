@@ -73,8 +73,7 @@ pub fn app(app: &App) -> parse::Result<()> {
     }
 
     // Check that all late resources are covered by `init::LateResources`
-    let cores = app.args.cores;
-    let mut late_resources_set = app.late_resources.keys().collect::<HashSet<_>>();
+    let late_resources_set = app.late_resources.keys().collect::<HashSet<_>>();
     if late_resources_set.is_empty() {
         for init in app.inits.values() {
             if init.returns_late_resources {
@@ -85,80 +84,19 @@ pub fn app(app: &App) -> parse::Result<()> {
             }
         }
     } else {
-        if cores == 1 {
-            // the only core will initialize all the late resources
-            if let Some(init) = app.inits.get(&0) {
-                if !init.returns_late_resources {
-                    return Err(parse::Error::new(
-                        init.name.span(),
-                        "late resources exist so `#[init]` must return `init::LateResources`",
-                    ));
-                }
-            } else {
+        // the only core will initialize all the late resources
+        if let Some(init) = app.inits.get(&0) {
+            if !init.returns_late_resources {
                 return Err(parse::Error::new(
-                    Span::call_site(),
-                    "late resources exist so a `#[init]` function must be defined",
+                    init.name.span(),
+                    "late resources exist so `#[init]` must return `init::LateResources`",
                 ));
             }
         } else {
-            // this core will initialize the "rest" of late resources
-            let mut rest = None;
-
-            let mut initialized = HashMap::new();
-            for (core, init) in &app.inits {
-                if !init.returns_late_resources {
-                    continue;
-                }
-
-                if late_resources_set.is_empty() {
-                    return Err(parse::Error::new(
-                        init.name.span(),
-                        "no more late resources to initialize; \
-                         this function must NOT return `LateResources`",
-                    ));
-                }
-
-                if !init.args.late.is_empty() {
-                    for res in &init.args.late {
-                        if !app.late_resources.contains_key(res) {
-                            return Err(parse::Error::new(
-                                res.span(),
-                                "this is not a late resource",
-                            ));
-                        }
-
-                        if let Some(other) = initialized.get(res) {
-                            return Err(parse::Error::new(
-                                res.span(),
-                                &format!("this resource is initialized by core {}", other),
-                            ));
-                        } else {
-                            late_resources_set.remove(res);
-                            initialized.insert(res, core);
-                        }
-                    }
-                } else if let Some(rest) = rest {
-                    return Err(parse::Error::new(
-                        init.name.span(),
-                        &format!(
-                            "unclear how initialization of late resources is split between \
-                             cores {} and {}",
-                            rest, core,
-                        ),
-                    ));
-                } else {
-                    rest = Some(core);
-                }
-            }
-
-            if let Some(res) = late_resources_set.iter().next() {
-                if rest.is_none() {
-                    return Err(parse::Error::new(
-                        res.span(),
-                        "this resource is not being initialized",
-                    ));
-                }
-            }
+            return Err(parse::Error::new(
+                Span::call_site(),
+                "late resources exist so a `#[init]` function must be defined",
+            ));
         }
     }
 
