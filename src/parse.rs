@@ -92,20 +92,6 @@ fn init_idle_args(
 
             let ident_s = ident.to_string();
             match &*ident_s {
-                /*
-                "core" if cores != 1 => {
-                    if core.is_some() {
-                        return Err(parse::Error::new(
-                            ident.span(),
-                            "argument appears more than once",
-                        ));
-                    }
-
-                    let lit: LitInt = content.parse()?;
-                    core = Some(util::parse_core(lit, cores)?);
-                }
-                */
-
                 "late" => {
                     if late.is_some() {
                         return Err(parse::Error::new(
@@ -277,20 +263,6 @@ fn task_args(
 
                     capacity = Some(value.unwrap());
                 }
-
-                /*
-                "core" if cores != 1 => {
-                    if core.is_some() {
-                        return Err(parse::Error::new(
-                            ident.span(),
-                            "argument appears more than once",
-                        ));
-                    }
-
-                    let lit: LitInt = content.parse()?;
-                    core = Some(util::parse_core(lit, cores)?);
-                }
-                */
 
                 "priority" => {
                     if priority.is_some() {
