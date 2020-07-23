@@ -95,8 +95,6 @@ impl AppArgs {
 
 impl App {
     pub(crate) fn parse(args: AppArgs, input: Input, settings: &Settings) -> parse::Result<Self> {
-        let cores = args.cores;
-
         let mut inits = BTreeMap::new();
         let mut idles = BTreeMap::new();
 
@@ -290,7 +288,7 @@ impl App {
                         if let ForeignItem::Fn(item) = item {
                             if settings.parse_extern_interrupt {
                                 let (core, ident, extern_interrupt) =
-                                    ExternInterrupt::parse(item, cores)?;
+                                    ExternInterrupt::parse(item)?;
 
                                 let extern_interrupts = extern_interrupts.entry(core).or_default();
 

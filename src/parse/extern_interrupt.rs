@@ -5,7 +5,6 @@ use crate::{ast::ExternInterrupt, parse::util, Core};
 impl ExternInterrupt {
     pub(crate) fn parse(
         item: ForeignItemFn,
-        cores: u8,
     ) -> parse::Result<(Core, Ident, ExternInterrupt)> {
         let valid_signature = util::check_foreign_fn_signature(&item)
             && item.sig.inputs.is_empty()
@@ -18,14 +17,10 @@ impl ExternInterrupt {
             ));
         }
 
-        let (core, attrs) = if cores > 1 {
-            util::extract_core(item.attrs, cores, item.sig.ident.span())?
-        } else {
-            (0, item.attrs)
-        };
+        let attrs = item.attrs;
 
         Ok((
-            core,
+            0,
             item.sig.ident,
             ExternInterrupt {
                 attrs,
