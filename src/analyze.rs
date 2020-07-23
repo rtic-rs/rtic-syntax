@@ -1,7 +1,7 @@
 //! RTIC application analysis
 
 use core::cmp;
-use std::collections::{btree_map::Entry, BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 
 use indexmap::IndexMap;
 use syn::{Ident, Type};
@@ -45,74 +45,24 @@ pub(crate) fn app(app: &App) -> Analysis {
         .iter()
         .chain(app.resources.iter().map(|(name, res)| (name, &res.late)))
         .filter_map(|(_name, _lr)| {
-            /*
-            if lr.shared {
-                Some((
-                    name.clone(),
-                    Location::Shared {
-                        cores: BTreeSet::new(),
-                    },
-                ))
-            } else {
-            */
                 None
-            //}
         })
         .collect::<Locations>();
+
     let mut ownerships = Ownerships::new();
-    let mut shared_accesses = HashMap::new();
+    //let mut shared_accesses = HashMap::new();
     let mut sync_types = SyncTypes::new();
     for (core, prio, name, access) in app.resource_accesses() {
         let res = app.resource(name).expect("UNREACHABLE").0;
 
-        // (d)
-        if access.is_shared() {
-            if let Some(&other_core) = shared_accesses.get(name) {
-                if other_core != core {
-                    // a resources accessed from different cores needs to be `Sync` regardless of
-                    // priorities
-                    sync_types.entry(core).or_default().insert(res.ty.clone());
-                    sync_types
-                        .entry(other_core)
-                        .or_default()
-                        .insert(res.ty.clone());
-                }
-            } else {
-                shared_accesses.insert(name, core);
-            }
-        }
-
         // (e)
-        // Checks if the resource is shared or cross initialized
-        // with only one core this can never happen
-        // so add directly to locations
-        /*
-        if let Some(loc) = locations.get_mut(name) {
-            match loc {
-                Location::Owned {
-                    core: other_core, ..
-                } => {
-                    if core != *other_core {
-                        let mut cores = BTreeSet::new();
-                        cores.insert(core);
-                        cores.insert(*other_core);
-                        *loc = Location::Shared { cores };
-                    }
-                }
-
-                Location::Shared { cores } => {
-                    cores.insert(core);
-                }
-            }
-        } else {
-            */
-            locations.insert(
-                name.clone(),
-                Location::Owned {
-                    core,
-                },
-            );
-        //}
+        // Add each resource to locations
+        locations.insert(
+            name.clone(),
+            Location::Owned {
+                core,
+            },
+        );
 
         // (c)
         if let Some(priority) = prio {
@@ -160,26 +110,11 @@ pub(crate) fn app(app: &App) -> Analysis {
         }
     }
 
-    /*
-    for (name, loc) in &mut locations {
-        if let Location::Owned {
-            core,
-            cross_initialized,
-        } = loc
-        {
-            for (&initializer, resources) in &late_resources {
-                if resources.contains(name) && *core != initializer {
-                    *cross_initialized = true;
-                }
-            }
-        }
-    }
-    */
-
     // Most late resources need to be `Send`
     let mut send_types = SendTypes::new();
     let owned_by_idle = Ownership::Owned { priority: 0 };
     for (name, res) in app.late_resources.iter() {
+        // handle not owned by idle
         if ownerships
             .get(name)
             .map(|ownership| *ownership != owned_by_idle)
@@ -188,31 +123,6 @@ pub(crate) fn app(app: &App) -> Analysis {
                 send_types.entry(0).or_default().insert(res.ty.clone());
             }
     }
-    /*
-        // cross-initialized || not owned by idle
-        if locations
-            .get(name)
-            .map(|loc| loc.cross_initialized())
-            .unwrap_or(false)
-            || ownerships
-                .get(name)
-                .map(|ownership| *ownership != owned_by_idle)
-                .unwrap_or(false)
-        {
-            if let Some(loc) = locations.get(name) {
-                match loc {
-                    Location::Owned { core, .. } => {
-                        send_types.entry(*core).or_default().insert(res.ty.clone());
-                    }
-
-                    Location::Shared { cores } => cores.iter().for_each(|&core| {
-                        send_types.entry(core).or_default().insert(res.ty.clone());
-                    }),
-                }
-            }
-        }
-    }
-    */
 
     // All resources shared with `init` (ownership != None) need to be `Send`
     for name in app
@@ -226,25 +136,6 @@ pub(crate) fn app(app: &App) -> Analysis {
                     .entry(0)
                     .or_default()
                     .insert(app.resources[name].ty.clone());
-                    /*
-                if let Some(loc) = locations.get(name) {
-                    match loc {
-                        Location::Owned { core, .. } => {
-                            send_types
-                                .entry(*core)
-                                .or_default()
-                                .insert(app.resources[name].ty.clone());
-                        }
-
-                        Location::Shared { cores } => cores.iter().for_each(|&core| {
-                            send_types
-                                .entry(core)
-                                .or_default()
-                                .insert(app.resources[name].ty.clone());
-                        }),
-                    }
-                }
-                */
             }
         }
     }
@@ -253,45 +144,17 @@ pub(crate) fn app(app: &App) -> Analysis {
     let mut timer_queues = TimerQueues::new();
     for (scheduler_core, _scheduler_prio, name) in app.schedule_calls() {
         let schedulee = &app.software_tasks[name];
-        let schedulee_core = schedulee.args.core;
         let schedulee_prio = schedulee.args.priority;
 
         let tq = timer_queues.entry(scheduler_core).or_default();
         tq.tasks.insert(name.clone());
 
-        if scheduler_core == schedulee_core {
-            // the handler priority must match the priority of the highest priority schedulee that's
-            // dispatched in the same core
-            tq.priority = cmp::max(tq.priority, schedulee_prio);
+        // the handler priority must match the priority of the highest priority schedulee that's
+        // dispatched in the same core
+        tq.priority = cmp::max(tq.priority, schedulee_prio);
 
-            // the priority ceiling must be equal or greater than the handler priority
-            tq.ceiling = tq.priority;
-        } else {
-            // when cross-scheduling the timer handler needs to run at the highest local priority
-            tq.priority = app
-                .hardware_tasks
-                .values()
-                .filter_map(|task| {
-                    if task.args.core == scheduler_core {
-                        Some(task.args.priority)
-                    } else {
-                        None
-                    }
-                })
-                .chain(app.software_tasks.values().filter_map(|task| {
-                    if task.args.core == scheduler_core {
-                        Some(task.args.priority)
-                    } else {
-                        None
-                    }
-                }))
-                .max()
-                .map(|prio| prio + 1)
-                .unwrap_or(tq.priority);
-
-            // the priority ceiling must be equal or greater than the handler priority
-            tq.ceiling = tq.priority;
-        }
+        // the priority ceiling must be equal or greater than the handler priority
+        tq.ceiling = tq.priority;
     }
 
     // g. Ceiling analysis of free queues (consumer end point) -- first pass
@@ -300,24 +163,12 @@ pub(crate) fn app(app: &App) -> Analysis {
     // j. Send analysis
     let mut channels = Channels::new();
     let mut free_queues = FreeQueues::new();
-    let mut spawn_barriers = SpawnBarriers::new();
     for (spawner_core, spawner_prio, name) in app.spawn_calls() {
         let spawnee = &app.software_tasks[name];
         let spawnee_core = spawnee.args.core;
         let spawnee_prio = spawnee.args.priority;
 
         let mut must_be_send = false;
-        if spawner_core != spawnee_core {
-            // (i)
-            let spawned_from_init = spawner_prio.is_none();
-            spawn_barriers
-                .entry(spawnee_core)
-                .or_default()
-                .insert(spawner_core, spawned_from_init);
-
-            // (j) messages that cross the core boundary need to be `Send`
-            must_be_send = true;
-        }
 
         let channel = channels
             .entry(spawnee_core)
@@ -386,25 +237,6 @@ pub(crate) fn app(app: &App) -> Analysis {
         let schedulee_prio = schedulee.args.priority;
 
         let mut must_be_send = false;
-        if scheduler_core != schedulee_core {
-            // (n)
-            match spawn_barriers
-                .entry(schedulee_core)
-                .or_default()
-                .entry(scheduler_core)
-            {
-                // NOTE `schedule`s always send messages from the timer queue handler so they never
-                // send messages during `init`
-                Entry::Vacant(entry) => {
-                    entry.insert(false);
-                }
-
-                Entry::Occupied(..) => {}
-            }
-
-            // (o) messages that cross the core boundary need to be `Send`
-            must_be_send = true;
-        }
 
         let tq = timer_queues.get_mut(&scheduler_core).expect("UNREACHABLE");
 
@@ -512,7 +344,6 @@ pub(crate) fn app(app: &App) -> Analysis {
         locations,
         ownerships,
         send_types,
-        spawn_barriers,
         sync_types,
         timer_queues,
     }
@@ -570,9 +401,6 @@ pub struct Analysis {
 
     /// Cross-core initialization barriers
     pub initialization_barriers: InitializationBarriers,
-
-    /// Cross-core spawn barriers
-    pub spawn_barriers: SpawnBarriers,
 
     /// Timer queues
     pub timer_queues: TimerQueues,
