@@ -1,5 +1,0 @@
-error: core needs to be specified using the `#[core = 0]` attribute
- --> $DIR/extern-interrupt-no-core.rs:6:12
-  |
-6 |         fn foo();
-  |            ^^^

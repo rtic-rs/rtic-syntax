@@ -1,5 +1,0 @@
-error: no more late resources to initialize; this function must NOT return `LateResources`
-  --> $DIR/init-late-resources-extra.rs:13:8
-   |
-13 |     fn init(_: init::Context) -> init::LateResources {}
-   |        ^^^^
