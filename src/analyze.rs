@@ -161,7 +161,6 @@ pub(crate) fn app(app: &App) -> Analysis {
     // h. Ceiling analysis of the channels (producer end point) -- first pass
     // i. Spawn barriers analysis
     // j. Send analysis
-    let mut channels = Channels::new();
     let mut free_queues = FreeQueues::new();
     for (spawner_core, spawner_prio, name) in app.spawn_calls() {
         let spawnee = &app.software_tasks[name];
@@ -170,15 +169,6 @@ pub(crate) fn app(app: &App) -> Analysis {
 
         let mut must_be_send = false;
 
-        let channel = channels
-            .entry(spawnee_core)
-            .or_default()
-            .entry(spawnee_prio)
-            .or_default()
-            .entry(spawner_core)
-            .or_default();
-        channel.tasks.insert(name.clone());
-
         let fq = free_queues
             .entry(name.clone())
             .or_default()
@@ -186,12 +176,6 @@ pub(crate) fn app(app: &App) -> Analysis {
             .or_default();
 
         if let Some(prio) = spawner_prio {
-            // (h) Spawners contend for the `channel`
-            match channel.ceiling {
-                None => channel.ceiling = Some(prio),
-                Some(ceil) => channel.ceiling = Some(cmp::max(prio, ceil)),
-            }
-
             // (g) Spawners contend for the free queue
             match *fq {
                 None => *fq = Some(prio),
@@ -240,26 +224,11 @@ pub(crate) fn app(app: &App) -> Analysis {
 
         let tq = timer_queues.get_mut(&scheduler_core).expect("UNREACHABLE");
 
-        let channel = channels
-            .entry(schedulee_core)
-            .or_default()
-            .entry(schedulee_prio)
-            .or_default()
-            .entry(scheduler_core)
-            .or_default();
-        channel.tasks.insert(name.clone());
-
         let fq = free_queues
             .entry(name.clone())
             .or_default()
             .entry(scheduler_core)
             .or_default();
-
-        // (l) The timer queue handler contends for the `channel`
-        match channel.ceiling {
-            None => channel.ceiling = Some(tq.priority),
-            Some(ceil) => channel.ceiling = Some(cmp::max(ceil, tq.priority)),
-        }
 
         if let Some(prio) = scheduler_prio {
             // (k) Schedulers contend for the free queue
@@ -299,24 +268,6 @@ pub(crate) fn app(app: &App) -> Analysis {
         }
     }
 
-    // no channel should ever be empty
-    debug_assert!(channels.values().all(|dispatchers| dispatchers
-        .values()
-        .all(|channels| channels.values().all(|channel| !channel.tasks.is_empty()))));
-
-    // Compute channel capacities
-    for channel in channels
-        .values_mut()
-        .flat_map(|dispatchers| dispatchers.values_mut())
-        .flat_map(|dispatcher| dispatcher.values_mut())
-    {
-        channel.capacity = channel
-            .tasks
-            .iter()
-            .map(|name| app.software_tasks[name].args.capacity)
-            .sum();
-    }
-
     // Compute the capacity of the timer queues
     for tq in timer_queues.values_mut() {
         tq.capacity = tq
@@ -337,7 +288,6 @@ pub(crate) fn app(app: &App) -> Analysis {
 
     Analysis {
         used_cores,
-        channels,
         free_queues,
         initialization_barriers,
         late_resources,
@@ -371,9 +321,6 @@ pub type Task = Ident;
 pub struct Analysis {
     /// Cores that have been assigned at least task, `#[init]` or `#[idle]`
     pub used_cores: BTreeSet<Core>,
-
-    /// SPSC message channels between cores
-    pub channels: Channels,
 
     /// Priority ceilings of "free queues"
     pub free_queues: FreeQueues,
