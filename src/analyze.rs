@@ -83,6 +83,10 @@ pub(crate) fn app(app: &App) -> Analysis {
         }
 
         // (e)
+        // Checks if the resource is shared or cross initialized
+        // with only one core this can never happen
+        // so add directly to locations
+        /*
         if let Some(loc) = locations.get_mut(name) {
             match loc {
                 Location::Owned {
@@ -101,14 +105,14 @@ pub(crate) fn app(app: &App) -> Analysis {
                 }
             }
         } else {
+            */
             locations.insert(
                 name.clone(),
                 Location::Owned {
                     core,
-                    cross_initialized: false,
                 },
             );
-        }
+        //}
 
         // (c)
         if let Some(priority) = prio {
@@ -156,6 +160,7 @@ pub(crate) fn app(app: &App) -> Analysis {
         }
     }
 
+    /*
     for (name, loc) in &mut locations {
         if let Location::Owned {
             core,
@@ -169,11 +174,21 @@ pub(crate) fn app(app: &App) -> Analysis {
             }
         }
     }
+    */
 
     // Most late resources need to be `Send`
     let mut send_types = SendTypes::new();
     let owned_by_idle = Ownership::Owned { priority: 0 };
     for (name, res) in app.late_resources.iter() {
+        if ownerships
+            .get(name)
+            .map(|ownership| *ownership != owned_by_idle)
+            .unwrap_or(false)
+            {
+                send_types.entry(0).or_default().insert(res.ty.clone());
+            }
+    }
+    /*
         // cross-initialized || not owned by idle
         if locations
             .get(name)
@@ -197,6 +212,7 @@ pub(crate) fn app(app: &App) -> Analysis {
             }
         }
     }
+    */
 
     // All resources shared with `init` (ownership != None) need to be `Send`
     for name in app
@@ -206,6 +222,11 @@ pub(crate) fn app(app: &App) -> Analysis {
     {
         if let Some(ownership) = ownerships.get(name) {
             if *ownership != owned_by_idle {
+                send_types
+                    .entry(0)
+                    .or_default()
+                    .insert(app.resources[name].ty.clone());
+                    /*
                 if let Some(loc) = locations.get(name) {
                     match loc {
                         Location::Owned { core, .. } => {
@@ -223,6 +244,7 @@ pub(crate) fn app(app: &App) -> Analysis {
                         }),
                     }
                 }
+                */
             }
         }
     }
@@ -681,15 +703,6 @@ pub enum Location {
     Owned {
         /// Core on which this resource is located
         core: u8,
-
-        /// Whether this resource is cross initialized
-        cross_initialized: bool,
-    },
-
-    /// `Access::Shared` resource shared between different cores
-    Shared {
-        /// Cores that share access to this resource
-        cores: BTreeSet<Core>,
     },
 }
 
@@ -698,17 +711,6 @@ impl Location {
     pub fn core(&self) -> Option<u8> {
         match *self {
             Location::Owned { core, .. } => Some(core),
-
-            Location::Shared { .. } => None,
-        }
-    }
-
-    fn cross_initialized(&self) -> bool {
-        match *self {
-            Location::Owned {
-                cross_initialized, ..
-            } => cross_initialized,
-            Location::Shared { .. } => false,
         }
     }
 }
