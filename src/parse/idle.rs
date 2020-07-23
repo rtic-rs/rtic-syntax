@@ -9,10 +9,8 @@ use crate::{
 
 impl IdleArgs {
     pub(crate) fn parse(
-        //cores: u8,
         tokens: TokenStream2,
         settings: &Settings,
-        //span: Span,
     ) -> parse::Result<Self> {
         crate::parse::init_idle_args(tokens, settings).map(|args| IdleArgs {
             core: args.core,
