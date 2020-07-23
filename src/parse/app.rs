@@ -21,7 +21,6 @@ use crate::{
 impl AppArgs {
     pub(crate) fn parse(tokens: TokenStream2) -> parse::Result<Self> {
         (|input: ParseStream<'_>| -> parse::Result<Self> {
-            //let mut cores = None;
             let mut custom = Map::new();
 
             loop {
@@ -35,35 +34,6 @@ impl AppArgs {
 
                 let ident_s = ident.to_string();
                 match &*ident_s {
-                    /*
-                    "cores" if settings.parse_cores => {
-                        if cores.is_some() {
-                            return Err(parse::Error::new(
-                                ident.span(),
-                                "argument appears more than once",
-                            ));
-                        }
-
-                        let lit = input.parse::<LitInt>()?;
-                        if !lit.suffix().is_empty() {
-                            return Err(parse::Error::new(
-                                lit.span(),
-                                "this integer must be unsuffixed",
-                            ));
-                        }
-
-                        let val = lit.base10_parse::<u8>().ok();
-                        if val.is_none() || val.unwrap() < 2 {
-                            return Err(parse::Error::new(
-                                lit.span(),
-                                "number of cores must be in the range 2..=255",
-                            ));
-                        }
-
-                        cores = Some(val.unwrap());
-                    }
-                    */
-
                     _ => {
                         if custom.contains_key(&ident) {
                             return Err(parse::Error::new(
@@ -223,9 +193,7 @@ impl App {
 
                         match crate::parse::task_args(
                             item.attrs.remove(pos).tokens,
-                            //cores,
                             settings,
-                            //span,
                         )? {
                             Either::Left(args) => {
                                 check_binding(args.core, &args.binds)?;
