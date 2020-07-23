@@ -18,16 +18,7 @@ pub fn app(app: &App) -> parse::Result<()> {
         }
 
         if access.is_exclusive() {
-            if let Some(owner) = owners.get(name) {
-                if core != *owner {
-                    return Err(parse::Error::new(
-                        name.span(),
-                        "resources can NOT be exclusively accessed (`&mut-`) from different cores",
-                    ));
-                }
-            } else {
-                owners.insert(name, core);
-            }
+            owners.insert(name, core);
         }
     }
 

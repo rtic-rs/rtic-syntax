@@ -340,10 +340,10 @@ pub struct Local {
 /// Resource access
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Access {
-    /// `[x]`
+    /// `[x]`, a mutable resource
     Exclusive,
 
-    /// `[&x]`
+    /// `[&x]`, a static non-mutable resource
     Shared,
 }
 
