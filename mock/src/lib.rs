@@ -2,7 +2,7 @@
 #![deny(rust_2018_idioms)]
 #![deny(warnings)]
 
-extern crate proc_macro;
+// extern crate proc_macro;
 
 use proc_macro::TokenStream;
 use rtic_syntax::Settings;

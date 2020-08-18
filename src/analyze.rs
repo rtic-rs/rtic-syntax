@@ -591,7 +591,7 @@ pub type TimerQueues = BTreeMap<Core, TimerQueue>;
 #[derive(Debug)]
 pub struct TimerQueue {
     /// The capacity of the queue
-    pub capacity: u8,
+    pub capacity: u16,
 
     /// The priority ceiling of the queue
     pub ceiling: u8,
@@ -618,7 +618,7 @@ impl Default for TimerQueue {
 #[derive(Debug, Default)]
 pub struct Channel {
     /// The channel capacity
-    pub capacity: u8,
+    pub capacity: u16,
 
     /// The (sender side) priority ceiling of this SPSC channel
     pub ceiling: Ceiling,
