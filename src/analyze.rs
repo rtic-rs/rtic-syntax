@@ -9,19 +9,19 @@ use syn::{Ident, Type};
 use crate::{ast::App, Id, Set};
 
 pub(crate) fn app(app: &App) -> Analysis {
-    // a. Which core initializes which resources
+    // a. Which id initializes which resources
     let mut late_resources = LateResources::new();
     if !app.late_resources.is_empty() {
         let mut resources = app.late_resources.keys().cloned().collect::<BTreeSet<_>>();
         let mut rest = None;
-        for (&core, init) in &app.inits {
+        for (&id, init) in &app.inits {
             if init.args.late.is_empty() {
                 // this was checked in the `check` pass
                 debug_assert!(rest.is_none());
 
-                rest = Some(core);
+                rest = Some(id);
             } else {
-                let late_resources = late_resources.entry(core).or_default();
+                let late_resources = late_resources.entry(id).or_default();
 
                 for name in &init.args.late {
                     late_resources.insert(name.clone());
@@ -48,9 +48,8 @@ pub(crate) fn app(app: &App) -> Analysis {
         .collect::<Locations>();
 
     let mut ownerships = Ownerships::new();
-    //let mut shared_accesses = HashMap::new();
     let mut sync_types = SyncTypes::new();
-    for (core, prio, name, access) in app.resource_accesses() {
+    for (id, prio, name, access) in app.resource_accesses() {
         let res = app.resource(name).expect("UNREACHABLE").0;
 
         // (e)
@@ -58,7 +57,7 @@ pub(crate) fn app(app: &App) -> Analysis {
         locations.insert(
             name.clone(),
             Location::Owned {
-                core,
+                id,
             },
         );
 
@@ -76,7 +75,7 @@ pub(crate) fn app(app: &App) -> Analysis {
                         };
 
                         if access.is_shared() {
-                            sync_types.entry(core).or_default().insert(res.ty.clone());
+                            sync_types.entry(id).or_default().insert(res.ty.clone());
                         }
                     }
 
@@ -124,15 +123,14 @@ pub(crate) fn app(app: &App) -> Analysis {
 
     // Initialize the timer queues
     let mut timer_queues = TimerQueues::new();
-    for (scheduler_core, _scheduler_prio, name) in app.schedule_calls() {
+    for (scheduler_id, _scheduler_prio, name) in app.schedule_calls() {
         let schedulee = &app.software_tasks[name];
         let schedulee_prio = schedulee.args.priority;
 
-        let tq = timer_queues.entry(scheduler_core).or_default();
+        let tq = timer_queues.entry(scheduler_id).or_default();
         tq.tasks.insert(name.clone());
 
-        // the handler priority must match the priority of the highest priority schedulee that's
-        // dispatched in the same core
+        // the handler priority must match the priority of the highest priority schedulee
         tq.priority = cmp::max(tq.priority, schedulee_prio);
 
         // the priority ceiling must be equal or greater than the handler priority
@@ -144,9 +142,9 @@ pub(crate) fn app(app: &App) -> Analysis {
     // j. Send analysis
     let mut channels = Channels::new();
     let mut free_queues = FreeQueues::new();
-    for (spawner_core, spawner_prio, name) in app.spawn_calls() {
+    for (spawner_id, spawner_prio, name) in app.spawn_calls() {
         let spawnee = &app.software_tasks[name];
-        let spawnee_core = spawnee.args.core;
+        let spawnee_id = spawnee.args.id;
         let spawnee_prio = spawnee.args.priority;
 
         let mut must_be_send = false;
@@ -172,12 +170,12 @@ pub(crate) fn app(app: &App) -> Analysis {
                 Some(ceil) => *fq = Some(cmp::max(ceil, prio)),
             }
 
-            // (j) core-local messages that connect tasks running at different priorities need to be
+            // (j) messages that connect tasks running at different priorities need to be
             // `Send`
-            if spawner_core == spawnee_core && spawnee_prio != prio {
+            if spawnee_prio != prio {
                 must_be_send = true;
             }
-        } else if spawner_core == spawnee_core {
+        } else {
             // (g, h) spawns from `init` are excluded from the ceiling analysis
             // (j) but spawns from `init` must be `Send`
             must_be_send = true;
@@ -185,14 +183,14 @@ pub(crate) fn app(app: &App) -> Analysis {
 
         if must_be_send {
             {
-                let send_types = send_types.entry(spawner_core).or_default();
+                let send_types = send_types.entry(spawner_id).or_default();
 
                 spawnee.inputs.iter().for_each(|input| {
                     send_types.insert(input.ty.clone());
                 });
             }
 
-            let send_types = send_types.entry(spawnee_core).or_default();
+            let send_types = send_types.entry(spawnee_id).or_default();
 
             spawnee.inputs.iter().for_each(|input| {
                 send_types.insert(input.ty.clone());
@@ -205,14 +203,14 @@ pub(crate) fn app(app: &App) -> Analysis {
     // m. Ceiling analysis of the timer queue
     // n. Spawn barriers analysis (schedule edition)
     // o. Send analysis
-    for (scheduler_core, scheduler_prio, name) in app.schedule_calls() {
+    for (scheduler_id, scheduler_prio, name) in app.schedule_calls() {
         let schedulee = &app.software_tasks[name];
-        let schedulee_core = schedulee.args.core;
+        let schedulee_id = schedulee.args.core;
         let schedulee_prio = schedulee.args.priority;
 
         let mut must_be_send = false;
 
-        let tq = timer_queues.get_mut(&scheduler_core).expect("UNREACHABLE");
+        let tq = timer_queues.get_mut(&scheduler_id).expect("UNREACHABLE");
 
         let channel = channels
             .entry(schedulee_prio)
@@ -231,12 +229,12 @@ pub(crate) fn app(app: &App) -> Analysis {
             // (m) Schedulers contend for the timer queue
             tq.ceiling = cmp::max(tq.ceiling, prio);
 
-            // (o) core-local messages that connect tasks running at different priorities need to be
+            // (o) messages that connect tasks running at different priorities need to be
             // `Send`
-            if scheduler_core == schedulee_core && schedulee_prio != prio {
+            if schedulee_prio != prio {
                 must_be_send = true;
             }
-        } else if scheduler_core == schedulee_core {
+        } else {
             // (k, m) schedules from `init` are excluded from the ceiling analysis
             // (o) but schedules from `init` must be `Send`
             must_be_send = true;
@@ -244,14 +242,14 @@ pub(crate) fn app(app: &App) -> Analysis {
 
         if must_be_send {
             {
-                let send_types = send_types.entry(scheduler_core).or_default();
+                let send_types = send_types.entry(scheduler_id).or_default();
 
                 schedulee.inputs.iter().for_each(|input| {
                     send_types.insert(input.ty.clone());
                 });
             }
 
-            let send_types = send_types.entry(schedulee_core).or_default();
+            let send_types = send_types.entry(schedulee_id).or_default();
 
             schedulee.inputs.iter().for_each(|input| {
                 send_types.insert(input.ty.clone());
@@ -286,17 +284,7 @@ pub(crate) fn app(app: &App) -> Analysis {
             .sum();
     }
 
-    let used_cores = app
-        .inits
-        .keys()
-        .cloned()
-        .chain(app.idles.keys().cloned())
-        .chain(app.hardware_tasks.values().map(|task| task.args.core))
-        .chain(app.software_tasks.values().map(|task| task.args.core))
-        .collect();
-
     Analysis {
-        used_cores,
         channels,
         free_queues,
         late_resources,
@@ -322,9 +310,6 @@ pub type Task = Ident;
 
 /// The result of analyzing an RTIC application
 pub struct Analysis {
-    /// Cores that have been assigned at least task, `#[init]` or `#[idle]`
-    pub used_cores: BTreeSet<Id>,
-
     /// SPSC message channels
     pub channels: Channels,
 
@@ -473,18 +458,18 @@ impl Ownership {
 /// Resource location
 #[derive(Clone, Debug, PartialEq)]
 pub enum Location {
-    /// resource that resides in `core`
+    /// resource that resides in `id`
     Owned {
-        /// Core on which this resource is located
-        core: u8,
+        /// The Id where this resource is located
+        id: u8,
     },
 }
 
 impl Location {
-    /// If resource is owned this returns the core on which is located
-    pub fn core(&self) -> Option<u8> {
+    /// If resource is owned this returns the Id owning it
+    pub fn id(&self) -> Option<u8> {
         match *self {
-            Location::Owned { core, .. } => Some(core),
+            Location::Owned { id, .. } => Some(id),
         }
     }
 }
