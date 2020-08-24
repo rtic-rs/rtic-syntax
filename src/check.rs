@@ -7,7 +7,7 @@ use crate::ast::App;
 
 pub fn app(app: &App) -> parse::Result<()> {
     // Check that all referenced resources have been declared
-    // Check that resources are NOT `Exclusive`-ly shared between cores
+    // Check that resources are NOT `Exclusive`-ly shared
     let mut owners = HashMap::new();
     for (core, _, name, access) in app.resource_accesses() {
         if app.resource(name).is_none() {
