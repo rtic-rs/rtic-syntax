@@ -1,11 +1,11 @@
 use syn::{parse, ForeignItemFn, Ident};
 
-use crate::{ast::ExternInterrupt, parse::util, Core};
+use crate::{ast::ExternInterrupt, parse::util, Id};
 
 impl ExternInterrupt {
     pub(crate) fn parse(
         item: ForeignItemFn,
-    ) -> parse::Result<(Core, Ident, ExternInterrupt)> {
+    ) -> parse::Result<(Id, Ident, ExternInterrupt)> {
         let valid_signature = util::check_foreign_fn_signature(&item)
             && item.sig.inputs.is_empty()
             && util::type_is_unit(&item.sig.output);

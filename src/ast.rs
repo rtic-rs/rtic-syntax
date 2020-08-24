@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 
 use syn::{Attribute, Expr, Ident, Pat, PatType, Path, Stmt, Type};
 
-use crate::{Core, Map, Set};
+use crate::{Id, Map, Set};
 
 /// The `#[app]` attribute
 #[derive(Debug)]
@@ -41,7 +41,7 @@ pub struct App {
 }
 
 /// Interrupts used to dispatch software tasks
-pub type ExternInterrupts = BTreeMap<Core, Map<ExternInterrupt>>;
+pub type ExternInterrupts = BTreeMap<Id, Map<ExternInterrupt>>;
 
 /// The arguments of the `#[app]` attribute
 #[derive(Debug)]

@@ -6,7 +6,7 @@ use std::collections::{BTreeSet, BTreeMap};
 use indexmap::IndexMap;
 use syn::{Ident, Type};
 
-use crate::{ast::App, Core, Set};
+use crate::{ast::App, Id, Set};
 
 pub(crate) fn app(app: &App) -> Analysis {
     // a. Which core initializes which resources
@@ -38,8 +38,6 @@ pub(crate) fn app(app: &App) -> Analysis {
     // c. Ceiling analysis of Exclusive resources
     // d. Sync-ness of Access::Shared resources
     // e. Location of resources
-    // f. Cross initialization needs a post-initialization synchronization barrier
-    let mut initialization_barriers = InitializationBarriers::new();
     let mut locations = app
         .late_resources
         .iter()
@@ -90,22 +88,6 @@ pub(crate) fn app(app: &App) -> Analysis {
                 }
             } else {
                 ownerships.insert(name.clone(), Ownership::Owned { priority });
-            }
-        }
-
-        // (f) in cross-initialization the initializer core is like a sender and the user core is
-        // like a receiver
-        let receiver = core;
-        for (&sender, resources) in &late_resources {
-            if sender == receiver {
-                continue;
-            }
-
-            if resources.contains(name) {
-                initialization_barriers
-                    .entry(receiver)
-                    .or_default()
-                    .insert(sender);
             }
         }
     }
@@ -317,7 +299,6 @@ pub(crate) fn app(app: &App) -> Analysis {
         used_cores,
         channels,
         free_queues,
-        initialization_barriers,
         late_resources,
         locations,
         ownerships,
@@ -333,14 +314,8 @@ pub type Ceiling = Option<u8>;
 /// Task priority
 pub type Priority = u8;
 
-/// Receiver core
-pub type Receiver = Core;
-
 /// Resource name
 pub type Resource = Ident;
-
-/// Sender core
-pub type Sender = Core;
 
 /// Task name
 pub type Task = Ident;
@@ -348,7 +323,7 @@ pub type Task = Ident;
 /// The result of analyzing an RTIC application
 pub struct Analysis {
     /// Cores that have been assigned at least task, `#[init]` or `#[idle]`
-    pub used_cores: BTreeSet<Core>,
+    pub used_cores: BTreeSet<Id>,
 
     /// SPSC message channels
     pub channels: Channels,
@@ -377,9 +352,6 @@ pub struct Analysis {
     /// These types must implement the `Sync` trait
     pub sync_types: SyncTypes,
 
-    /// Cross-core initialization barriers
-    pub initialization_barriers: InitializationBarriers,
-
     /// Timer queues
     pub timer_queues: TimerQueues,
 }
@@ -390,13 +362,13 @@ pub type Channels = BTreeMap<Priority, Channel>;
 
 /// All cross-core channels, keyed by receiver core, then by dispatch priority and then by sender
 /// core
-pub type Channels = BTreeMap<Receiver, BTreeMap<Priority, BTreeMap<Sender, Channel>>>;
+//pub type Channels = BTreeMap<Receiver, BTreeMap<Priority, BTreeMap<Sender, Channel>>>;
 
-/// All free queues, keyed by task and then by sender
-pub type FreeQueues = IndexMap<Task, BTreeMap<Sender, Ceiling>>;
+/// All free queues, keyed by task and then by Id
+pub type FreeQueues = IndexMap<Task, BTreeMap<Id, Ceiling>>;
 
 /// Late resources, keyed by the core that initializes them
-pub type LateResources = BTreeMap<Core, BTreeSet<Resource>>;
+pub type LateResources = BTreeMap<Id, BTreeSet<Resource>>;
 
 /// Location of all *used* resources
 pub type Locations = IndexMap<Resource, Location>;
@@ -405,21 +377,13 @@ pub type Locations = IndexMap<Resource, Location>;
 pub type Ownerships = IndexMap<Resource, Ownership>;
 
 /// These types must implement the `Send` trait
-pub type SendTypes = BTreeMap<Core, Set<Box<Type>>>;
+pub type SendTypes = BTreeMap<Id, Set<Box<Type>>>;
 
 /// These types must implement the `Sync` trait
-pub type SyncTypes = BTreeMap<Core, Set<Box<Type>>>;
+pub type SyncTypes = BTreeMap<Id, Set<Box<Type>>>;
 
-/// Cross-core initialization barriers
-pub type InitializationBarriers =
-    BTreeMap</* user */ Receiver, BTreeSet</* initializer */ Sender>>;
-
-/// Cross-core spawn barriers
-pub type SpawnBarriers =
-    BTreeMap</* spawnee */ Receiver, BTreeMap</* spawner */ Sender, /* before_init */ bool>>;
-
-/// Timer queues, keyed by core
-pub type TimerQueues = BTreeMap<Core, TimerQueue>;
+/// Timer queues, keyed by Id
+pub type TimerQueues = BTreeMap<Id, TimerQueue>;
 
 /// The timer queue
 #[derive(Debug)]

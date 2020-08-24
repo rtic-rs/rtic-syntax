@@ -3,7 +3,7 @@ use syn::{Expr, Ident};
 use crate::{
     analyze::{Analysis, Location, Priority},
     ast::{Access, App, LateResource},
-    Context, Core, Set,
+    Context, Id, Set,
 };
 
 impl App {
@@ -122,7 +122,7 @@ impl App {
 
     pub(crate) fn resource_accesses(
         &self,
-    ) -> impl Iterator<Item = (Core, Option<Priority>, &Ident, Access)> {
+    ) -> impl Iterator<Item = (Id, Option<Priority>, &Ident, Access)> {
         self.inits
             .iter()
             .flat_map(|(core, init)| {
@@ -149,7 +149,7 @@ impl App {
             }))
     }
 
-    pub(crate) fn schedule_calls(&self) -> impl Iterator<Item = (Core, Option<Priority>, &Ident)> {
+    pub(crate) fn schedule_calls(&self) -> impl Iterator<Item = (Id, Option<Priority>, &Ident)> {
         self.inits
             .iter()
             .flat_map(|(&core, init)| {
@@ -190,7 +190,7 @@ impl App {
     /// the name of the spawnee. A task may appear more that once in this iterator.
     ///
     /// A priority of `None` means that this being called from `init`
-    pub(crate) fn spawn_calls(&self) -> impl Iterator<Item = (Core, Option<Priority>, &Ident)> {
+    pub(crate) fn spawn_calls(&self) -> impl Iterator<Item = (Id, Option<Priority>, &Ident)> {
         self.inits
             .iter()
             .flat_map(|(&core, init)| init.args.spawn.iter().map(move |task| (core, None, task)))

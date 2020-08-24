@@ -26,8 +26,8 @@ mod parse;
 #[cfg(test)]
 mod tests;
 
-/// Core identifier
-pub type Core = u8;
+/// Identifier
+pub type Id = u8;
 
 /// An ordered map keyed by identifier
 pub type Map<T> = IndexMap<Ident, T>;
@@ -62,10 +62,10 @@ pub enum Context<'a> {
     HardwareTask(&'a Ident),
 
     /// The `idle` context
-    Idle(Core),
+    Idle(Id),
 
     /// The `init`-ialization function
-    Init(Core),
+    Init(Id),
 
     /// A software task: `#[task]`
     SoftwareTask(&'a Ident),
