@@ -93,8 +93,8 @@ impl AppArgs {
 
 impl App {
     pub(crate) fn parse(args: AppArgs, input: Input, settings: &Settings) -> parse::Result<Self> {
-        let mut inits = BTreeMap::new();
-        let mut idles = BTreeMap::new();
+        let mut inits = Vec::new();
+        let mut idles = Vec::new();
 
         let mut late_resources = Map::new();
         let mut resources = Map::new();
@@ -103,7 +103,7 @@ impl App {
 
         let mut extern_interrupts = ExternInterrupts::new();
 
-        let mut seen_idents = BTreeMap::<u8, HashSet<Ident>>::new();
+        let mut seen_idents = HashSet::<Ident>::new();
         let mut bindings = BTreeMap::<u8, HashSet<Ident>>::new();
         let mut check_binding = |core: u8, ident: &Ident| {
             let bindings = bindings.entry(core).or_default();
@@ -119,9 +119,7 @@ impl App {
 
             Ok(())
         };
-        let mut check_ident = |core: u8, ident: &Ident| {
-            let seen_idents = seen_idents.entry(core).or_default();
-
+        let mut check_ident = |ident: &Ident| {
             if seen_idents.contains(ident) {
                 return Err(parse::Error::new(
                     ident.span(),
@@ -145,16 +143,17 @@ impl App {
                         let args =
                             InitArgs::parse(item.attrs.remove(pos).tokens, settings)?;
 
-                        if inits.contains_key(&args.core) {
+                        // If an init function already exists, error
+                        if !inits.is_empty() {
                             return Err(parse::Error::new(
                                 span,
                                 "`#[init]` function must appear at most once"
                             ));
                         }
 
-                        check_ident(args.core, &item.sig.ident)?;
+                        check_ident(&item.sig.ident)?;
 
-                        inits.insert(args.core, Init::parse(args, item)?);
+                        inits.push(Init::parse(args, item)?);
                     } else if let Some(pos) = item
                         .attrs
                         .iter()
@@ -163,16 +162,16 @@ impl App {
                         let args =
                             IdleArgs::parse(item.attrs.remove(pos).tokens, settings)?;
 
-                        if idles.contains_key(&args.core) {
+                        if !idles.is_empty() {
                             return Err(parse::Error::new(
                                 span,
                                 "`#[idle]` function must appear at most once"
                             ));
                         }
 
-                        check_ident(args.core, &item.sig.ident)?;
+                        check_ident(&item.sig.ident)?;
 
-                        idles.insert(args.core, Idle::parse(args, item)?);
+                        idles.push(Idle::parse(args, item)?);
                     } else if let Some(pos) = item
                         .attrs
                         .iter()
@@ -193,7 +192,7 @@ impl App {
                         )? {
                             Either::Left(args) => {
                                 check_binding(args.core, &args.binds)?;
-                                check_ident(args.core, &item.sig.ident)?;
+                                check_ident(&item.sig.ident)?;
 
                                 hardware_tasks.insert(
                                     item.sig.ident.clone(),
@@ -202,7 +201,7 @@ impl App {
                             }
 
                             Either::Right(args) => {
-                                check_ident(args.core, &item.sig.ident)?;
+                                check_ident(&item.sig.ident)?;
 
                                 software_tasks.insert(
                                     item.sig.ident.clone(),

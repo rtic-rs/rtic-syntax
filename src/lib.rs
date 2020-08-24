@@ -62,39 +62,29 @@ pub enum Context<'a> {
     HardwareTask(&'a Ident),
 
     /// The `idle` context
-    Idle(Id),
+    Idle,
 
     /// The `init`-ialization function
-    Init(Id),
+    Init,
 
     /// A software task: `#[task]`
     SoftwareTask(&'a Ident),
 }
 
 impl<'a> Context<'a> {
-    /// The core this context belongs to
-    pub fn core(&self, app: &App) -> u8 {
-        match self {
-            Context::HardwareTask(name) => app.hardware_tasks[*name].args.core,
-            Context::Idle(core) => app.idles[core].args.core,
-            Context::Init(core) => app.inits[core].args.core,
-            Context::SoftwareTask(name) => app.software_tasks[*name].args.core,
-        }
-    }
-
     /// The identifier of this context
     pub fn ident(&self, app: &'a App) -> &'a Ident {
         match self {
             Context::HardwareTask(ident) => ident,
-            Context::Idle(core) => &app.idles[core].name,
-            Context::Init(core) => &app.inits[core].name,
+            Context::Idle => &app.idles[0].name,
+            Context::Init => &app.inits[0].name,
             Context::SoftwareTask(ident) => ident,
         }
     }
 
     /// Is this the `idle` context?
     pub fn is_idle(&self) -> bool {
-        if let Context::Idle(_) = self {
+        if let Context::Idle = self {
             true
         } else {
             false
@@ -103,7 +93,7 @@ impl<'a> Context<'a> {
 
     /// Is this the `init`-ialization context?
     pub fn is_init(&self) -> bool {
-        if let Context::Init(_) = self {
+        if let Context::Init = self {
             true
         } else {
             false
@@ -119,8 +109,8 @@ impl<'a> Context<'a> {
     pub fn has_locals(&self, app: &App) -> bool {
         match *self {
             Context::HardwareTask(name) => !app.hardware_tasks[name].locals.is_empty(),
-            Context::Idle(core) => !app.idles[&core].locals.is_empty(),
-            Context::Init(core) => !app.inits[&core].locals.is_empty(),
+            Context::Idle => !app.idles[0].locals.is_empty(),
+            Context::Init => !app.inits[0].locals.is_empty(),
             Context::SoftwareTask(name) => !app.software_tasks[name].locals.is_empty(),
         }
     }
@@ -129,8 +119,8 @@ impl<'a> Context<'a> {
     pub fn has_resources(&self, app: &App) -> bool {
         match *self {
             Context::HardwareTask(name) => !app.hardware_tasks[name].args.resources.is_empty(),
-            Context::Idle(core) => !app.idles[&core].args.resources.is_empty(),
-            Context::Init(core) => !app.inits[&core].args.resources.is_empty(),
+            Context::Idle => !app.idles[0].args.resources.is_empty(),
+            Context::Init => !app.inits[0].args.resources.is_empty(),
             Context::SoftwareTask(name) => !app.software_tasks[name].args.resources.is_empty(),
         }
     }
@@ -139,8 +129,8 @@ impl<'a> Context<'a> {
     pub fn uses_schedule(&self, app: &App) -> bool {
         match *self {
             Context::HardwareTask(name) => !app.hardware_tasks[name].args.schedule.is_empty(),
-            Context::Idle(core) => !app.idles[&core].args.schedule.is_empty(),
-            Context::Init(core) => !app.inits[&core].args.schedule.is_empty(),
+            Context::Idle => !app.idles[0].args.schedule.is_empty(),
+            Context::Init => !app.inits[0].args.schedule.is_empty(),
             Context::SoftwareTask(name) => !app.software_tasks[name].args.schedule.is_empty(),
         }
     }
@@ -149,8 +139,8 @@ impl<'a> Context<'a> {
     pub fn uses_spawn(&self, app: &App) -> bool {
         match *self {
             Context::HardwareTask(name) => !app.hardware_tasks[name].args.spawn.is_empty(),
-            Context::Idle(core) => !app.idles[&core].args.spawn.is_empty(),
-            Context::Init(core) => !app.inits[&core].args.spawn.is_empty(),
+            Context::Idle => !app.idles[0].args.spawn.is_empty(),
+            Context::Init => !app.inits[0].args.spawn.is_empty(),
             Context::SoftwareTask(name) => !app.software_tasks[name].args.spawn.is_empty(),
         }
     }

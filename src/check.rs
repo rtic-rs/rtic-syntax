@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use proc_macro2::Span;
 use syn::parse;
@@ -8,8 +8,8 @@ use crate::ast::App;
 pub fn app(app: &App) -> parse::Result<()> {
     // Check that all referenced resources have been declared
     // Check that resources are NOT `Exclusive`-ly shared
-    let mut owners = HashMap::new();
-    for (core, _, name, access) in app.resource_accesses() {
+    let mut owners = HashSet::new();
+    for ( _, name, access) in app.resource_accesses() {
         if app.resource(name).is_none() {
             return Err(parse::Error::new(
                 name.span(),
@@ -18,7 +18,7 @@ pub fn app(app: &App) -> parse::Result<()> {
         }
 
         if access.is_exclusive() {
-            owners.insert(name, core);
+            owners.insert(name);
         }
     }
 
@@ -28,7 +28,7 @@ pub fn app(app: &App) -> parse::Result<()> {
     // `lock` API
     let exclusive_accesses = app
         .resource_accesses()
-        .filter_map(|(_, priority, name, access)| {
+        .filter_map(|(priority, name, access)| {
             if priority.is_some() && access.is_exclusive() {
                 Some(name)
             } else {
@@ -36,7 +36,7 @@ pub fn app(app: &App) -> parse::Result<()> {
             }
         })
         .collect::<HashSet<_>>();
-    for (_, _, name, access) in app.resource_accesses() {
+    for (_, name, access) in app.resource_accesses() {
         if access.is_shared() && exclusive_accesses.contains(name) {
             return Err(parse::Error::new(
                 name.span(),
@@ -47,36 +47,38 @@ pub fn app(app: &App) -> parse::Result<()> {
 
     // Check that init only has `Access::Exclusive` resources
     // Check that late resources have NOT been assigned to `init`
-    for (name, access) in app.inits.values().flat_map(|init| &init.args.resources) {
-        if app.late_resources.contains_key(name) {
-            return Err(parse::Error::new(
-                name.span(),
-                "late resources can NOT be assigned to `init`",
-            ));
-        }
+    if let Some(init) = &app.inits.first() {
+        for (name, access) in &init.args.resources {
+            if app.late_resources.contains_key(name) {
+                return Err(parse::Error::new(
+                    name.span(),
+                    "late resources can NOT be assigned to `init`",
+                ));
+            }
 
-        if access.is_shared() {
-            return Err(parse::Error::new(
-                name.span(),
-                "`init` has direct exclusive access to resources; use `x` instead of `&x` ",
-            ));
+            if access.is_shared() {
+                return Err(parse::Error::new(
+                    name.span(),
+                    "`init` has direct exclusive access to resources; use `x` instead of `&x` ",
+                ));
+            }
         }
     }
 
     // Check that all late resources are covered by `init::LateResources`
     let late_resources_set = app.late_resources.keys().collect::<HashSet<_>>();
     if late_resources_set.is_empty() {
-        for init in app.inits.values() {
+        if let Some(init) = &app.inits.first() {
             if init.returns_late_resources {
-                return Err(parse::Error::new(
-                    init.name.span(),
-                    "no late resources exist so this function must NOT return `LateResources`",
-                ));
+                    return Err(parse::Error::new(
+                        init.name.span(),
+                        "no late resources exist so this function must NOT return `LateResources`",
+                    ));
             }
         }
     } else {
         // the only core will initialize all the late resources
-        if let Some(init) = app.inits.get(&0) {
+        if let Some(init) = &app.inits.first() {
             if !init.returns_late_resources {
                 return Err(parse::Error::new(
                     init.name.span(),

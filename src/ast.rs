@@ -16,10 +16,10 @@ pub struct App {
     /// The name of the `const` item on which the `#[app]` attribute has been placed
     pub name: Ident,
 
-    /// `#[init]` function
+    /// Vector containing the `#[init]` function, to allow easy iteration
     pub inits: Inits,
 
-    /// `#[idle]` function
+    /// Vector containing the `#[idle]` function, to allow easy iteration
     pub idles: Idles,
 
     /// Late (runtime initialized) resources
@@ -64,9 +64,9 @@ pub enum CustomArg {
 }
 
 /// `init` function
-pub type Inits = BTreeMap<u8, Init>;
+pub type Inits = Vec<Init>;
 /// `idle` function
-pub type Idles = BTreeMap<u8, Idle>;
+pub type Idles = Vec<Idle>;
 
 /// The `init`-ialization function
 #[derive(Debug)]
@@ -222,9 +222,6 @@ pub struct SoftwareTask {
 /// Software task metadata
 #[derive(Debug)]
 pub struct SoftwareTaskArgs {
-    /// The core this task will run on
-    pub core: u8,
-
     /// The task capacity: the maximum number of pending messages that can be queued
     pub capacity: u8,
 
@@ -246,7 +243,6 @@ pub struct SoftwareTaskArgs {
 impl Default for SoftwareTaskArgs {
     fn default() -> Self {
         Self {
-            core: 0,
             capacity: 1,
             priority: 1,
             resources: Resources::new(),

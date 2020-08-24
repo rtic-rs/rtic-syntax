@@ -370,7 +370,6 @@ fn task_args(
             })
         } else {
             Either::Right(SoftwareTaskArgs {
-                core,
                 capacity: capacity.unwrap_or(1),
                 priority,
                 resources,

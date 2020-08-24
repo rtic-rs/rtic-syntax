@@ -3,29 +3,29 @@ use syn::{Expr, Ident};
 use crate::{
     analyze::{Analysis, Location, Priority},
     ast::{Access, App, LateResource},
-    Context, Id, Set,
+    Context, Set,
 };
 
 impl App {
-    /// Whether this `core` uses the `schedule` API
-    pub fn uses_schedule(&self, core: u8) -> bool {
+    /// Whether the `schedule` API is used
+    pub fn uses_schedule(&self) -> bool {
         self.inits
-            .get(&core)
+            .first()
             .map(|init| !init.args.schedule.is_empty())
             .unwrap_or(false)
             || self
                 .idles
-                .get(&core)
+                .first()
                 .map(|idle| !idle.args.schedule.is_empty())
                 .unwrap_or(false)
             || self
                 .hardware_tasks
                 .values()
-                .any(|task| task.args.core == core && !task.args.schedule.is_empty())
+                .any(|task| !task.args.schedule.is_empty())
             || self
                 .software_tasks
                 .values()
-                .any(|task| task.args.core == core && !task.args.schedule.is_empty())
+                .any(|task| !task.args.schedule.is_empty())
     }
 
     /// Returns information about the resource that matches `name`
@@ -56,16 +56,16 @@ impl App {
     pub fn schedule_callers<'a>(&'a self) -> impl Iterator<Item = (Context<'a>, &'a Set<Ident>)> {
         self.inits
             .iter()
-            .filter_map(|(&core, init)| {
+            .filter_map(|init| {
                 if !init.args.schedule.is_empty() {
-                    Some((Context::Init(core), &init.args.schedule))
+                    Some((Context::Init, &init.args.schedule))
                 } else {
                     None
                 }
             })
-            .chain(self.idles.iter().filter_map(|(&core, idle)| {
+            .chain(self.idles.iter().filter_map(|idle| {
                 if !idle.args.schedule.is_empty() {
-                    Some((Context::Idle(core), &idle.args.schedule))
+                    Some((Context::Idle, &idle.args.schedule))
                 } else {
                     None
                 }
@@ -90,16 +90,16 @@ impl App {
     pub fn spawn_callers<'a>(&'a self) -> impl Iterator<Item = (Context<'a>, &'a Set<Ident>)> {
         self.inits
             .iter()
-            .filter_map(|(&core, init)| {
+            .filter_map(|init| {
                 if !init.args.spawn.is_empty() {
-                    Some((Context::Init(core), &init.args.spawn))
+                    Some((Context::Init, &init.args.spawn))
                 } else {
                     None
                 }
             })
-            .chain(self.idles.iter().filter_map(|(&core, idle)| {
+            .chain(self.idles.iter().filter_map(|idle| {
                 if !idle.args.spawn.is_empty() {
-                    Some((Context::Idle(core), &idle.args.spawn))
+                    Some((Context::Idle, &idle.args.spawn))
                 } else {
                     None
                 }
@@ -122,52 +122,51 @@ impl App {
 
     pub(crate) fn resource_accesses(
         &self,
-    ) -> impl Iterator<Item = (Id, Option<Priority>, &Ident, Access)> {
+    ) -> impl Iterator<Item = (Option<Priority>, &Ident, Access)> {
         self.inits
             .iter()
-            .flat_map(|(core, init)| {
+            .flat_map(|init| {
                 init.args
                     .resources
                     .iter()
-                    .map(move |(name, access)| (*core, None, name, *access))
+                    .map(move |(name, access)| (None, name, *access))
             })
-            .chain(self.idles.iter().flat_map(|(core, idle)| {
+            .chain(self.idles.iter().flat_map(|idle| {
                 idle.args
                     .resources
                     .iter()
-                    .map(move |(name, access)| (*core, Some(0), name, *access))
+                    .map(move |(name, access)| (Some(0), name, *access))
             }))
             .chain(self.hardware_tasks.values().flat_map(|task| {
                 task.args.resources.iter().map(move |(name, access)| {
-                    (task.args.core, Some(task.args.priority), name, *access)
+                    (Some(task.args.priority), name, *access)
                 })
             }))
             .chain(self.software_tasks.values().flat_map(|task| {
                 task.args.resources.iter().map(move |(name, access)| {
-                    (task.args.core, Some(task.args.priority), name, *access)
+                    (Some(task.args.priority), name, *access)
                 })
             }))
     }
 
-    pub(crate) fn schedule_calls(&self) -> impl Iterator<Item = (Id, Option<Priority>, &Ident)> {
+    pub(crate) fn schedule_calls(&self) -> impl Iterator<Item = (Option<Priority>, &Ident)> {
         self.inits
             .iter()
-            .flat_map(|(&core, init)| {
+            .flat_map(|init| {
                 init.args
                     .schedule
                     .iter()
-                    .map(move |task| (core, None, task))
+                    .map(move |task| (None, task))
             })
-            .chain(self.idles.iter().flat_map(|(&core, idle)| {
+            .chain(self.idles.iter().flat_map(|idle| {
                 idle.args
                     .schedule
                     .iter()
-                    .map(move |task| (core, Some(0), task))
+                    .map(move |task| (Some(0), task))
             }))
             .chain(self.hardware_tasks.values().flat_map(|scheduler| {
                 scheduler.args.schedule.iter().map(move |schedulee| {
                     (
-                        scheduler.args.core,
                         Some(scheduler.args.priority),
                         schedulee,
                     )
@@ -176,7 +175,6 @@ impl App {
             .chain(self.software_tasks.values().flat_map(|scheduler| {
                 scheduler.args.schedule.iter().map(move |schedulee| {
                     (
-                        scheduler.args.core,
                         Some(scheduler.args.priority),
                         schedulee,
                     )
@@ -190,39 +188,39 @@ impl App {
     /// the name of the spawnee. A task may appear more that once in this iterator.
     ///
     /// A priority of `None` means that this being called from `init`
-    pub(crate) fn spawn_calls(&self) -> impl Iterator<Item = (Id, Option<Priority>, &Ident)> {
+    pub(crate) fn spawn_calls(&self) -> impl Iterator<Item = (Option<Priority>, &Ident)> {
         self.inits
             .iter()
-            .flat_map(|(&core, init)| init.args.spawn.iter().map(move |task| (core, None, task)))
-            .chain(self.idles.iter().flat_map(|(&core, idle)| {
+            .flat_map(|init| init.args.spawn.iter().map(move |task| (None, task)))
+            .chain(self.idles.iter().flat_map(|idle| {
                 idle.args
                     .spawn
                     .iter()
-                    .map(move |task| (core, Some(0), task))
+                    .map(move |task| (Some(0), task))
             }))
             .chain(self.hardware_tasks.values().flat_map(|spawner| {
                 spawner
                     .args
                     .spawn
                     .iter()
-                    .map(move |spawnee| (spawner.args.core, Some(spawner.args.priority), spawnee))
+                    .map(move |spawnee| (Some(spawner.args.priority), spawnee))
             }))
             .chain(self.software_tasks.values().flat_map(|spawner| {
                 spawner
                     .args
                     .spawn
                     .iter()
-                    .map(move |spawnee| (spawner.args.core, Some(spawner.args.priority), spawnee))
+                    .map(move |spawnee| (Some(spawner.args.priority), spawnee))
             }))
     }
 
     pub(crate) fn task_references(&self) -> impl Iterator<Item = &Ident> {
         self.inits
-            .values()
+            .iter()
             .flat_map(|init| init.args.spawn.iter().chain(&init.args.schedule))
             .chain(
                 self.idles
-                    .values()
+                    .iter()
                     .flat_map(|idle| idle.args.spawn.iter().chain(&idle.args.schedule)),
             )
             .chain(
