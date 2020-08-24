@@ -16,11 +16,10 @@ pub struct App {
     /// The name of the `const` item on which the `#[app]` attribute has been placed
     pub name: Ident,
 
-    // NOTE one per core
-    /// Per-core `#[init]` functions
+    /// `#[init]` function
     pub inits: Inits,
 
-    /// Per-core `#[idle]` functions
+    /// `#[idle]` function
     pub idles: Idles,
 
     /// Late (runtime initialized) resources
@@ -47,9 +46,6 @@ pub type ExternInterrupts = BTreeMap<Core, Map<ExternInterrupt>>;
 /// The arguments of the `#[app]` attribute
 #[derive(Debug)]
 pub struct AppArgs {
-    /// The number of cores the application will use
-    pub cores: u8,
-
     /// Custom arguments
     pub custom: Map<CustomArg>,
 }
@@ -67,9 +63,9 @@ pub enum CustomArg {
     Path(Path),
 }
 
-/// Per-core `init` functions
+/// `init` function
 pub type Inits = BTreeMap<u8, Init>;
-/// Per-core `idle` functions
+/// `idle` function
 pub type Idles = BTreeMap<u8, Idle>;
 
 /// The `init`-ialization function

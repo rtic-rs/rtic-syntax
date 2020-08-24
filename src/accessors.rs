@@ -9,8 +9,6 @@ use crate::{
 impl App {
     /// Whether this `core` uses the `schedule` API
     pub fn uses_schedule(&self, core: u8) -> bool {
-        assert!(core < self.args.cores);
-
         self.inits
             .get(&core)
             .map(|init| !init.args.schedule.is_empty())

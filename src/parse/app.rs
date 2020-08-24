@@ -84,8 +84,6 @@ impl AppArgs {
             }
 
             Ok(AppArgs {
-                cores: 1,
-
                 custom,
             })
         })
@@ -361,7 +359,7 @@ mod tests {
         let result = AppArgs::parse(stream).unwrap();
 
         // Check cores
-        assert_eq!(result.cores, 1);
+        //assert_eq!(result.cores, 1);
 
         // Check map
         for (ident, value) in result.custom {
