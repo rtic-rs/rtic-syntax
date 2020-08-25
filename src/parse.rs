@@ -163,8 +163,6 @@ fn init_idle_args(
         }
 
         Ok(InitArgs {
-            core: 0,
-
             late: late.unwrap_or(Set::new()),
 
             resources: resources.unwrap_or(Resources::new()),
@@ -350,9 +348,6 @@ fn task_args(
             // ,
             let _: Token![,] = content.parse()?;
         }
-
-        let core = 0;
-
         let priority = priority.unwrap_or(1);
         let resources = resources.unwrap_or(Resources::new());
         let schedule = schedule.unwrap_or(Set::new());
@@ -360,7 +355,6 @@ fn task_args(
 
         Ok(if let Some(binds) = binds {
             Either::Left(HardwareTaskArgs {
-                core,
                 binds,
                 priority,
                 resources,

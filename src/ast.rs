@@ -96,9 +96,6 @@ pub struct Init {
 /// `init` context metadata
 #[derive(Debug, Default)]
 pub struct InitArgs {
-    /// Which core this context belongs to?
-    pub core: u8,
-
     /// Late resources that will be initialized by this core
     ///
     /// NOTE do not use this field for codegen; use `Analysis.late_resources` instead
@@ -272,9 +269,6 @@ pub struct HardwareTask {
 /// Hardware task metadata
 #[derive(Debug)]
 pub struct HardwareTaskArgs {
-    /// The core on which this task will be executed
-    pub core: u8,
-
     /// The interrupt or exception that this task is bound to
     pub binds: Ident,
 

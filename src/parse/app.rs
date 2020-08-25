@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashSet};
+use std::collections::HashSet;
 
 use indexmap::map::Entry;
 use proc_macro2::TokenStream as TokenStream2;
@@ -104,10 +104,8 @@ impl App {
         let mut extern_interrupts = ExternInterrupts::new();
 
         let mut seen_idents = HashSet::<Ident>::new();
-        let mut bindings = BTreeMap::<u8, HashSet<Ident>>::new();
-        let mut check_binding = |core: u8, ident: &Ident| {
-            let bindings = bindings.entry(core).or_default();
-
+        let mut bindings = HashSet::<Ident>::new();
+        let mut check_binding = |ident: &Ident| {
             if bindings.contains(ident) {
                 return Err(parse::Error::new(
                     ident.span(),
@@ -191,7 +189,7 @@ impl App {
                             settings,
                         )? {
                             Either::Left(args) => {
-                                check_binding(args.core, &args.binds)?;
+                                check_binding(&args.binds)?;
                                 check_ident(&item.sig.ident)?;
 
                                 hardware_tasks.insert(
