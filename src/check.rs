@@ -77,7 +77,7 @@ pub fn app(app: &App) -> parse::Result<()> {
             }
         }
     } else {
-        // the only core will initialize all the late resources
+        // If there exist late_resources, check that #[init] returns them
         if let Some(init) = &app.inits.first() {
             if !init.returns_late_resources {
                 return Err(parse::Error::new(
@@ -97,13 +97,11 @@ pub fn app(app: &App) -> parse::Result<()> {
     for task in app.hardware_tasks.values() {
         let binds = &task.args.binds;
 
-        if let Some(extern_interrupts) = app.extern_interrupts.get(&task.args.core) {
-            if extern_interrupts.contains_key(binds) {
-                return Err(parse::Error::new(
-                    binds.span(),
-                    "`extern` interrupts can't be used as hardware tasks",
-                ));
-            }
+        if app.extern_interrupts.contains_key(binds) {
+            return Err(parse::Error::new(
+                binds.span(),
+                "`extern` interrupts can't be used as hardware tasks",
+            ));
         }
     }
 

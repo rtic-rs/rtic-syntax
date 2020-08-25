@@ -13,7 +13,6 @@ impl IdleArgs {
         settings: &Settings,
     ) -> parse::Result<Self> {
         crate::parse::init_idle_args(tokens, settings).map(|args| IdleArgs {
-            core: args.core,
             resources: args.resources,
             spawn: args.spawn,
             schedule: args.schedule,

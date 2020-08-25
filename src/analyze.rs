@@ -313,7 +313,7 @@ pub struct Analysis {
     /// Priority ceilings of "free queues"
     pub free_queues: FreeQueues,
 
-    /// Maps a core to the late resources it initializes
+    /// The late resources
     pub late_resources: LateResources,
 
     /// Location of all *used* resources

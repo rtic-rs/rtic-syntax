@@ -1,11 +1,10 @@
 //! Abstract Syntax Tree
 
 use core::ops::Deref;
-use std::collections::BTreeMap;
 
 use syn::{Attribute, Expr, Ident, Pat, PatType, Path, Stmt, Type};
 
-use crate::{Id, Map, Set};
+use crate::{Map, Set};
 
 /// The `#[app]` attribute
 #[derive(Debug)]
@@ -41,7 +40,7 @@ pub struct App {
 }
 
 /// Interrupts used to dispatch software tasks
-pub type ExternInterrupts = BTreeMap<Id, Map<ExternInterrupt>>;
+pub type ExternInterrupts = Map<ExternInterrupt>;
 
 /// The arguments of the `#[app]` attribute
 #[derive(Debug)]
@@ -144,9 +143,6 @@ pub struct Idle {
 /// `idle` context metadata
 #[derive(Debug)]
 pub struct IdleArgs {
-    /// Which core this context belongs to?
-    pub core: u8,
-
     /// Resources that can be accessed from this context
     pub resources: Resources,
 
