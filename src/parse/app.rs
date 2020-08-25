@@ -349,14 +349,11 @@ mod tests {
     use crate::{ast::AppArgs, ast::CustomArg};
 
     #[test]
-    fn parse_app_args_cores1() {
+    fn parse_app_args() {
         let s = "peripherals = true";
 
         let stream: proc_macro2::TokenStream = s.parse().unwrap();
         let result = AppArgs::parse(stream).unwrap();
-
-        // Check cores
-        //assert_eq!(result.cores, 1);
 
         // Check map
         for (ident, value) in result.custom {

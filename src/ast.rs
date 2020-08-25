@@ -96,7 +96,7 @@ pub struct Init {
 /// `init` context metadata
 #[derive(Debug, Default)]
 pub struct InitArgs {
-    /// Late resources that will be initialized by this core
+    /// Late resources that will be initialized
     ///
     /// NOTE do not use this field for codegen; use `Analysis.late_resources` instead
     pub late: Set<Ident>,
@@ -176,11 +176,6 @@ pub struct LateResource {
 
     /// Attributes that will apply to this resource
     pub attrs: Vec<Attribute>,
-
-    /// Whether this contains the `#[shared]` attribute or not
-    ///
-    /// NOTE: Always `false` in single core mode
-    //pub shared: bool,
 
     /// The type of this resource
     pub ty: Box<Type>,
@@ -304,11 +299,6 @@ pub struct Local {
 
     /// `#[cfg]` attributes like `#[cfg(debug_assertions)]`
     pub cfgs: Vec<Attribute>,
-
-    /// Whether this contains the `#[shared]` attribute or not
-    ///
-    /// NOTE: Always `false` in single core mode
-    //pub shared: bool,
 
     /// Type
     pub ty: Box<Type>,
