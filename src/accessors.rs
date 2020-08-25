@@ -188,7 +188,7 @@ impl App {
 
     /// Returns an iterator over all `spawn` calls
     ///
-    /// Each spawn call includes the core spawning the task, the priority of the spawner task and
+    /// Each spawn call includes the priority of the spawner task and
     /// the name of the spawnee. A task may appear more that once in this iterator.
     ///
     /// A priority of `None` means that this being called from `init`
