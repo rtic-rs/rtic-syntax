@@ -353,7 +353,7 @@ fn sync() {
 
 #[test]
 fn late_resources() {
-    // in single-core mode the only core initializes all resources
+    // Check so that late resources gets initialized
     let (_app, analysis) = crate::parse2(
         quote!(),
         quote!(

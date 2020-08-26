@@ -439,17 +439,6 @@ impl Ownership {
 /// Resource location
 #[derive(Clone, Debug, PartialEq)]
 pub enum Location {
-    /// resource that resides in `id`
+    /// resource that is owned
     Owned
 }
-
-/*
-impl Location {
-    /// If resource is owned this returns the Id owning it
-    pub fn id(&self) -> Option<u8> {
-        match *self {
-            Location::Owned { id, .. } => Some(id),
-        }
-    }
-}
-*/
