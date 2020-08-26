@@ -5,8 +5,8 @@ use syn::{
     parse::{self, ParseStream},
     punctuated::Punctuated,
     spanned::Spanned,
-    Abi, AttrStyle, Attribute, Expr, FnArg, ForeignItemFn, Ident, Item, ItemFn, ItemStatic,
-    Pat, PatType, PathArguments, ReturnType, Stmt, Token, Type, Visibility,
+    Abi, AttrStyle, Attribute, Expr, FnArg, ForeignItemFn, Ident, Item, ItemFn, ItemStatic, Pat,
+    PatType, PathArguments, ReturnType, Stmt, Token, Type, Visibility,
 };
 
 use crate::{ast::Access, Map, Set};

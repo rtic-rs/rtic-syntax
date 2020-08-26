@@ -138,47 +138,41 @@ impl App {
                     .map(move |(name, access)| (Some(0), name, *access))
             }))
             .chain(self.hardware_tasks.values().flat_map(|task| {
-                task.args.resources.iter().map(move |(name, access)| {
-                    (Some(task.args.priority), name, *access)
-                })
+                task.args
+                    .resources
+                    .iter()
+                    .map(move |(name, access)| (Some(task.args.priority), name, *access))
             }))
             .chain(self.software_tasks.values().flat_map(|task| {
-                task.args.resources.iter().map(move |(name, access)| {
-                    (Some(task.args.priority), name, *access)
-                })
+                task.args
+                    .resources
+                    .iter()
+                    .map(move |(name, access)| (Some(task.args.priority), name, *access))
             }))
     }
 
     pub(crate) fn schedule_calls(&self) -> impl Iterator<Item = (Option<Priority>, &Ident)> {
         self.inits
             .iter()
-            .flat_map(|init| {
-                init.args
-                    .schedule
+            .flat_map(|init| init.args.schedule.iter().map(move |task| (None, task)))
+            .chain(
+                self.idles
                     .iter()
-                    .map(move |task| (None, task))
-            })
-            .chain(self.idles.iter().flat_map(|idle| {
-                idle.args
-                    .schedule
-                    .iter()
-                    .map(move |task| (Some(0), task))
-            }))
+                    .flat_map(|idle| idle.args.schedule.iter().map(move |task| (Some(0), task))),
+            )
             .chain(self.hardware_tasks.values().flat_map(|scheduler| {
-                scheduler.args.schedule.iter().map(move |schedulee| {
-                    (
-                        Some(scheduler.args.priority),
-                        schedulee,
-                    )
-                })
+                scheduler
+                    .args
+                    .schedule
+                    .iter()
+                    .map(move |schedulee| (Some(scheduler.args.priority), schedulee))
             }))
             .chain(self.software_tasks.values().flat_map(|scheduler| {
-                scheduler.args.schedule.iter().map(move |schedulee| {
-                    (
-                        Some(scheduler.args.priority),
-                        schedulee,
-                    )
-                })
+                scheduler
+                    .args
+                    .schedule
+                    .iter()
+                    .map(move |schedulee| (Some(scheduler.args.priority), schedulee))
             }))
     }
 
@@ -192,12 +186,11 @@ impl App {
         self.inits
             .iter()
             .flat_map(|init| init.args.spawn.iter().map(move |task| (None, task)))
-            .chain(self.idles.iter().flat_map(|idle| {
-                idle.args
-                    .spawn
+            .chain(
+                self.idles
                     .iter()
-                    .map(move |task| (Some(0), task))
-            }))
+                    .flat_map(|idle| idle.args.spawn.iter().map(move |task| (Some(0), task))),
+            )
             .chain(self.hardware_tasks.values().flat_map(|spawner| {
                 spawner
                     .args

@@ -9,7 +9,7 @@ pub fn app(app: &App) -> parse::Result<()> {
     // Check that all referenced resources have been declared
     // Check that resources are NOT `Exclusive`-ly shared
     let mut owners = HashSet::new();
-    for ( _, name, access) in app.resource_accesses() {
+    for (_, name, access) in app.resource_accesses() {
         if app.resource(name).is_none() {
             return Err(parse::Error::new(
                 name.span(),
@@ -70,10 +70,10 @@ pub fn app(app: &App) -> parse::Result<()> {
     if late_resources_set.is_empty() {
         if let Some(init) = &app.inits.first() {
             if init.returns_late_resources {
-                    return Err(parse::Error::new(
-                        init.name.span(),
-                        "no late resources exist so this function must NOT return `LateResources`",
-                    ));
+                return Err(parse::Error::new(
+                    init.name.span(),
+                    "no late resources exist so this function must NOT return `LateResources`",
+                ));
             }
         }
     } else {

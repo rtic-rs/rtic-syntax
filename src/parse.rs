@@ -65,10 +65,7 @@ impl Parse for Input {
     }
 }
 
-fn init_idle_args(
-    tokens: TokenStream2,
-    settings: &Settings,
-) -> parse::Result<InitArgs> {
+fn init_idle_args(tokens: TokenStream2, settings: &Settings) -> parse::Result<InitArgs> {
     (|input: ParseStream<'_>| -> parse::Result<InitArgs> {
         if input.is_empty() {
             return Ok(InitArgs::default());

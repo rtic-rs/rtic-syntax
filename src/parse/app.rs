@@ -83,9 +83,7 @@ impl AppArgs {
                 let _: Token![,] = input.parse()?;
             }
 
-            Ok(AppArgs {
-                custom,
-            })
+            Ok(AppArgs { custom })
         })
         .parse2(tokens)
     }
@@ -109,7 +107,7 @@ impl App {
             if bindings.contains(ident) {
                 return Err(parse::Error::new(
                     ident.span(),
-                    "a task has already been bound to this interrupt"
+                    "a task has already been bound to this interrupt",
                 ));
             } else {
                 bindings.insert(ident.clone());
@@ -121,7 +119,7 @@ impl App {
             if seen_idents.contains(ident) {
                 return Err(parse::Error::new(
                     ident.span(),
-                    "this identifier has already been used"
+                    "this identifier has already been used",
                 ));
             } else {
                 seen_idents.insert(ident.clone());
@@ -138,14 +136,13 @@ impl App {
                         .iter()
                         .position(|attr| util::attr_eq(attr, "init"))
                     {
-                        let args =
-                            InitArgs::parse(item.attrs.remove(pos).tokens, settings)?;
+                        let args = InitArgs::parse(item.attrs.remove(pos).tokens, settings)?;
 
                         // If an init function already exists, error
                         if !inits.is_empty() {
                             return Err(parse::Error::new(
                                 span,
-                                "`#[init]` function must appear at most once"
+                                "`#[init]` function must appear at most once",
                             ));
                         }
 
@@ -157,13 +154,12 @@ impl App {
                         .iter()
                         .position(|attr| util::attr_eq(attr, "idle"))
                     {
-                        let args =
-                            IdleArgs::parse(item.attrs.remove(pos).tokens, settings)?;
+                        let args = IdleArgs::parse(item.attrs.remove(pos).tokens, settings)?;
 
                         if !idles.is_empty() {
                             return Err(parse::Error::new(
                                 span,
-                                "`#[idle]` function must appear at most once"
+                                "`#[idle]` function must appear at most once",
                             ));
                         }
 
@@ -184,10 +180,7 @@ impl App {
                             ));
                         }
 
-                        match crate::parse::task_args(
-                            item.attrs.remove(pos).tokens,
-                            settings,
-                        )? {
+                        match crate::parse::task_args(item.attrs.remove(pos).tokens, settings)? {
                             Either::Left(args) => {
                                 check_binding(&args.binds)?;
                                 check_ident(&item.sig.ident)?;
@@ -282,8 +275,7 @@ impl App {
                     for item in mod_.items {
                         if let ForeignItem::Fn(item) = item {
                             if settings.parse_extern_interrupt {
-                                let (ident, extern_interrupt) =
-                                    ExternInterrupt::parse(item)?;
+                                let (ident, extern_interrupt) = ExternInterrupt::parse(item)?;
 
                                 //let extern_interrupts = extern_interrupts.entry(core).or_default();
 
@@ -292,7 +284,7 @@ impl App {
                                     Entry::Occupied(..) => {
                                         return Err(parse::Error::new(
                                             span,
-                                            "this extern interrupt is listed more than once"
+                                            "this extern interrupt is listed more than once",
                                         ));
                                     }
 

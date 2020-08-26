@@ -1,7 +1,7 @@
 //! RTIC application analysis
 
 use core::cmp;
-use std::collections::{BTreeSet, BTreeMap};
+use std::collections::{BTreeMap, BTreeSet};
 
 use indexmap::IndexMap;
 use syn::{Ident, Type};
@@ -43,9 +43,7 @@ pub(crate) fn app(app: &App) -> Analysis {
         .late_resources
         .iter()
         .chain(app.resources.iter().map(|(name, res)| (name, &res.late)))
-        .filter_map(|(_name, _lr)| {
-                None
-        })
+        .filter_map(|(_name, _lr)| None)
         .collect::<Locations>();
 
     let mut ownerships = Ownerships::new();
@@ -55,10 +53,7 @@ pub(crate) fn app(app: &App) -> Analysis {
 
         // (e)
         // Add each resource to locations
-        locations.insert(
-            name.clone(),
-            Location::Owned,
-        );
+        locations.insert(name.clone(), Location::Owned);
 
         // (c)
         if let Some(priority) = prio {
@@ -99,21 +94,16 @@ pub(crate) fn app(app: &App) -> Analysis {
             .get(name)
             .map(|ownership| *ownership != owned_by_idle)
             .unwrap_or(false)
-            {
-                send_types.insert(res.ty.clone());
-            }
+        {
+            send_types.insert(res.ty.clone());
+        }
     }
 
     // All resources shared with `init` (ownership != None) need to be `Send`
-    for name in app
-        .inits
-        .iter()
-        .flat_map(|init| init.args.resources.keys())
-    {
+    for name in app.inits.iter().flat_map(|init| init.args.resources.keys()) {
         if let Some(ownership) = ownerships.get(name) {
             if *ownership != owned_by_idle {
-                send_types
-                    .insert(app.resources[name].ty.clone());
+                send_types.insert(app.resources[name].ty.clone());
             }
         }
     }
@@ -153,11 +143,8 @@ pub(crate) fn app(app: &App) -> Analysis {
 
         let mut must_be_send = false;
 
-        let channel = channels
-            .entry(spawnee_prio)
-            .or_default();
+        let channel = channels.entry(spawnee_prio).or_default();
         channel.tasks.insert(name.clone());
-
 
         let fq = free_queues.entry(name.clone()).or_default();
 
@@ -210,10 +197,7 @@ pub(crate) fn app(app: &App) -> Analysis {
 
         let mut must_be_send = false;
 
-
-        let channel = channels
-            .entry(schedulee_prio)
-            .or_default();
+        let channel = channels.entry(schedulee_prio).or_default();
         channel.tasks.insert(name.clone());
 
         // Get the TimerQueue
@@ -224,6 +208,9 @@ pub(crate) fn app(app: &App) -> Analysis {
             timer_queues.push(TimerQueue::default());
             timer_queues.first_mut().unwrap()
         };
+
+        let channel = channels.entry(schedulee_prio).or_default();
+        channel.tasks.insert(name.clone());
 
         let fq = free_queues.entry(name.clone()).or_default();
 
@@ -270,8 +257,7 @@ pub(crate) fn app(app: &App) -> Analysis {
     debug_assert!(channels.values().all(|channel| !channel.tasks.is_empty()));
 
     // Compute channel capacities
-    for channel in channels.values_mut()
-    {
+    for channel in channels.values_mut() {
         channel.capacity = channel
             .tasks
             .iter()
@@ -464,5 +450,5 @@ impl Ownership {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Location {
     /// resource that is owned
-    Owned
+    Owned,
 }

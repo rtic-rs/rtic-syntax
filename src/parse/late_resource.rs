@@ -12,7 +12,7 @@ impl LateResource {
             ));
         }
 
-        let (cfgs,  attrs) = util::extract_cfgs(item.attrs.clone());
+        let (cfgs, attrs) = util::extract_cfgs(item.attrs.clone());
 
         Ok(LateResource {
             cfgs,
