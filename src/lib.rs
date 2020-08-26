@@ -26,9 +26,6 @@ mod parse;
 #[cfg(test)]
 mod tests;
 
-/// Identifier
-pub type Id = u8;
-
 /// An ordered map keyed by identifier
 pub type Map<T> = IndexMap<Ident, T>;
 

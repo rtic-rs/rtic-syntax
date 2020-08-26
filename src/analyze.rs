@@ -6,7 +6,7 @@ use std::collections::{BTreeSet, BTreeMap};
 use indexmap::IndexMap;
 use syn::{Ident, Type};
 
-use crate::{ast::App, Id, Set};
+use crate::{ast::App, Set};
 
 pub(crate) fn app(app: &App) -> Analysis {
     // a. Which id initializes which resources
@@ -100,7 +100,7 @@ pub(crate) fn app(app: &App) -> Analysis {
             .map(|ownership| *ownership != owned_by_idle)
             .unwrap_or(false)
             {
-                send_types.entry(0).or_default().insert(res.ty.clone());
+                send_types.insert(res.ty.clone());
             }
     }
 
@@ -113,8 +113,6 @@ pub(crate) fn app(app: &App) -> Analysis {
         if let Some(ownership) = ownerships.get(name) {
             if *ownership != owned_by_idle {
                 send_types
-                    .entry(0)
-                    .or_default()
                     .insert(app.resources[name].ty.clone());
             }
         }
@@ -180,16 +178,10 @@ pub(crate) fn app(app: &App) -> Analysis {
 
         if must_be_send {
             {
-                //#TODO
-                let send_types = send_types.entry(0).or_default();
-
                 spawnee.inputs.iter().for_each(|input| {
                     send_types.insert(input.ty.clone());
                 });
             }
-
-            //#TODO
-            let send_types = send_types.entry(0).or_default();
 
             spawnee.inputs.iter().for_each(|input| {
                 send_types.insert(input.ty.clone());
@@ -240,15 +232,10 @@ pub(crate) fn app(app: &App) -> Analysis {
 
         if must_be_send {
             {
-                let send_types = send_types.entry(0).or_default();
-
                 schedulee.inputs.iter().for_each(|input| {
                     send_types.insert(input.ty.clone());
                 });
             }
-
-            //#TODO
-            let send_types = send_types.entry(0).or_default();
 
             schedulee.inputs.iter().for_each(|input| {
                 send_types.insert(input.ty.clone());
@@ -346,8 +333,8 @@ pub type Channels = BTreeMap<Priority, Channel>;
 /// core
 //pub type Channels = BTreeMap<Receiver, BTreeMap<Priority, BTreeMap<Sender, Channel>>>;
 
-/// All free queues, keyed by task and then by Id
-pub type FreeQueues = IndexMap<Task, BTreeMap<Id, Ceiling>>;
+/// All free queues, keyed by task and containing the Ceiling
+pub type FreeQueues = IndexMap<Task, Ceiling>;
 
 /// Late resources, wrapped in a vector
 pub type LateResources = Vec<BTreeSet<Resource>>;
@@ -359,10 +346,9 @@ pub type Locations = IndexMap<Resource, Location>;
 pub type Ownerships = IndexMap<Resource, Ownership>;
 
 /// These types must implement the `Send` trait
-pub type SendTypes = BTreeMap<Id, Set<Box<Type>>>;
+pub type SendTypes = Set<Box<Type>>;
 
 /// These types must implement the `Sync` trait
-//pub type SyncTypes = BTreeMap<Id, Set<Box<Type>>>;
 pub type SyncTypes = Set<Box<Type>>;
 
 /// The timer queue
