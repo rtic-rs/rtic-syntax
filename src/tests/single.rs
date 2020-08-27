@@ -193,7 +193,7 @@ fn no_send_schedule() {
 
     assert!(analysis.send_types.is_empty());
     // even when it passes through a timer handler that runs at higher priority
-    assert_eq!(analysis.timer_queue.priority, 2);
+    assert_eq!(analysis.timer_queues[0].priority, 2);
 }
 
 #[test]
@@ -377,6 +377,26 @@ fn late_resources() {
 }
 
 #[test]
+fn tq0() {
+    // schedule nothing
+    let (_app, analysis) = crate::parse2(
+        quote!(),
+        quote!(
+            const APP: () = {
+                #[task]
+                fn foo(_: foo::Context) {}
+            };
+        ),
+        Settings {
+            parse_schedule: true,
+            ..Settings::default()
+        },
+    )
+    .unwrap();
+
+    assert_eq!(analysis.timer_queues.len(), 0);
+}
+#[test]
 fn tq1() {
     // schedule same priority task
     let (_app, analysis) = crate::parse2(
@@ -397,7 +417,7 @@ fn tq1() {
     )
     .unwrap();
 
-    let tq = &analysis.timer_queue;
+    let tq = &analysis.timer_queues.first().unwrap();
     assert_eq!(tq.priority, 2);
     assert_eq!(tq.ceiling, 2);
     assert_eq!(tq.tasks.len(), 1);
@@ -425,7 +445,7 @@ fn tq2() {
     )
     .unwrap();
 
-    let tq = &analysis.timer_queue;
+    let tq = &analysis.timer_queues.first().unwrap();
     assert_eq!(tq.priority, 1);
     assert_eq!(tq.ceiling, 2);
     assert_eq!(tq.tasks.len(), 1);
@@ -456,7 +476,7 @@ fn tq3() {
     )
     .unwrap();
 
-    let tq = &analysis.timer_queue;
+    let tq = &analysis.timer_queues.first().unwrap();
     assert_eq!(tq.priority, 3);
     assert_eq!(tq.ceiling, 3);
     assert_eq!(tq.tasks.len(), 1);
@@ -484,7 +504,7 @@ fn gh183() {
     )
     .unwrap();
 
-    let tq = &analysis.timer_queue;
+    let tq = &analysis.timer_queues.first().unwrap();
     assert_eq!(tq.priority, 2);
     assert_eq!(tq.ceiling, 2);
 }

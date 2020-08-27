@@ -119,10 +119,19 @@ pub(crate) fn app(app: &App) -> Analysis {
     }
 
     // Initialize the timer queues
-    let mut tq = TimerQueue::default();
+    let mut timer_queues = TimerQueues::new();
     for (_, name) in app.schedule_calls() {
         let schedulee = &app.software_tasks[name];
         let schedulee_prio = schedulee.args.priority;
+
+        // Get the TimerQueue
+        // If there is no TimerQueue, create one
+        let mut tq = if !timer_queues.is_empty() {
+            timer_queues.first_mut().unwrap()
+        } else {
+            timer_queues.push(TimerQueue::default());
+            timer_queues.first_mut().unwrap()
+        };
 
         tq.tasks.insert(name.clone());
 
@@ -207,6 +216,15 @@ pub(crate) fn app(app: &App) -> Analysis {
             .or_default();
         channel.tasks.insert(name.clone());
 
+        // Get the TimerQueue
+        // If there is no TimerQueue, create one
+        let mut tq = if !timer_queues.is_empty() {
+            timer_queues.first_mut().unwrap()
+        } else {
+            timer_queues.push(TimerQueue::default());
+            timer_queues.first_mut().unwrap()
+        };
+
         let fq = free_queues.entry(name.clone()).or_default();
 
         if let Some(prio) = scheduler_prio {
@@ -262,11 +280,13 @@ pub(crate) fn app(app: &App) -> Analysis {
     }
 
     // Compute the capacity of the timer queues
-    tq.capacity = tq
-        .tasks
-        .iter()
-        .map(|name| app.software_tasks[name].args.capacity)
-        .sum();
+    if let Some(tq) = timer_queues.first_mut() {
+        tq.capacity = tq
+            .tasks
+            .iter()
+            .map(|name| app.software_tasks[name].args.capacity)
+            .sum();
+    }
 
     Analysis {
         channels,
@@ -276,7 +296,7 @@ pub(crate) fn app(app: &App) -> Analysis {
         ownerships,
         send_types,
         sync_types,
-        timer_queue: tq,
+        timer_queues,
     }
 }
 
@@ -321,9 +341,10 @@ pub struct Analysis {
     /// These types must implement the `Sync` trait
     pub sync_types: SyncTypes,
 
-    /// Timer queue
-    pub timer_queue: TimerQueue,
+    /// Timer queues
+    pub timer_queues: TimerQueues,
 }
+///
 
 /// All channels, keyed by dispatch priority
 /// core
@@ -351,8 +372,11 @@ pub type SendTypes = Set<Box<Type>>;
 /// These types must implement the `Sync` trait
 pub type SyncTypes = Set<Box<Type>>;
 
+/// Timer queue, wrapped in a vec!
+pub type TimerQueues = Vec<TimerQueue>;
+
 /// The timer queue
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TimerQueue {
     /// The capacity of the queue
     pub capacity: u8,
