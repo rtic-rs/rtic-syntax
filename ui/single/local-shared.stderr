@@ -1,5 +1,0 @@
-error: `#[shared]` can only be used in multi-core mode
- --> $DIR/local-shared.rs:7:9
-  |
-7 |         #[shared]
-  |         ^
