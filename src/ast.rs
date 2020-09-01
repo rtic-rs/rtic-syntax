@@ -15,10 +15,10 @@ pub struct App {
     /// The name of the `const` item on which the `#[app]` attribute has been placed
     pub name: Ident,
 
-    /// Vector containing the `#[init]` function, to allow easy iteration
+    /// Vector containing the `#[init]` function
     pub inits: Inits,
 
-    /// Vector containing the `#[idle]` function, to allow easy iteration
+    /// Vector containing the `#[idle]` function
     pub idles: Idles,
 
     /// Late (runtime initialized) resources
@@ -64,6 +64,7 @@ pub enum CustomArg {
 
 /// `init` function
 pub type Inits = Vec<Init>;
+
 /// `idle` function
 pub type Idles = Vec<Idle>;
 

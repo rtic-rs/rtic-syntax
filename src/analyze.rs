@@ -9,19 +9,15 @@ use syn::{Ident, Type};
 use crate::{ast::App, Set};
 
 pub(crate) fn app(app: &App) -> Analysis {
-    // a. Which id initializes which resources
+    // a. Initialization of resources
     let mut late_resources = LateResources::new();
     if !app.late_resources.is_empty() {
         let mut resources = app.late_resources.keys().cloned().collect::<BTreeSet<_>>();
-        let mut rest = None;
+        let mut rest = false;
         if let Some(init) = &app.inits.first() {
             if init.args.late.is_empty() {
-                // this was checked in the `check` pass
-                debug_assert!(rest.is_none());
-
-                rest = Some(());
+                rest = true;
             } else {
-                //let late_resources = late_resources.entry(0).or_default();
                 let mut late_resources = Vec::new();
 
                 for name in &init.args.late {
@@ -31,13 +27,11 @@ pub(crate) fn app(app: &App) -> Analysis {
             }
         }
 
-        if let Some(_rest) = rest {
+        if rest {
             late_resources.push(resources);
         }
     }
 
-    // c. Ceiling analysis of Exclusive resources
-    // d. Sync-ness of Access::Shared resources
     // e. Location of resources
     let mut locations = app
         .late_resources
@@ -133,7 +127,7 @@ pub(crate) fn app(app: &App) -> Analysis {
     }
 
     // g. Ceiling analysis of free queues (consumer end point) -- first pass
-    // h. Ceiling analysis of the channels (producer end point) -- first pass (#TODO MULTICORE)
+    // h. Ceiling analysis of the channels (producer end point) -- first pass
     // j. Send analysis
     let mut channels = Channels::new();
     let mut free_queues = FreeQueues::new();
@@ -186,9 +180,8 @@ pub(crate) fn app(app: &App) -> Analysis {
     }
 
     // k. Ceiling analysis of free queues (consumer end point) -- second pass
-    // l. Ceiling analysis of the channels (producer end point) -- second pass (#TODO MULTICORE)
+    // l. Ceiling analysis of the channels (producer end point) -- second pass
     // m. Ceiling analysis of the timer queue
-    // n. Spawn barriers analysis (schedule edition)
     // o. Send analysis
 
     for (scheduler_prio, name) in app.schedule_calls() {
@@ -248,12 +241,7 @@ pub(crate) fn app(app: &App) -> Analysis {
         }
     }
 
-    // no channel should ever be empty
-    /*
-    debug_assert!(channels.values().all(|dispatchers| dispatchers
-        .values()
-        .all(|channels| channels.values().all(|channel| !channel.tasks.is_empty()))));
-    */
+    // No channel should ever be empty
     debug_assert!(channels.values().all(|channel| !channel.tasks.is_empty()));
 
     // Compute channel capacities
@@ -314,8 +302,7 @@ pub struct Analysis {
     /// If a resource is not listed here it means that's a "dead" (never accessed) resource and the
     /// backend should not generate code for it
     ///
-    /// `None` indicates that the resource must reside in memory visible to more than one core
-    /// ("shared memory")
+    /// `None` indicates that the resource must reside in shared memory
     pub locations: Locations,
 
     /// Resource ownership
@@ -330,15 +317,9 @@ pub struct Analysis {
     /// Timer queues
     pub timer_queues: TimerQueues,
 }
-///
 
 /// All channels, keyed by dispatch priority
-/// core
 pub type Channels = BTreeMap<Priority, Channel>;
-
-/// All cross-core channels, keyed by receiver core, then by dispatch priority and then by sender
-/// core
-//pub type Channels = BTreeMap<Receiver, BTreeMap<Priority, BTreeMap<Sender, Channel>>>;
 
 /// All free queues, keyed by task and containing the Ceiling
 pub type FreeQueues = IndexMap<Task, Ceiling>;

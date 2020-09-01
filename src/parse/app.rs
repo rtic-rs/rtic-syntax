@@ -156,6 +156,7 @@ impl App {
                     {
                         let args = IdleArgs::parse(item.attrs.remove(pos).tokens, settings)?;
 
+                        // If an idle function already exists, error
                         if !idles.is_empty() {
                             return Err(parse::Error::new(
                                 span,
@@ -276,8 +277,6 @@ impl App {
                         if let ForeignItem::Fn(item) = item {
                             if settings.parse_extern_interrupt {
                                 let (ident, extern_interrupt) = ExternInterrupt::parse(item)?;
-
-                                //let extern_interrupts = extern_interrupts.entry(core).or_default();
 
                                 let span = ident.span();
                                 match extern_interrupts.entry(ident) {

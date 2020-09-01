@@ -4,8 +4,8 @@ use crate::{ast::App, Settings};
 
 pub fn app(app: &mut App, settings: &Settings) {
     // "compress" priorities
-    // if the user specified, for example, task priorities of "1, 3, 6"; we'll compress them into
-    // "1, 2, 3" as to leave no gaps
+    // If the user specified, for example, task priorities of "1, 3, 6",
+    // compress them into "1, 2, 3" as to leave no gaps
     if settings.optimize_priorities {
         // all task priorities ordered in ascending order
         let priorities = app

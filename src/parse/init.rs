@@ -9,11 +9,7 @@ use crate::{
 };
 
 impl InitArgs {
-    pub(crate) fn parse(
-        tokens: TokenStream2,
-        settings: &Settings,
-        //span: Span,
-    ) -> parse::Result<Self> {
+    pub(crate) fn parse(tokens: TokenStream2, settings: &Settings) -> parse::Result<Self> {
         crate::parse::init_idle_args(tokens, settings)
     }
 }
