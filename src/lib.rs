@@ -73,8 +73,8 @@ impl<'a> Context<'a> {
     pub fn ident(&self, app: &'a App) -> &'a Ident {
         match self {
             Context::HardwareTask(ident) => ident,
-            Context::Idle => &app.idles[0].name,
-            Context::Init => &app.inits[0].name,
+            Context::Idle => &app.idles.first().unwrap().name,
+            Context::Init => &app.inits.first().unwrap().name,
             Context::SoftwareTask(ident) => ident,
         }
     }
@@ -106,8 +106,8 @@ impl<'a> Context<'a> {
     pub fn has_locals(&self, app: &App) -> bool {
         match *self {
             Context::HardwareTask(name) => !app.hardware_tasks[name].locals.is_empty(),
-            Context::Idle => !app.idles[0].locals.is_empty(),
-            Context::Init => !app.inits[0].locals.is_empty(),
+            Context::Idle => !app.idles.first().unwrap().locals.is_empty(),
+            Context::Init => !app.inits.first().unwrap().locals.is_empty(),
             Context::SoftwareTask(name) => !app.software_tasks[name].locals.is_empty(),
         }
     }
@@ -116,8 +116,8 @@ impl<'a> Context<'a> {
     pub fn has_resources(&self, app: &App) -> bool {
         match *self {
             Context::HardwareTask(name) => !app.hardware_tasks[name].args.resources.is_empty(),
-            Context::Idle => !app.idles[0].args.resources.is_empty(),
-            Context::Init => !app.inits[0].args.resources.is_empty(),
+            Context::Idle => !app.idles.first().unwrap().args.resources.is_empty(),
+            Context::Init => !app.inits.first().unwrap().args.resources.is_empty(),
             Context::SoftwareTask(name) => !app.software_tasks[name].args.resources.is_empty(),
         }
     }
@@ -126,8 +126,8 @@ impl<'a> Context<'a> {
     pub fn uses_schedule(&self, app: &App) -> bool {
         match *self {
             Context::HardwareTask(name) => !app.hardware_tasks[name].args.schedule.is_empty(),
-            Context::Idle => !app.idles[0].args.schedule.is_empty(),
-            Context::Init => !app.inits[0].args.schedule.is_empty(),
+            Context::Idle => !app.idles.first().unwrap().args.schedule.is_empty(),
+            Context::Init => !app.inits.first().unwrap().args.schedule.is_empty(),
             Context::SoftwareTask(name) => !app.software_tasks[name].args.schedule.is_empty(),
         }
     }
@@ -136,8 +136,8 @@ impl<'a> Context<'a> {
     pub fn uses_spawn(&self, app: &App) -> bool {
         match *self {
             Context::HardwareTask(name) => !app.hardware_tasks[name].args.spawn.is_empty(),
-            Context::Idle => !app.idles[0].args.spawn.is_empty(),
-            Context::Init => !app.inits[0].args.spawn.is_empty(),
+            Context::Idle => !app.idles.first().unwrap().args.spawn.is_empty(),
+            Context::Init => !app.inits.first().unwrap().args.spawn.is_empty(),
             Context::SoftwareTask(name) => !app.software_tasks[name].args.spawn.is_empty(),
         }
     }
@@ -152,7 +152,6 @@ pub struct Settings {
     pub parse_extern_interrupt: bool,
     /// Whether to accept the `schedule` argument or not
     pub parse_schedule: bool,
-
     /// Whether to "compress" priorities or not
     pub optimize_priorities: bool,
 
