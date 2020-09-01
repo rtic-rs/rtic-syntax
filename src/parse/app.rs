@@ -291,6 +291,7 @@ impl App {
                                     ExternInterrupt::parse(item)?;
 
                                 let extern_interrupts = extern_interrupts.entry(core).or_default();
+
                                 let span = ident.span();
                                 match extern_interrupts.entry(ident) {
                                     Entry::Occupied(..) => {
