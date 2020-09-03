@@ -110,13 +110,10 @@ pub(crate) fn app(app: &App) -> Analysis {
 
         // Get the TimerQueue
         // If there is no TimerQueue, create one
-        let mut tq = if !timer_queues.is_empty() {
-            timer_queues.first_mut().unwrap()
-        } else {
+        if timer_queues.is_empty() {
             timer_queues.push(TimerQueue::default());
-            timer_queues.first_mut().unwrap()
-        };
-
+        }
+        let mut tq = timer_queues.first_mut().unwrap();
         tq.tasks.insert(name.clone());
 
         // the handler priority must match the priority of the highest priority schedulee
@@ -195,12 +192,10 @@ pub(crate) fn app(app: &App) -> Analysis {
 
         // Get the TimerQueue
         // If there is no TimerQueue, create one
-        let mut tq = if !timer_queues.is_empty() {
-            timer_queues.first_mut().unwrap()
-        } else {
+        if timer_queues.is_empty() {
             timer_queues.push(TimerQueue::default());
-            timer_queues.first_mut().unwrap()
-        };
+        }
+        let mut tq = timer_queues.first_mut().unwrap();
 
         let channel = channels.entry(schedulee_prio).or_default();
         channel.tasks.insert(name.clone());
