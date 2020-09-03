@@ -343,7 +343,7 @@ pub type SyncTypes = Set<Box<Type>>;
 pub type TimerQueues = Vec<TimerQueue>;
 
 /// The timer queue
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct TimerQueue {
     /// The capacity of the queue
     pub capacity: u8,
