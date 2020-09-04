@@ -13,9 +13,7 @@ pub fn app(args: TokenStream, input: TokenStream) -> TokenStream {
     let mut settings = Settings::default();
     let mut rtic_args = vec![];
     for arg in args.to_string().split(',') {
-        if arg.trim() == "parse_cores" {
-            settings.parse_cores = true;
-        } else if arg.trim() == "parse_binds" {
+        if arg.trim() == "parse_binds" {
             settings.parse_binds = true;
         } else if arg.trim() == "parse_extern_interrupt" {
             settings.parse_extern_interrupt = true;

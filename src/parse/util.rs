@@ -1,13 +1,12 @@
 use std::collections::HashSet;
 
-use proc_macro2::Span;
 use syn::{
     bracketed,
-    parse::{self, Parse, ParseStream},
+    parse::{self, ParseStream},
     punctuated::Punctuated,
     spanned::Spanned,
-    Abi, AttrStyle, Attribute, Expr, FnArg, ForeignItemFn, Ident, Item, ItemFn, ItemStatic, LitInt,
-    Pat, PatType, PathArguments, ReturnType, Stmt, Token, Type, Visibility,
+    Abi, AttrStyle, Attribute, Expr, FnArg, ForeignItemFn, Ident, Item, ItemFn, ItemStatic, Pat,
+    PatType, PathArguments, ReturnType, Stmt, Token, Type, Visibility,
 };
 
 use crate::{ast::Access, Map, Set};
@@ -72,54 +71,6 @@ pub fn extract_cfgs(attrs: Vec<Attribute>) -> (Vec<Attribute>, Vec<Attribute>) {
     (cfgs, not_cfgs)
 }
 
-/// `#[core = 0]`
-pub fn extract_core(
-    mut attrs: Vec<Attribute>,
-    cores: u8,
-    span: Span,
-) -> parse::Result<(u8, Vec<Attribute>)> {
-    struct Rhs {
-        _eq: Token![=],
-        lit: LitInt,
-    }
-
-    impl Parse for Rhs {
-        fn parse(input: ParseStream<'_>) -> parse::Result<Self> {
-            Ok(Rhs {
-                _eq: input.parse()?,
-                lit: input.parse()?,
-            })
-        }
-    }
-
-    let mut res = None;
-    for (pos, attr) in attrs.iter().enumerate() {
-        if attr_eq(attr, "core") {
-            if let Ok(rhs) = syn::parse2::<Rhs>(attr.tokens.clone()) {
-                if rhs.lit.suffix().is_empty() {
-                    let core = rhs.lit.base10_parse::<u8>()?;
-
-                    if core < cores {
-                        res = Some((pos, core));
-                        break;
-                    }
-                }
-            }
-        }
-    }
-
-    let (pos, core) = res.ok_or_else(|| {
-        parse::Error::new(
-            span,
-            "core needs to be specified using the `#[core = 0]` attribute",
-        )
-    })?;
-
-    attrs.remove(pos);
-
-    Ok((core, attrs))
-}
-
 pub fn extract_locals(stmts: Vec<Stmt>) -> parse::Result<(Vec<ItemStatic>, Vec<Stmt>)> {
     let mut istmts = stmts.into_iter();
 
@@ -155,43 +106,6 @@ pub fn extract_locals(stmts: Vec<Stmt>) -> parse::Result<(Vec<ItemStatic>, Vec<S
     stmts.extend(istmts);
 
     Ok((locals, stmts))
-}
-
-pub fn extract_shared(attrs: &mut Vec<Attribute>, cores: u8) -> parse::Result<bool> {
-    if let Some(pos) = attrs.iter().position(|attr| attr_eq(attr, "shared")) {
-        if cores == 1 {
-            Err(parse::Error::new(
-                attrs[pos].span(),
-                "`#[shared]` can only be used in multi-core mode",
-            ))
-        } else {
-            attrs.remove(pos);
-
-            Ok(true)
-        }
-    } else {
-        Ok(false)
-    }
-}
-
-pub fn parse_core(lit: LitInt, cores: u8) -> parse::Result<u8> {
-    if !lit.suffix().is_empty() {
-        return Err(parse::Error::new(
-            lit.span(),
-            "this integer must be unsuffixed",
-        ));
-    }
-
-    if let Ok(val) = lit.base10_parse::<u8>() {
-        if val < cores {
-            return Ok(val);
-        }
-    }
-
-    Err(parse::Error::new(
-        lit.span(),
-        &format!("core number must be in the range 0..{}", cores),
-    ))
 }
 
 pub fn parse_idents(content: ParseStream<'_>) -> parse::Result<Set<Ident>> {

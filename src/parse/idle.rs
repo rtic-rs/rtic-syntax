@@ -1,4 +1,4 @@
-use proc_macro2::{Span, TokenStream as TokenStream2};
+use proc_macro2::TokenStream as TokenStream2;
 use syn::{parse, ItemFn};
 
 use crate::{
@@ -8,14 +8,8 @@ use crate::{
 };
 
 impl IdleArgs {
-    pub(crate) fn parse(
-        cores: u8,
-        tokens: TokenStream2,
-        settings: &Settings,
-        span: Span,
-    ) -> parse::Result<Self> {
-        crate::parse::init_idle_args(tokens, cores, settings, false, span).map(|args| IdleArgs {
-            core: args.core,
+    pub(crate) fn parse(tokens: TokenStream2, settings: &Settings) -> parse::Result<Self> {
+        crate::parse::init_idle_args(tokens, settings).map(|args| IdleArgs {
             resources: args.resources,
             spawn: args.spawn,
             schedule: args.schedule,
@@ -25,7 +19,7 @@ impl IdleArgs {
 }
 
 impl Idle {
-    pub(crate) fn parse(args: IdleArgs, item: ItemFn, cores: u8) -> parse::Result<Self> {
+    pub(crate) fn parse(args: IdleArgs, item: ItemFn) -> parse::Result<Self> {
         let valid_signature = util::check_fn_signature(&item)
             && item.sig.inputs.len() == 1
             && util::type_is_bottom(&item.sig.output);
@@ -41,7 +35,7 @@ impl Idle {
                         args,
                         attrs: item.attrs,
                         context,
-                        locals: Local::parse(locals, cores)?,
+                        locals: Local::parse(locals)?,
                         name: item.sig.ident,
                         stmts,
                         _extensible: (),

@@ -1,5 +1,0 @@
-error: unclear how initialization of late resources is split between cores 0 and 1
-  --> $DIR/init-late-resources-split.rs:13:8
-   |
-13 |     fn init(_: init::Context) -> init::LateResources {}
-   |        ^^^^

@@ -1,2 +1,1 @@
-mod multi;
 mod single;

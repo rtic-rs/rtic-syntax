@@ -1,4 +1,4 @@
-//! Full syntax for single core
+//! Full syntax
 
 #[mock::app]
 const APP: () = {

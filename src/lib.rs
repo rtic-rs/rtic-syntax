@@ -26,9 +26,6 @@ mod parse;
 #[cfg(test)]
 mod tests;
 
-/// Core identifier
-pub type Core = u8;
-
 /// An ordered map keyed by identifier
 pub type Map<T> = IndexMap<Ident, T>;
 
@@ -62,39 +59,29 @@ pub enum Context<'a> {
     HardwareTask(&'a Ident),
 
     /// The `idle` context
-    Idle(Core),
+    Idle,
 
     /// The `init`-ialization function
-    Init(Core),
+    Init,
 
     /// A software task: `#[task]`
     SoftwareTask(&'a Ident),
 }
 
 impl<'a> Context<'a> {
-    /// The core this context belongs to
-    pub fn core(&self, app: &App) -> u8 {
-        match self {
-            Context::HardwareTask(name) => app.hardware_tasks[*name].args.core,
-            Context::Idle(core) => app.idles[core].args.core,
-            Context::Init(core) => app.inits[core].args.core,
-            Context::SoftwareTask(name) => app.software_tasks[*name].args.core,
-        }
-    }
-
     /// The identifier of this context
     pub fn ident(&self, app: &'a App) -> &'a Ident {
         match self {
             Context::HardwareTask(ident) => ident,
-            Context::Idle(core) => &app.idles[core].name,
-            Context::Init(core) => &app.inits[core].name,
+            Context::Idle => &app.idles.first().unwrap().name,
+            Context::Init => &app.inits.first().unwrap().name,
             Context::SoftwareTask(ident) => ident,
         }
     }
 
     /// Is this the `idle` context?
     pub fn is_idle(&self) -> bool {
-        if let Context::Idle(_) = self {
+        if let Context::Idle = self {
             true
         } else {
             false
@@ -103,7 +90,7 @@ impl<'a> Context<'a> {
 
     /// Is this the `init`-ialization context?
     pub fn is_init(&self) -> bool {
-        if let Context::Init(_) = self {
+        if let Context::Init = self {
             true
         } else {
             false
@@ -119,8 +106,8 @@ impl<'a> Context<'a> {
     pub fn has_locals(&self, app: &App) -> bool {
         match *self {
             Context::HardwareTask(name) => !app.hardware_tasks[name].locals.is_empty(),
-            Context::Idle(core) => !app.idles[&core].locals.is_empty(),
-            Context::Init(core) => !app.inits[&core].locals.is_empty(),
+            Context::Idle => !app.idles.first().unwrap().locals.is_empty(),
+            Context::Init => !app.inits.first().unwrap().locals.is_empty(),
             Context::SoftwareTask(name) => !app.software_tasks[name].locals.is_empty(),
         }
     }
@@ -129,8 +116,8 @@ impl<'a> Context<'a> {
     pub fn has_resources(&self, app: &App) -> bool {
         match *self {
             Context::HardwareTask(name) => !app.hardware_tasks[name].args.resources.is_empty(),
-            Context::Idle(core) => !app.idles[&core].args.resources.is_empty(),
-            Context::Init(core) => !app.inits[&core].args.resources.is_empty(),
+            Context::Idle => !app.idles.first().unwrap().args.resources.is_empty(),
+            Context::Init => !app.inits.first().unwrap().args.resources.is_empty(),
             Context::SoftwareTask(name) => !app.software_tasks[name].args.resources.is_empty(),
         }
     }
@@ -139,8 +126,8 @@ impl<'a> Context<'a> {
     pub fn uses_schedule(&self, app: &App) -> bool {
         match *self {
             Context::HardwareTask(name) => !app.hardware_tasks[name].args.schedule.is_empty(),
-            Context::Idle(core) => !app.idles[&core].args.schedule.is_empty(),
-            Context::Init(core) => !app.inits[&core].args.schedule.is_empty(),
+            Context::Idle => !app.idles.first().unwrap().args.schedule.is_empty(),
+            Context::Init => !app.inits.first().unwrap().args.schedule.is_empty(),
             Context::SoftwareTask(name) => !app.software_tasks[name].args.schedule.is_empty(),
         }
     }
@@ -149,8 +136,8 @@ impl<'a> Context<'a> {
     pub fn uses_spawn(&self, app: &App) -> bool {
         match *self {
             Context::HardwareTask(name) => !app.hardware_tasks[name].args.spawn.is_empty(),
-            Context::Idle(core) => !app.idles[&core].args.spawn.is_empty(),
-            Context::Init(core) => !app.inits[&core].args.spawn.is_empty(),
+            Context::Idle => !app.idles.first().unwrap().args.spawn.is_empty(),
+            Context::Init => !app.inits.first().unwrap().args.spawn.is_empty(),
             Context::SoftwareTask(name) => !app.software_tasks[name].args.spawn.is_empty(),
         }
     }
@@ -161,13 +148,10 @@ impl<'a> Context<'a> {
 pub struct Settings {
     /// Whether to accept the `binds` argument in `#[task]` or not
     pub parse_binds: bool,
-    /// Whether to accept the `cores`, `core` and `late` arguments or not
-    pub parse_cores: bool,
     /// Whether to parse `extern` interrupts (functions) or not
     pub parse_extern_interrupt: bool,
     /// Whether to accept the `schedule` argument or not
     pub parse_schedule: bool,
-
     /// Whether to "compress" priorities or not
     pub optimize_priorities: bool,
 

@@ -4,5 +4,4 @@ use trybuild::TestCases;
 fn ui() {
     let t = TestCases::new();
     t.compile_fail("ui/single/*.rs");
-    t.compile_fail("ui/multi/*.rs");
 }

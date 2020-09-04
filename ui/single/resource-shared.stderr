@@ -1,5 +1,7 @@
-error: `#[shared]` can only be used in multi-core mode
- --> $DIR/resource-shared.rs:6:9
+error: late resources exist so a `#[init]` function must be defined
+ --> $DIR/resource-shared.rs:3:1
   |
-6 |         #[shared]
-  |         ^
+3 | #[mock::app]
+  | ^^^^^^^^^^^^
+  |
+  = note: this error originates in an attribute macro (in Nightly builds, run with -Z macro-backtrace for more info)

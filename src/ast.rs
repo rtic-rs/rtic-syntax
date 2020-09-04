@@ -1,11 +1,10 @@
 //! Abstract Syntax Tree
 
 use core::ops::Deref;
-use std::collections::BTreeMap;
 
 use syn::{Attribute, Expr, Ident, Pat, PatType, Path, Stmt, Type};
 
-use crate::{Core, Map, Set};
+use crate::{Map, Set};
 
 /// The `#[app]` attribute
 #[derive(Debug)]
@@ -16,11 +15,10 @@ pub struct App {
     /// The name of the `const` item on which the `#[app]` attribute has been placed
     pub name: Ident,
 
-    // NOTE one per core
-    /// Per-core `#[init]` functions
+    /// Vector containing the `#[init]` function
     pub inits: Inits,
 
-    /// Per-core `#[idle]` functions
+    /// Vector containing the `#[idle]` function
     pub idles: Idles,
 
     /// Late (runtime initialized) resources
@@ -42,14 +40,11 @@ pub struct App {
 }
 
 /// Interrupts used to dispatch software tasks
-pub type ExternInterrupts = BTreeMap<Core, Map<ExternInterrupt>>;
+pub type ExternInterrupts = Map<ExternInterrupt>;
 
 /// The arguments of the `#[app]` attribute
 #[derive(Debug)]
 pub struct AppArgs {
-    /// The number of cores the application will use
-    pub cores: u8,
-
     /// Custom arguments
     pub custom: Map<CustomArg>,
 }
@@ -67,10 +62,11 @@ pub enum CustomArg {
     Path(Path),
 }
 
-/// Per-core `init` functions
-pub type Inits = BTreeMap<u8, Init>;
-/// Per-core `idle` functions
-pub type Idles = BTreeMap<u8, Idle>;
+/// `init` function
+pub type Inits = Vec<Init>;
+
+/// `idle` function
+pub type Idles = Vec<Idle>;
 
 /// The `init`-ialization function
 #[derive(Debug)]
@@ -101,10 +97,7 @@ pub struct Init {
 /// `init` context metadata
 #[derive(Debug, Default)]
 pub struct InitArgs {
-    /// Which core this context belongs to?
-    pub core: u8,
-
-    /// Late resources that will be initialized by this core
+    /// Late resources that will be initialized
     ///
     /// NOTE do not use this field for codegen; use `Analysis.late_resources` instead
     pub late: Set<Ident>,
@@ -148,9 +141,6 @@ pub struct Idle {
 /// `idle` context metadata
 #[derive(Debug)]
 pub struct IdleArgs {
-    /// Which core this context belongs to?
-    pub core: u8,
-
     /// Resources that can be accessed from this context
     pub resources: Resources,
 
@@ -188,11 +178,6 @@ pub struct LateResource {
     /// Attributes that will apply to this resource
     pub attrs: Vec<Attribute>,
 
-    /// Whether this contains the `#[shared]` attribute or not
-    ///
-    /// NOTE: Always `false` in single core mode
-    pub shared: bool,
-
     /// The type of this resource
     pub ty: Box<Type>,
 
@@ -226,9 +211,6 @@ pub struct SoftwareTask {
 /// Software task metadata
 #[derive(Debug)]
 pub struct SoftwareTaskArgs {
-    /// The core this task will run on
-    pub core: u8,
-
     /// The task capacity: the maximum number of pending messages that can be queued
     pub capacity: u8,
 
@@ -250,7 +232,6 @@ pub struct SoftwareTaskArgs {
 impl Default for SoftwareTaskArgs {
     fn default() -> Self {
         Self {
-            core: 0,
             capacity: 1,
             priority: 1,
             resources: Resources::new(),
@@ -284,9 +265,6 @@ pub struct HardwareTask {
 /// Hardware task metadata
 #[derive(Debug)]
 pub struct HardwareTaskArgs {
-    /// The core on which this task will be executed
-    pub core: u8,
-
     /// The interrupt or exception that this task is bound to
     pub binds: Ident,
 
@@ -323,11 +301,6 @@ pub struct Local {
     /// `#[cfg]` attributes like `#[cfg(debug_assertions)]`
     pub cfgs: Vec<Attribute>,
 
-    /// Whether this contains the `#[shared]` attribute or not
-    ///
-    /// NOTE: Always `false` in single core mode
-    pub shared: bool,
-
     /// Type
     pub ty: Box<Type>,
 
@@ -340,10 +313,10 @@ pub struct Local {
 /// Resource access
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Access {
-    /// `[x]`
+    /// `[x]`, a mutable resource
     Exclusive,
 
-    /// `[&x]`
+    /// `[&x]`, a static non-mutable resource
     Shared,
 }
 

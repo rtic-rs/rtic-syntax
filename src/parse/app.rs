@@ -1,11 +1,11 @@
-use std::collections::{BTreeMap, HashSet};
+use std::collections::HashSet;
 
 use indexmap::map::Entry;
 use proc_macro2::TokenStream as TokenStream2;
 use syn::{
     parse::{self, ParseStream, Parser},
     spanned::Spanned,
-    ExprParen, Fields, ForeignItem, Ident, Item, Lit, LitInt, Path, Token, Visibility,
+    ExprParen, Fields, ForeignItem, Ident, Item, Lit, Path, Token, Visibility,
 };
 
 use super::Input;
@@ -19,9 +19,8 @@ use crate::{
 };
 
 impl AppArgs {
-    pub(crate) fn parse(tokens: TokenStream2, settings: &Settings) -> parse::Result<Self> {
+    pub(crate) fn parse(tokens: TokenStream2) -> parse::Result<Self> {
         (|input: ParseStream<'_>| -> parse::Result<Self> {
-            let mut cores = None;
             let mut custom = Map::new();
 
             loop {
@@ -35,33 +34,6 @@ impl AppArgs {
 
                 let ident_s = ident.to_string();
                 match &*ident_s {
-                    "cores" if settings.parse_cores => {
-                        if cores.is_some() {
-                            return Err(parse::Error::new(
-                                ident.span(),
-                                "argument appears more than once",
-                            ));
-                        }
-
-                        let lit = input.parse::<LitInt>()?;
-                        if !lit.suffix().is_empty() {
-                            return Err(parse::Error::new(
-                                lit.span(),
-                                "this integer must be unsuffixed",
-                            ));
-                        }
-
-                        let val = lit.base10_parse::<u8>().ok();
-                        if val.is_none() || val.unwrap() < 2 {
-                            return Err(parse::Error::new(
-                                lit.span(),
-                                "number of cores must be in the range 2..=255",
-                            ));
-                        }
-
-                        cores = Some(val.unwrap());
-                    }
-
                     _ => {
                         if custom.contains_key(&ident) {
                             return Err(parse::Error::new(
@@ -111,11 +83,7 @@ impl AppArgs {
                 let _: Token![,] = input.parse()?;
             }
 
-            Ok(AppArgs {
-                cores: cores.unwrap_or(1),
-
-                custom,
-            })
+            Ok(AppArgs { custom })
         })
         .parse2(tokens)
     }
@@ -123,10 +91,8 @@ impl AppArgs {
 
 impl App {
     pub(crate) fn parse(args: AppArgs, input: Input, settings: &Settings) -> parse::Result<Self> {
-        let cores = args.cores;
-
-        let mut inits = BTreeMap::new();
-        let mut idles = BTreeMap::new();
+        let mut inits = Vec::new();
+        let mut idles = Vec::new();
 
         let mut late_resources = Map::new();
         let mut resources = Map::new();
@@ -135,19 +101,13 @@ impl App {
 
         let mut extern_interrupts = ExternInterrupts::new();
 
-        let mut seen_idents = BTreeMap::<u8, HashSet<Ident>>::new();
-        let mut bindings = BTreeMap::<u8, HashSet<Ident>>::new();
-        let mut check_binding = |core: u8, ident: &Ident| {
-            let bindings = bindings.entry(core).or_default();
-
+        let mut seen_idents = HashSet::<Ident>::new();
+        let mut bindings = HashSet::<Ident>::new();
+        let mut check_binding = |ident: &Ident| {
             if bindings.contains(ident) {
                 return Err(parse::Error::new(
                     ident.span(),
-                    if cores == 1 {
-                        "a task has already been bound to this interrupt"
-                    } else {
-                        "a task has already been bound to this interrupt on this core"
-                    },
+                    "a task has already been bound to this interrupt",
                 ));
             } else {
                 bindings.insert(ident.clone());
@@ -155,17 +115,11 @@ impl App {
 
             Ok(())
         };
-        let mut check_ident = |core: u8, ident: &Ident| {
-            let seen_idents = seen_idents.entry(core).or_default();
-
+        let mut check_ident = |ident: &Ident| {
             if seen_idents.contains(ident) {
                 return Err(parse::Error::new(
                     ident.span(),
-                    if cores == 1 {
-                        "this identifier has already been used"
-                    } else {
-                        "this identifier has already been used on this core"
-                    },
+                    "this identifier has already been used",
                 ));
             } else {
                 seen_idents.insert(ident.clone());
@@ -182,45 +136,37 @@ impl App {
                         .iter()
                         .position(|attr| util::attr_eq(attr, "init"))
                     {
-                        let args =
-                            InitArgs::parse(cores, item.attrs.remove(pos).tokens, settings, span)?;
+                        let args = InitArgs::parse(item.attrs.remove(pos).tokens, settings)?;
 
-                        if inits.contains_key(&args.core) {
+                        // If an init function already exists, error
+                        if !inits.is_empty() {
                             return Err(parse::Error::new(
                                 span,
-                                if cores == 1 {
-                                    "`#[init]` function must appear at most once"
-                                } else {
-                                    "an `#[init]` function has already been assigned to this core"
-                                },
+                                "`#[init]` function must appear at most once",
                             ));
                         }
 
-                        check_ident(args.core, &item.sig.ident)?;
+                        check_ident(&item.sig.ident)?;
 
-                        inits.insert(args.core, Init::parse(args, item, cores)?);
+                        inits.push(Init::parse(args, item)?);
                     } else if let Some(pos) = item
                         .attrs
                         .iter()
                         .position(|attr| util::attr_eq(attr, "idle"))
                     {
-                        let args =
-                            IdleArgs::parse(cores, item.attrs.remove(pos).tokens, settings, span)?;
+                        let args = IdleArgs::parse(item.attrs.remove(pos).tokens, settings)?;
 
-                        if idles.contains_key(&args.core) {
+                        // If an idle function already exists, error
+                        if !idles.is_empty() {
                             return Err(parse::Error::new(
                                 span,
-                                if cores == 1 {
-                                    "`#[idle]` function must appear at most once"
-                                } else {
-                                    "an `#[idle]` function has already been assigned to this core"
-                                },
+                                "`#[idle]` function must appear at most once",
                             ));
                         }
 
-                        check_ident(args.core, &item.sig.ident)?;
+                        check_ident(&item.sig.ident)?;
 
-                        idles.insert(args.core, Idle::parse(args, item, cores)?);
+                        idles.push(Idle::parse(args, item)?);
                     } else if let Some(pos) = item
                         .attrs
                         .iter()
@@ -235,28 +181,23 @@ impl App {
                             ));
                         }
 
-                        match crate::parse::task_args(
-                            item.attrs.remove(pos).tokens,
-                            cores,
-                            settings,
-                            span,
-                        )? {
+                        match crate::parse::task_args(item.attrs.remove(pos).tokens, settings)? {
                             Either::Left(args) => {
-                                check_binding(args.core, &args.binds)?;
-                                check_ident(args.core, &item.sig.ident)?;
+                                check_binding(&args.binds)?;
+                                check_ident(&item.sig.ident)?;
 
                                 hardware_tasks.insert(
                                     item.sig.ident.clone(),
-                                    HardwareTask::parse(args, item, cores)?,
+                                    HardwareTask::parse(args, item)?,
                                 );
                             }
 
                             Either::Right(args) => {
-                                check_ident(args.core, &item.sig.ident)?;
+                                check_ident(&item.sig.ident)?;
 
                                 software_tasks.insert(
                                     item.sig.ident.clone(),
-                                    SoftwareTask::parse(args, item, cores)?,
+                                    SoftwareTask::parse(args, item)?,
                                 );
                             }
                         }
@@ -301,7 +242,7 @@ impl App {
                             {
                                 let attr = field.attrs.remove(pos);
 
-                                let late = LateResource::parse(field, ident.span(), cores)?;
+                                let late = LateResource::parse(field, ident.span())?;
 
                                 resources.insert(
                                     ident.clone(),
@@ -311,7 +252,7 @@ impl App {
                                     },
                                 );
                             } else {
-                                let late = LateResource::parse(field, ident.span(), cores)?;
+                                let late = LateResource::parse(field, ident.span())?;
 
                                 late_resources.insert(ident.clone(), late);
                             }
@@ -335,22 +276,14 @@ impl App {
                     for item in mod_.items {
                         if let ForeignItem::Fn(item) = item {
                             if settings.parse_extern_interrupt {
-                                let (core, ident, extern_interrupt) =
-                                    ExternInterrupt::parse(item, cores)?;
-
-                                let extern_interrupts = extern_interrupts.entry(core).or_default();
+                                let (ident, extern_interrupt) = ExternInterrupt::parse(item)?;
 
                                 let span = ident.span();
                                 match extern_interrupts.entry(ident) {
                                     Entry::Occupied(..) => {
                                         return Err(parse::Error::new(
                                             span,
-                                            if cores == 1 {
-                                                "this extern interrupt is listed more than once"
-                                            } else {
-                                                "this extern interrupt is listed more than once on \
-                                                 this core"
-                                            },
+                                            "this extern interrupt is listed more than once",
                                         ));
                                     }
 
@@ -404,18 +337,14 @@ impl App {
 
 #[cfg(test)]
 mod tests {
-    use crate::{ast::AppArgs, ast::CustomArg, Settings};
+    use crate::{ast::AppArgs, ast::CustomArg};
 
     #[test]
-    fn parse_app_args_cores1() {
+    fn parse_app_args() {
         let s = "peripherals = true";
 
         let stream: proc_macro2::TokenStream = s.parse().unwrap();
-        let settings = Settings::default();
-        let result = AppArgs::parse(stream, &settings).unwrap();
-
-        // Check cores
-        assert_eq!(result.cores, 1);
+        let result = AppArgs::parse(stream).unwrap();
 
         // Check map
         for (ident, value) in result.custom {
@@ -423,32 +352,6 @@ mod tests {
                 "peripherals" => match value {
                     CustomArg::Bool(true) => {}
                     _ => panic!("Expected peripherals = true"),
-                },
-                _ => panic!("Unexpected identifier"),
-            }
-        }
-    }
-
-    #[test]
-    fn parse_app_args_cores2() {
-        let s = "cores = 2, peripherals = 1";
-
-        let stream: proc_macro2::TokenStream = s.parse().unwrap();
-        let mut settings = Settings::default();
-        settings.parse_cores = true;
-        let result = AppArgs::parse(stream, &settings).unwrap();
-
-        // Check cores
-        assert_eq!(result.cores, 2);
-
-        // Check map
-        for (ident, value) in result.custom {
-            match ident.to_string().as_ref() {
-                "peripherals" => match value {
-                    CustomArg::UInt(int) => {
-                        assert_eq!(int, "1");
-                    }
-                    _ => panic!("Expected peripherals = 1"),
                 },
                 _ => panic!("Unexpected identifier"),
             }

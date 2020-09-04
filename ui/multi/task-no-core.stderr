@@ -1,5 +1,0 @@
-error: this task must be assigned to a core
- --> $DIR/task-no-core.rs:6:8
-  |
-6 |     fn foo(_: foo::Context) {}
-  |        ^^^
