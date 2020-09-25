@@ -197,9 +197,6 @@ pub(crate) fn app(app: &App) -> Analysis {
         }
         let mut tq = timer_queues.first_mut().unwrap();
 
-        let channel = channels.entry(schedulee_prio).or_default();
-        channel.tasks.insert(name.clone());
-
         let fq = free_queues.entry(name.clone()).or_default();
 
         // (l) The timer queue handler contends for the `channel`
