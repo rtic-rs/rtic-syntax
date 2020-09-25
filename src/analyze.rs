@@ -202,6 +202,12 @@ pub(crate) fn app(app: &App) -> Analysis {
 
         let fq = free_queues.entry(name.clone()).or_default();
 
+        // (l) The timer queue handler contends for the `channel`
+        match channel.ceiling {
+            None => channel.ceiling = Some(tq.priority),
+            Some(ceil) => channel.ceiling = Some(cmp::max(ceil, tq.priority)),
+        }
+
         if let Some(prio) = scheduler_prio {
             // (k) Schedulers contend for the free queue
             match *fq {
