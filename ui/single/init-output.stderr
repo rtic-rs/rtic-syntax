@@ -1,4 +1,4 @@
-error: this `#[init]` function must have signature `fn(init::Context) [-> init::LateResources]`
+error: this `#[init]` function must have signature `fn(init::Context) -> init::LateResources`
  --> $DIR/init-output.rs:6:8
   |
 6 |     fn init(_: init::Context) -> u32 {

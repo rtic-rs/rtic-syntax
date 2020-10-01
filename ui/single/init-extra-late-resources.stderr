@@ -1,5 +1,0 @@
-error: no late resources exist so this function must NOT return `LateResources`
- --> $DIR/init-extra-late-resources.rs:6:8
-  |
-6 |     fn init(_: init::Context) -> init::LateResources {}
-  |        ^^^^

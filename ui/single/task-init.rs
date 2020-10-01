@@ -3,7 +3,7 @@
 #[mock::app]
 const APP: () = {
     #[init]
-    fn foo(_: foo::Context) {}
+    fn foo(_: foo::Context) -> foo::LateResources {}
 
     // name collides with `#[idle]` function
     #[task]

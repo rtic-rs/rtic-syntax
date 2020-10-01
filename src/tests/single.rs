@@ -284,7 +284,7 @@ fn send_shared_with_init() {
                 }
 
                 #[init(resources = [x])]
-                fn init(_: init::Context) {}
+                fn init(_: init::Context) -> init::LateResources {}
 
                 #[task(resources = [x])]
                 fn foo(_: foo::Context) {}

@@ -8,5 +8,5 @@ const APP: () = {
     }
 
     #[init(resources = [&x])]
-    fn init(_: init::Context) {}
+    fn init(_: init::Context) -> init::LateResources {}
 };

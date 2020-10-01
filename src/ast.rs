@@ -83,9 +83,6 @@ pub struct Init {
     /// The context argument
     pub context: Box<Pat>,
 
-    /// Whether this `init` function returns `LateResources` or not
-    pub returns_late_resources: bool,
-
     /// Static variables local to this context
     pub locals: Map<Local>,
     /// The statements that make up this `init` function
