@@ -67,25 +67,9 @@ pub fn app(app: &App) -> parse::Result<()> {
 
     // Check that all late resources are covered by `init::LateResources`
     let late_resources_set = app.late_resources.keys().collect::<HashSet<_>>();
-    if late_resources_set.is_empty() {
-        if let Some(init) = &app.inits.first() {
-            if init.returns_late_resources {
-                return Err(parse::Error::new(
-                    init.name.span(),
-                    "no late resources exist so this function must NOT return `LateResources`",
-                ));
-            }
-        }
-    } else {
+    if !late_resources_set.is_empty() {
         // If there exist late_resources, check that #[init] returns them
-        if let Some(init) = &app.inits.first() {
-            if !init.returns_late_resources {
-                return Err(parse::Error::new(
-                    init.name.span(),
-                    "late resources exist so `#[init]` must return `init::LateResources`",
-                ));
-            }
-        } else {
+        if app.inits.first().is_none() {
             return Err(parse::Error::new(
                 Span::call_site(),
                 "late resources exist so a `#[init]` function must be defined",

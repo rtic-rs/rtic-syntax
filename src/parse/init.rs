@@ -27,15 +27,7 @@ impl Init {
                 util::type_is_late_resources(&item.sig.output, &name)
             {
                 if let Some((context, Ok(rest))) = util::parse_inputs(item.sig.inputs, &name) {
-                    if rest.is_empty() {
-                        if !returns_late_resources && !args.late.is_empty() {
-                            return Err(parse::Error::new(
-                                span,
-                                "the `late` argument can only be used on functions that \
-                                 return `LateResources`",
-                            ));
-                        }
-
+                    if rest.is_empty() && returns_late_resources {
                         let (locals, stmts) = util::extract_locals(item.block.stmts)?;
 
                         return Ok(Init {
@@ -44,7 +36,6 @@ impl Init {
                             context,
                             locals: Local::parse(locals)?,
                             name: item.sig.ident,
-                            returns_late_resources,
                             stmts,
                             _extensible: (),
                         });
@@ -56,7 +47,7 @@ impl Init {
         Err(parse::Error::new(
             span,
             &format!(
-                "this `#[init]` function must have signature `fn({}::Context) [-> {0}::LateResources]`",
+                "this `#[init]` function must have signature `fn({}::Context) -> {0}::LateResources`",
                 name
             ),
         ))

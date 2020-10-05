@@ -1,4 +1,4 @@
-error: late resources exist so `#[init]` must return `init::LateResources`
+error: this `#[init]` function must have signature `fn(init::Context) -> init::LateResources`
   --> $DIR/init-no-late-resources.rs:11:8
    |
 11 |     fn init(_: init::Context) {}
