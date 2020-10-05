@@ -1,10 +1,10 @@
 #![no_main]
 
 #[mock::app(parse_binds)]
-const APP: () = {
+mod app {
     #[task(binds = SysTick)]
     fn foo(_: foo::Context) {}
 
     #[task]
     fn foo(_: foo::Context) {}
-};
+}

@@ -1,7 +1,7 @@
 #![no_main]
 
 #[mock::app]
-const APP: () = {
+mod app {
     #[init]
     pub fn init(_: init::Context) {}
-};
+}

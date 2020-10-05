@@ -1,7 +1,8 @@
 #![no_main]
 
 #[mock::app]
-const APP: () = {
+mod app {
+    #[resources]
     struct Resources {
         #[init(0)]
         x: i32,
@@ -9,4 +10,4 @@ const APP: () = {
 
     #[init(resources = [&x])]
     fn init(_: init::Context) {}
-};
+}
