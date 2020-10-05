@@ -1,7 +1,7 @@
 #![no_main]
 
 #[mock::app]
-const APP: () = {
+mod app {
     #[init(resources = [A], resources = [B])]
     fn init(_: init::Context) {}
-};
+}

@@ -1,9 +1,9 @@
 #![no_main]
 
 #[mock::app]
-const APP: () = {
+mod app {
     #[idle]
     fn idle() -> ! {
         loop {}
     }
-};
+}
