@@ -175,6 +175,7 @@ impl App {
                         .iter()
                         .position(|attr| util::attr_eq(attr, "task"))
                     {
+                        eprintln!("--- task ---");
                         if hardware_tasks.contains_key(&item.sig.ident)
                             || software_tasks.contains_key(&item.sig.ident)
                         {
@@ -196,6 +197,7 @@ impl App {
                             }
 
                             Either::Right(args) => {
+                                eprintln!("--- software task ---");
                                 check_ident(&item.sig.ident)?;
 
                                 software_tasks.insert(
@@ -295,6 +297,8 @@ impl App {
 
                     for item in mod_.items {
                         if let ForeignItem::Fn(item) = item {
+                            eprintln!("--- foreign Fn -- {}", item.sig.ident);
+                            //  eprintln!("attr {:?}", item.attrs);
                             if settings.parse_extern_interrupt {
                                 let (ident, extern_interrupt) = ExternInterrupt::parse(item)?;
 
@@ -312,12 +316,13 @@ impl App {
                                     }
                                 }
                             } else {
-                                return Err(parse::Error::new(
-                                    item.sig.ident.span(),
-                                    "this item must live outside the `#[app]` module",
-                                ));
+                                // return Err(parse::Error::new(
+                                //     item.sig.ident.span(),
+                                //     "this item must live outside the `#[app]` module",
+                                // ));
                             }
                         } else {
+                            eprintln!("--- not fn ---");
                             return Err(parse::Error::new(
                                 item.span(),
                                 "this item must live outside the `#[app]` module",
@@ -329,7 +334,11 @@ impl App {
                     // Store the user provided use-statements
                     user_imports.push(itemuse_.clone());
                 }
+                Item::Type(_) => {
+                    eprintln!("-- type --");
+                }
                 _ => {
+                    eprintln!("-- not recognized -- {:?}", &item);
                     // Anything else within the module should not make any difference
                     user_code.push(item.clone());
                 }

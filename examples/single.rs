@@ -54,4 +54,19 @@ mod app {
 
         *X += 1;
     }
+
+    extern "C" {
+        #[task()]
+        fn task_decl(_: task_decl::Context);
+    }
+
+    #[task()]
+    extern "C" fn task_decl(_: task_decl::Context);
+
+    #[task()]
+    fn baz(_: baz::Context, _: u32) {
+        static mut X: u32 = 0;
+
+        *X += 1;
+    }
 }

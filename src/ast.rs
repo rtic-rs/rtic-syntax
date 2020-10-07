@@ -208,6 +208,9 @@ pub struct SoftwareTask {
     /// The statements that make up the task handler
     pub stmts: Vec<Stmt>,
 
+    /// Is true, defined with body, else defined elsewhere
+    pub is_defined: bool,
+
     pub(crate) _extensible: (),
 }
 

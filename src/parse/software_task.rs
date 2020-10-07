@@ -16,9 +16,9 @@ impl SoftwareTask {
 
         if valid_signature {
             if let Some((context, Ok(inputs))) = util::parse_inputs(item.sig.inputs, &name) {
+                eprintln!("item {:?}", &item.sig.ident);
                 let (locals, stmts) = util::extract_locals(item.block.stmts)?;
                 let (cfgs, attrs) = util::extract_cfgs(item.attrs);
-
                 return Ok(SoftwareTask {
                     args,
                     attrs,
@@ -27,6 +27,7 @@ impl SoftwareTask {
                     inputs,
                     locals: Local::parse(locals)?,
                     stmts,
+                    is_defined: false,
                     _extensible: (),
                 });
             }
