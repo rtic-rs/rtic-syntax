@@ -57,7 +57,7 @@ impl Parse for Input {
     }
 }
 
-fn init_idle_args(tokens: TokenStream2, settings: &Settings) -> parse::Result<InitArgs> {
+fn init_idle_args(tokens: TokenStream2) -> parse::Result<InitArgs> {
     (|input: ParseStream<'_>| -> parse::Result<InitArgs> {
         if input.is_empty() {
             return Ok(InitArgs::default());
@@ -65,7 +65,6 @@ fn init_idle_args(tokens: TokenStream2, settings: &Settings) -> parse::Result<In
 
         let mut late = None;
         let mut resources = None;
-        let mut schedule = None;
 
         let content;
         parenthesized!(content in input);
@@ -104,21 +103,6 @@ fn init_idle_args(tokens: TokenStream2, settings: &Settings) -> parse::Result<In
                     resources = Some(util::parse_resources(&content)?);
                 }
 
-                "schedule" => {
-                    let idents = util::parse_idents(&content)?;
-
-                    if settings.parse_schedule {
-                        if schedule.is_some() {
-                            return Err(parse::Error::new(
-                                ident.span(),
-                                "argument appears more than once",
-                            ));
-                        }
-
-                        schedule = Some(idents);
-                    }
-                }
-
                 _ => {
                     return Err(parse::Error::new(ident.span(), "unexpected argument"));
                 }
@@ -136,8 +120,6 @@ fn init_idle_args(tokens: TokenStream2, settings: &Settings) -> parse::Result<In
             late: late.unwrap_or(Set::new()),
 
             resources: resources.unwrap_or(Resources::new()),
-
-            schedule: schedule.unwrap_or(Set::new()),
 
             _extensible: (),
         })
@@ -158,7 +140,6 @@ fn task_args(
         let mut capacity = None;
         let mut priority = None;
         let mut resources = None;
-        let mut schedule = None;
 
         let content;
         parenthesized!(content in input);
@@ -270,23 +251,6 @@ fn task_args(
                     resources = Some(util::parse_resources(&content)?);
                 }
 
-                "schedule" => {
-                    if !settings.parse_schedule {
-                        return Err(parse::Error::new(ident.span(), "unexpected argument"));
-                    }
-
-                    // .. [#(#idents)*]
-                    let idents = util::parse_idents(&content)?;
-                    if schedule.is_some() {
-                        return Err(parse::Error::new(
-                            ident.span(),
-                            "argument appears more than once",
-                        ));
-                    }
-
-                    schedule = Some(idents);
-                }
-
                 _ => {
                     return Err(parse::Error::new(ident.span(), "unexpected argument"));
                 }
@@ -301,14 +265,12 @@ fn task_args(
         }
         let priority = priority.unwrap_or(1);
         let resources = resources.unwrap_or(Resources::new());
-        let schedule = schedule.unwrap_or(Set::new());
 
         Ok(if let Some(binds) = binds {
             Either::Left(HardwareTaskArgs {
                 binds,
                 priority,
                 resources,
-                schedule,
                 _extensible: (),
             })
         } else {
@@ -316,7 +278,6 @@ fn task_args(
                 capacity: capacity.unwrap_or(1),
                 priority,
                 resources,
-                schedule,
                 _extensible: (),
             })
         })

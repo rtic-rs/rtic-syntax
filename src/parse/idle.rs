@@ -4,14 +4,12 @@ use syn::{parse, ItemFn};
 use crate::{
     ast::{Idle, IdleArgs, Local},
     parse::util,
-    Settings,
 };
 
 impl IdleArgs {
-    pub(crate) fn parse(tokens: TokenStream2, settings: &Settings) -> parse::Result<Self> {
-        crate::parse::init_idle_args(tokens, settings).map(|args| IdleArgs {
+    pub(crate) fn parse(tokens: TokenStream2) -> parse::Result<Self> {
+        crate::parse::init_idle_args(tokens).map(|args| IdleArgs {
             resources: args.resources,
-            schedule: args.schedule,
             _extensible: (),
         })
     }

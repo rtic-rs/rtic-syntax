@@ -139,7 +139,7 @@ impl App {
                         .iter()
                         .position(|attr| util::attr_eq(attr, "init"))
                     {
-                        let args = InitArgs::parse(item.attrs.remove(pos).tokens, settings)?;
+                        let args = InitArgs::parse(item.attrs.remove(pos).tokens)?;
 
                         // If an init function already exists, error
                         if !inits.is_empty() {
@@ -157,7 +157,7 @@ impl App {
                         .iter()
                         .position(|attr| util::attr_eq(attr, "idle"))
                     {
-                        let args = IdleArgs::parse(item.attrs.remove(pos).tokens, settings)?;
+                        let args = IdleArgs::parse(item.attrs.remove(pos).tokens)?;
 
                         // If an idle function already exists, error
                         if !idles.is_empty() {

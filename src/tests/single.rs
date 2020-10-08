@@ -173,31 +173,6 @@ fn send_spawn() {
 }
 
 #[test]
-fn send_schedule() {
-    // message passing between different priority tasks needs a `Send` bound
-    let (_app, analysis) = crate::parse2(
-        quote!(),
-        quote!(
-            mod app {
-                #[task(priority = 2)]
-                fn foo(_: foo::Context) {}
-
-                #[task]
-                fn bar(_: bar::Context, _: X) {}
-            }
-        ),
-        Settings {
-            parse_schedule: true,
-            ..Settings::default()
-        },
-    )
-    .unwrap();
-
-    let ty = analysis.send_types.iter().next().unwrap();
-    assert_eq!(quote!(#ty).to_string(), "X");
-}
-
-#[test]
 fn send_late_resource() {
     // late resources used by tasks must be `Send`
     let (_app, analysis) = crate::parse2(

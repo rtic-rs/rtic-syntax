@@ -121,16 +121,6 @@ impl<'a> Context<'a> {
             Context::SoftwareTask(name) => !app.software_tasks[name].args.resources.is_empty(),
         }
     }
-
-    /// Whether this context may use the `schedule` API
-    pub fn uses_schedule(&self, app: &App) -> bool {
-        match *self {
-            Context::HardwareTask(name) => !app.hardware_tasks[name].args.schedule.is_empty(),
-            Context::Idle => !app.idles.first().unwrap().args.schedule.is_empty(),
-            Context::Init => !app.inits.first().unwrap().args.schedule.is_empty(),
-            Context::SoftwareTask(name) => !app.software_tasks[name].args.schedule.is_empty(),
-        }
-    }
 }
 
 /// Parser and optimizer configuration
@@ -140,8 +130,6 @@ pub struct Settings {
     pub parse_binds: bool,
     /// Whether to parse `extern` interrupts (functions) or not
     pub parse_extern_interrupt: bool,
-    /// Whether to accept the `schedule` argument or not
-    pub parse_schedule: bool,
     /// Whether to "compress" priorities or not
     pub optimize_priorities: bool,
 

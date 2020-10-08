@@ -197,33 +197,6 @@ pub type SendTypes = Set<Box<Type>>;
 /// These types must implement the `Sync` trait
 pub type SyncTypes = Set<Box<Type>>;
 
-/// The timer queue
-#[derive(Debug)]
-pub struct TimerQueue {
-    /// The capacity of the queue
-    pub capacity: u8,
-
-    /// The priority ceiling of the queue
-    pub ceiling: u8,
-
-    /// Priority of the timer queue handler
-    pub priority: u8,
-
-    /// Tasks that can be scheduled on this queue
-    pub tasks: BTreeSet<Task>,
-}
-
-impl Default for TimerQueue {
-    fn default() -> Self {
-        Self {
-            capacity: 0,
-            ceiling: 1,
-            priority: 1,
-            tasks: BTreeSet::new(),
-        }
-    }
-}
-
 /// A channel used to send messages
 #[derive(Debug, Default)]
 pub struct Channel {
