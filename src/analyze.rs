@@ -179,9 +179,6 @@ pub struct Analysis {
 /// All channels, keyed by dispatch priority
 pub type Channels = BTreeMap<Priority, Channel>;
 
-/// All free queues
-pub type FreeQueues = Vec<Task>;
-
 /// Late resources, wrapped in a vector
 pub type LateResources = Vec<BTreeSet<Resource>>;
 
