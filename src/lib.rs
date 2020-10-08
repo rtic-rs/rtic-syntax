@@ -81,20 +81,12 @@ impl<'a> Context<'a> {
 
     /// Is this the `idle` context?
     pub fn is_idle(&self) -> bool {
-        if let Context::Idle = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, Context::Idle)
     }
 
     /// Is this the `init`-ialization context?
     pub fn is_init(&self) -> bool {
-        if let Context::Init = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, Context::Init)
     }
 
     /// Whether this context runs only once
@@ -125,6 +117,7 @@ impl<'a> Context<'a> {
 
 /// Parser and optimizer configuration
 #[derive(Default)]
+#[non_exhaustive]
 pub struct Settings {
     /// Whether to accept the `binds` argument in `#[task]` or not
     pub parse_binds: bool,
@@ -132,8 +125,6 @@ pub struct Settings {
     pub parse_extern_interrupt: bool,
     /// Whether to "compress" priorities or not
     pub optimize_priorities: bool,
-
-    _extensible: (),
 }
 
 /// Parses the input of the `#[app]` attribute
@@ -149,11 +140,11 @@ pub fn parse(
 pub fn parse2(
     args: TokenStream2,
     input: TokenStream2,
-    ref settings: Settings,
+    settings: Settings,
 ) -> Result<(P<ast::App>, P<analyze::Analysis>), syn::parse::Error> {
-    let mut app = parse::app(args, input, settings)?;
+    let mut app = parse::app(args, input, &settings)?;
     check::app(&app)?;
-    optimize::app(&mut app, settings);
+    optimize::app(&mut app, &settings);
 
     match analyze::app(&app) {
         Err(e) => Err(e),

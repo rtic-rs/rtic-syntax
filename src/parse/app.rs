@@ -32,45 +32,40 @@ impl AppArgs {
                 let ident: Ident = input.parse()?;
                 let _eq_token: Token![=] = input.parse()?;
 
-                let ident_s = ident.to_string();
-                match &*ident_s {
-                    _ => {
-                        if custom.contains_key(&ident) {
+                if custom.contains_key(&ident) {
+                    return Err(parse::Error::new(
+                        ident.span(),
+                        "argument appears more than once",
+                    ));
+                }
+
+                // Parse as path
+                if let Ok(p) = input.parse::<Path>() {
+                    custom.insert(ident, CustomArg::Path(p));
+                } else {
+                    // Parse as literal
+                    match input.parse::<Lit>()? {
+                        Lit::Bool(lit) => {
+                            custom.insert(ident, CustomArg::Bool(lit.value));
+                        }
+                        Lit::Int(lit) => {
+                            if lit.suffix().is_empty() {
+                                custom.insert(
+                                    ident,
+                                    CustomArg::UInt(lit.base10_digits().to_string()),
+                                );
+                            } else {
+                                return Err(parse::Error::new(
+                                    ident.span(),
+                                    "integer must be unsuffixed",
+                                ));
+                            }
+                        }
+                        _ => {
                             return Err(parse::Error::new(
                                 ident.span(),
-                                "argument appears more than once",
+                                "argument has unexpected value",
                             ));
-                        }
-
-                        // Parse as path
-                        if let Ok(p) = input.parse::<Path>() {
-                            custom.insert(ident, CustomArg::Path(p));
-                        } else {
-                            // Parse as literal
-                            match input.parse::<Lit>()? {
-                                Lit::Bool(lit) => {
-                                    custom.insert(ident, CustomArg::Bool(lit.value));
-                                }
-                                Lit::Int(lit) => {
-                                    if lit.suffix().is_empty() {
-                                        custom.insert(
-                                            ident,
-                                            CustomArg::UInt(lit.base10_digits().to_string()),
-                                        );
-                                    } else {
-                                        return Err(parse::Error::new(
-                                            ident.span(),
-                                            "integer must be unsuffixed",
-                                        ));
-                                    }
-                                }
-                                _ => {
-                                    return Err(parse::Error::new(
-                                        ident.span(),
-                                        "argument has unexpected value",
-                                    ));
-                                }
-                            }
                         }
                     }
                 }

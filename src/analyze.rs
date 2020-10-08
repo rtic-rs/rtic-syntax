@@ -189,12 +189,7 @@ pub(crate) fn app(app: &App) -> Result<Analysis, syn::Error> {
     }
 
     // e. Location of resources
-    let mut locations = app
-        .late_resources
-        .iter()
-        .chain(app.resources.iter().map(|(name, res)| (name, &res.late)))
-        .filter_map(|(_name, _lr)| None)
-        .collect::<Locations>();
+    let mut locations = IndexMap::new();
 
     let mut ownerships = Ownerships::new();
     let mut sync_types = SyncTypes::new();
@@ -405,10 +400,7 @@ impl Ownership {
 
     /// Whether this resource is exclusively owned
     pub fn is_owned(&self) -> bool {
-        match self {
-            Ownership::Owned { .. } => true,
-            _ => false,
-        }
+        matches!(self, Ownership::Owned { .. })
     }
 }
 
