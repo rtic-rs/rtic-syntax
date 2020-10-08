@@ -11,7 +11,6 @@ impl IdleArgs {
     pub(crate) fn parse(tokens: TokenStream2, settings: &Settings) -> parse::Result<Self> {
         crate::parse::init_idle_args(tokens, settings).map(|args| IdleArgs {
             resources: args.resources,
-            spawn: args.spawn,
             schedule: args.schedule,
             _extensible: (),
         })

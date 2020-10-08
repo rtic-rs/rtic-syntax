@@ -89,20 +89,5 @@ pub fn app(app: &App) -> parse::Result<()> {
         }
     }
 
-    // Check that all referenced tasks have been declared
-    for task in app.task_references() {
-        if app.hardware_tasks.contains_key(task) {
-            return Err(parse::Error::new(
-                task.span(),
-                "hardware tasks can NOT be spawned",
-            ));
-        } else if !app.software_tasks.contains_key(task) {
-            return Err(parse::Error::new(
-                task.span(),
-                "this software task has NOT been declared",
-            ));
-        }
-    }
-
     Ok(())
 }

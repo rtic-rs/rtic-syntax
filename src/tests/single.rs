@@ -151,63 +151,13 @@ fn no_send_late_resources_idle() {
 }
 
 #[test]
-fn no_send_spawn() {
-    // message passing between same priority tasks doesn't need a `Send` bound
-    let (_app, analysis) = crate::parse2(
-        quote!(),
-        quote!(
-            mod app {
-                #[task(spawn = [bar])]
-                fn foo(_: foo::Context) {}
-
-                #[task]
-                fn bar(_: bar::Context, _: X) {}
-            }
-        ),
-        Settings::default(),
-    )
-    .unwrap();
-
-    assert!(analysis.send_types.is_empty());
-}
-
-#[test]
-fn no_send_schedule() {
-    // message passing between same priority tasks doesn't need a `Send` bound
-    let (_app, analysis) = crate::parse2(
-        quote!(),
-        quote!(
-            mod app {
-                #[task(schedule = [bar])]
-                fn foo(_: foo::Context) {}
-
-                #[task]
-                fn bar(_: bar::Context, _: X) {}
-
-                #[task(priority = 2, schedule = [baz])]
-                fn baz(_: baz::Context) {}
-            }
-        ),
-        Settings {
-            parse_schedule: true,
-            ..Settings::default()
-        },
-    )
-    .unwrap();
-
-    assert!(analysis.send_types.is_empty());
-    // even when it passes through a timer handler that runs at higher priority
-    assert_eq!(analysis.timer_queues[0].priority, 2);
-}
-
-#[test]
 fn send_spawn() {
     // message passing between different priority tasks needs a `Send` bound
     let (_app, analysis) = crate::parse2(
         quote!(),
         quote!(
             mod app {
-                #[task(priority = 2, spawn = [bar])]
+                #[task(priority = 2)]
                 fn foo(_: foo::Context) {}
 
                 #[task]
@@ -229,7 +179,7 @@ fn send_schedule() {
         quote!(),
         quote!(
             mod app {
-                #[task(priority = 2, schedule = [bar])]
+                #[task(priority = 2)]
                 fn foo(_: foo::Context) {}
 
                 #[task]
@@ -383,137 +333,4 @@ fn late_resources() {
 
     let late = &analysis.late_resources;
     assert_eq!(late.len(), 1);
-}
-
-#[test]
-fn tq0() {
-    // schedule nothing
-    let (_app, analysis) = crate::parse2(
-        quote!(),
-        quote!(
-            mod app {
-                #[task]
-                fn foo(_: foo::Context) {}
-            }
-        ),
-        Settings {
-            parse_schedule: true,
-            ..Settings::default()
-        },
-    )
-    .unwrap();
-
-    assert_eq!(analysis.timer_queues.len(), 0);
-}
-#[test]
-fn tq1() {
-    // schedule same priority task
-    let (_app, analysis) = crate::parse2(
-        quote!(),
-        quote!(
-            mod app {
-                #[task]
-                fn foo(_: foo::Context) {}
-
-                #[task(priority = 2, schedule = [bar])]
-                fn bar(_: bar::Context) {}
-            }
-        ),
-        Settings {
-            parse_schedule: true,
-            ..Settings::default()
-        },
-    )
-    .unwrap();
-
-    let tq = &analysis.timer_queues.first().unwrap();
-    assert_eq!(tq.priority, 2);
-    assert_eq!(tq.ceiling, 2);
-    assert_eq!(tq.tasks.len(), 1);
-    assert_eq!(tq.tasks.iter().next().unwrap().to_string(), "bar");
-}
-
-#[test]
-fn tq2() {
-    // schedule lower priority task
-    let (_app, analysis) = crate::parse2(
-        quote!(),
-        quote!(
-            mod app {
-                #[task]
-                fn foo(_: foo::Context) {}
-
-                #[task(priority = 2, schedule = [foo])]
-                fn bar(_: bar::Context) {}
-            }
-        ),
-        Settings {
-            parse_schedule: true,
-            ..Settings::default()
-        },
-    )
-    .unwrap();
-
-    let tq = &analysis.timer_queues.first().unwrap();
-    assert_eq!(tq.priority, 1);
-    assert_eq!(tq.ceiling, 2);
-    assert_eq!(tq.tasks.len(), 1);
-    assert_eq!(tq.tasks.iter().next().unwrap().to_string(), "foo");
-}
-
-#[test]
-fn tq3() {
-    // schedule higher priority task
-    let (_app, analysis) = crate::parse2(
-        quote!(),
-        quote!(
-            mod app {
-                #[task]
-                fn foo(_: foo::Context) {}
-
-                #[task(priority = 2, schedule = [baz])]
-                fn bar(_: bar::Context) {}
-
-                #[task(priority = 3)]
-                fn baz(_: baz::Context) {}
-            }
-        ),
-        Settings {
-            parse_schedule: true,
-            ..Settings::default()
-        },
-    )
-    .unwrap();
-
-    let tq = &analysis.timer_queues.first().unwrap();
-    assert_eq!(tq.priority, 3);
-    assert_eq!(tq.ceiling, 3);
-    assert_eq!(tq.tasks.len(), 1);
-    assert_eq!(tq.tasks.iter().next().unwrap().to_string(), "baz");
-}
-
-#[test]
-fn gh183() {
-    // regression test for https://github.com/rtic-rs/cortex-m-rtic/pull/183
-    let (_app, analysis) = crate::parse2(
-        quote!(),
-        quote!(
-            mod app {
-                #[task(priority = 2)]
-                fn foo(_: foo::Context) {}
-
-                #[task(schedule = [foo])]
-                fn bar(_: bar::Context) {}
-            }
-        ),
-        Settings {
-            parse_schedule: true,
-            ..Settings::default()
-        },
-    )
-    .unwrap();
-
-    let tq = &analysis.timer_queues.first().unwrap();
-    assert_eq!(tq.priority, 2);
-    assert_eq!(tq.ceiling, 2);
 }

@@ -65,7 +65,6 @@ fn init_idle_args(tokens: TokenStream2, settings: &Settings) -> parse::Result<In
 
         let mut late = None;
         let mut resources = None;
-        let mut spawn = None;
         let mut schedule = None;
 
         let content;
@@ -105,36 +104,18 @@ fn init_idle_args(tokens: TokenStream2, settings: &Settings) -> parse::Result<In
                     resources = Some(util::parse_resources(&content)?);
                 }
 
-                "spawn" | "schedule" => {
+                "schedule" => {
                     let idents = util::parse_idents(&content)?;
 
-                    let ident_s = ident.to_string();
-                    match &*ident_s {
-                        "spawn" => {
-                            if spawn.is_some() {
-                                return Err(parse::Error::new(
-                                    ident.span(),
-                                    "argument appears more than once",
-                                ));
-                            }
-
-                            spawn = Some(idents);
+                    if settings.parse_schedule {
+                        if schedule.is_some() {
+                            return Err(parse::Error::new(
+                                ident.span(),
+                                "argument appears more than once",
+                            ));
                         }
 
-                        "schedule" if settings.parse_schedule => {
-                            if schedule.is_some() {
-                                return Err(parse::Error::new(
-                                    ident.span(),
-                                    "argument appears more than once",
-                                ));
-                            }
-
-                            schedule = Some(idents);
-                        }
-
-                        _ => {
-                            return Err(parse::Error::new(ident.span(), "unexpected argument"));
-                        }
+                        schedule = Some(idents);
                     }
                 }
 
@@ -155,7 +136,6 @@ fn init_idle_args(tokens: TokenStream2, settings: &Settings) -> parse::Result<In
             late: late.unwrap_or(Set::new()),
 
             resources: resources.unwrap_or(Resources::new()),
-            spawn: spawn.unwrap_or(Set::new()),
 
             schedule: schedule.unwrap_or(Set::new()),
 
@@ -179,7 +159,6 @@ fn task_args(
         let mut priority = None;
         let mut resources = None;
         let mut schedule = None;
-        let mut spawn = None;
 
         let content;
         parenthesized!(content in input);
@@ -291,38 +270,21 @@ fn task_args(
                     resources = Some(util::parse_resources(&content)?);
                 }
 
-                "schedule" | "spawn" => {
-                    if !settings.parse_schedule && ident_s == "schedule" {
+                "schedule" => {
+                    if !settings.parse_schedule {
                         return Err(parse::Error::new(ident.span(), "unexpected argument"));
                     }
 
                     // .. [#(#idents)*]
                     let idents = util::parse_idents(&content)?;
-                    match &*ident_s {
-                        "schedule" => {
-                            if schedule.is_some() {
-                                return Err(parse::Error::new(
-                                    ident.span(),
-                                    "argument appears more than once",
-                                ));
-                            }
-
-                            schedule = Some(idents);
-                        }
-
-                        "spawn" => {
-                            if spawn.is_some() {
-                                return Err(parse::Error::new(
-                                    ident.span(),
-                                    "argument appears more than once",
-                                ));
-                            }
-
-                            spawn = Some(idents);
-                        }
-
-                        _ => unreachable!(),
+                    if schedule.is_some() {
+                        return Err(parse::Error::new(
+                            ident.span(),
+                            "argument appears more than once",
+                        ));
                     }
+
+                    schedule = Some(idents);
                 }
 
                 _ => {
@@ -340,7 +302,6 @@ fn task_args(
         let priority = priority.unwrap_or(1);
         let resources = resources.unwrap_or(Resources::new());
         let schedule = schedule.unwrap_or(Set::new());
-        let spawn = spawn.unwrap_or(Set::new());
 
         Ok(if let Some(binds) = binds {
             Either::Left(HardwareTaskArgs {
@@ -348,7 +309,6 @@ fn task_args(
                 priority,
                 resources,
                 schedule,
-                spawn,
                 _extensible: (),
             })
         } else {
@@ -357,7 +317,6 @@ fn task_args(
                 priority,
                 resources,
                 schedule,
-                spawn,
                 _extensible: (),
             })
         })

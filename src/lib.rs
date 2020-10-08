@@ -131,16 +131,6 @@ impl<'a> Context<'a> {
             Context::SoftwareTask(name) => !app.software_tasks[name].args.schedule.is_empty(),
         }
     }
-
-    /// Whether this context may use the `spawn` API
-    pub fn uses_spawn(&self, app: &App) -> bool {
-        match *self {
-            Context::HardwareTask(name) => !app.hardware_tasks[name].args.spawn.is_empty(),
-            Context::Idle => !app.idles.first().unwrap().args.spawn.is_empty(),
-            Context::Init => !app.inits.first().unwrap().args.spawn.is_empty(),
-            Context::SoftwareTask(name) => !app.software_tasks[name].args.spawn.is_empty(),
-        }
-    }
 }
 
 /// Parser and optimizer configuration

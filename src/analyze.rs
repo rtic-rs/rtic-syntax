@@ -102,141 +102,18 @@ pub(crate) fn app(app: &App) -> Analysis {
         }
     }
 
-    // Initialize the timer queues
-    let mut timer_queues = TimerQueues::new();
-    for (_, name) in app.schedule_calls() {
-        let schedulee = &app.software_tasks[name];
-        let schedulee_prio = schedulee.args.priority;
-
-        // Get the TimerQueue
-        // If there is no TimerQueue, create one
-        if timer_queues.is_empty() {
-            timer_queues.push(TimerQueue::default());
-        }
-        let mut tq = timer_queues.first_mut().unwrap();
-        tq.tasks.insert(name.clone());
-
-        // the handler priority must match the priority of the highest priority schedulee
-        tq.priority = cmp::max(tq.priority, schedulee_prio);
-
-        // the priority ceiling must be equal or greater than the handler priority
-        tq.ceiling = tq.priority;
-    }
-
-    // g. Ceiling analysis of free queues (consumer end point) -- first pass
-    // h. Ceiling analysis of the channels (producer end point) -- first pass
-    // j. Send analysis
     let mut channels = Channels::new();
-    let mut free_queues = FreeQueues::new();
-    for (spawner_prio, name) in app.spawn_calls() {
-        let spawnee = &app.software_tasks[name];
-        let spawnee_prio = spawnee.args.priority;
 
-        let mut must_be_send = false;
+    for (name, spawnee) in &app.software_tasks {
+        let spawnee_prio = spawnee.args.priority;
 
         let channel = channels.entry(spawnee_prio).or_default();
         channel.tasks.insert(name.clone());
 
-        let fq = free_queues.entry(name.clone()).or_default();
-
-        if let Some(prio) = spawner_prio {
-            // (h) Spawners contend for the `channel`
-            match channel.ceiling {
-                None => channel.ceiling = Some(prio),
-                Some(ceil) => channel.ceiling = Some(cmp::max(prio, ceil)),
-            }
-
-            // (g) Spawners contend for the free queue
-            match *fq {
-                None => *fq = Some(prio),
-                Some(ceil) => *fq = Some(cmp::max(ceil, prio)),
-            }
-
-            // (j) messages that connect tasks running at different priorities need to be
-            // `Send`
-            if spawnee_prio != prio {
-                must_be_send = true;
-            }
-        } else {
-            // (g, h) spawns from `init` are excluded from the ceiling analysis
-            // (j) but spawns from `init` must be `Send`
-            must_be_send = true;
-        }
-
-        if must_be_send {
-            {
-                spawnee.inputs.iter().for_each(|input| {
-                    send_types.insert(input.ty.clone());
-                });
-            }
-
-            spawnee.inputs.iter().for_each(|input| {
-                send_types.insert(input.ty.clone());
-            });
-        }
-    }
-
-    // k. Ceiling analysis of free queues (consumer end point) -- second pass
-    // l. Ceiling analysis of the channels (producer end point) -- second pass
-    // m. Ceiling analysis of the timer queue
-    // o. Send analysis
-
-    for (scheduler_prio, name) in app.schedule_calls() {
-        let schedulee = &app.software_tasks[name];
-        let schedulee_prio = schedulee.args.priority;
-
-        let mut must_be_send = false;
-
-        let channel = channels.entry(schedulee_prio).or_default();
-        channel.tasks.insert(name.clone());
-
-        // Get the TimerQueue
-        // If there is no TimerQueue, create one
-        if timer_queues.is_empty() {
-            timer_queues.push(TimerQueue::default());
-        }
-        let mut tq = timer_queues.first_mut().unwrap();
-
-        let fq = free_queues.entry(name.clone()).or_default();
-
-        // (l) The timer queue handler contends for the `channel`
-        match channel.ceiling {
-            None => channel.ceiling = Some(tq.priority),
-            Some(ceil) => channel.ceiling = Some(cmp::max(ceil, tq.priority)),
-        }
-
-        if let Some(prio) = scheduler_prio {
-            // (k) Schedulers contend for the free queue
-            match *fq {
-                None => *fq = Some(prio),
-                Some(ceil) => *fq = Some(cmp::max(ceil, prio)),
-            }
-
-            // (m) Schedulers contend for the timer queue
-            tq.ceiling = cmp::max(tq.ceiling, prio);
-
-            // (o) messages that connect tasks running at different priorities need to be
-            // `Send`
-            if schedulee_prio != prio {
-                must_be_send = true;
-            }
-        } else {
-            // (k, m) schedules from `init` are excluded from the ceiling analysis
-            // (o) but schedules from `init` must be `Send`
-            must_be_send = true;
-        }
-
-        if must_be_send {
-            {
-                schedulee.inputs.iter().for_each(|input| {
-                    send_types.insert(input.ty.clone());
-                });
-            }
-
-            schedulee.inputs.iter().for_each(|input| {
-                send_types.insert(input.ty.clone());
-            });
-        }
+        // All inputs are now send as we do not know from where they may be spawned.
+        spawnee.inputs.iter().for_each(|input| {
+            send_types.insert(input.ty.clone());
+        });
     }
 
     // No channel should ever be empty
@@ -251,24 +128,13 @@ pub(crate) fn app(app: &App) -> Analysis {
             .sum();
     }
 
-    // Compute the capacity of the timer queues
-    if let Some(tq) = timer_queues.first_mut() {
-        tq.capacity = tq
-            .tasks
-            .iter()
-            .map(|name| app.software_tasks[name].args.capacity)
-            .sum();
-    }
-
     Analysis {
         channels,
-        free_queues,
         late_resources,
         locations,
         ownerships,
         send_types,
         sync_types,
-        timer_queues,
     }
 }
 
@@ -289,9 +155,6 @@ pub struct Analysis {
     /// SPSC message channels
     pub channels: Channels,
 
-    /// Priority ceilings of "free queues"
-    pub free_queues: FreeQueues,
-
     /// The late resources
     pub late_resources: LateResources,
 
@@ -311,16 +174,13 @@ pub struct Analysis {
 
     /// These types must implement the `Sync` trait
     pub sync_types: SyncTypes,
-
-    /// Timer queues
-    pub timer_queues: TimerQueues,
 }
 
 /// All channels, keyed by dispatch priority
 pub type Channels = BTreeMap<Priority, Channel>;
 
-/// All free queues, keyed by task and containing the Ceiling
-pub type FreeQueues = IndexMap<Task, Ceiling>;
+/// All free queues
+pub type FreeQueues = Vec<Task>;
 
 /// Late resources, wrapped in a vector
 pub type LateResources = Vec<BTreeSet<Resource>>;
@@ -336,9 +196,6 @@ pub type SendTypes = Set<Box<Type>>;
 
 /// These types must implement the `Sync` trait
 pub type SyncTypes = Set<Box<Type>>;
-
-/// Timer queue, wrapped in a vec!
-pub type TimerQueues = Vec<TimerQueue>;
 
 /// The timer queue
 #[derive(Debug)]
@@ -372,9 +229,6 @@ impl Default for TimerQueue {
 pub struct Channel {
     /// The channel capacity
     pub capacity: u8,
-
-    /// The (sender side) priority ceiling of this SPSC channel
-    pub ceiling: Ceiling,
 
     /// Tasks that can be spawned on this channel
     pub tasks: BTreeSet<Task>,
