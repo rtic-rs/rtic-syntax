@@ -1,6 +1,6 @@
 //! Full syntax
 
-#[mock::app]
+#[mock::app(parse_extern_interrupt, parse_binds)]
 mod app {
     #[resources]
     struct Resources {
@@ -27,6 +27,7 @@ mod app {
         resources = [&a, d],
         spawn = [foo],
     )]
+
     fn idle(_: idle::Context) -> ! {
         static mut X: u32 = 0;
 
@@ -49,6 +50,7 @@ mod app {
             resources = [d],
             spawn = [foo],
         )]
+
     fn bar(_: bar::Context, _: u32) {
         static mut X: u32 = 0;
 
@@ -56,9 +58,18 @@ mod app {
     }
 
     extern "C" {
-        #[task()]
-        fn task_decl(_: task_decl::Context);
+        // #[init()]
+        // fn init(_: init::Context);
+
+        // #[task()]
+        // fn task_decl(_: task_decl::Context);
+
+        // mod x {
         fn SSIO();
+    // #[dispatcher]
+    // fn SSIO();
+    // }
+
     }
 
     // #[task()]

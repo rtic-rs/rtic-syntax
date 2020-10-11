@@ -5,7 +5,7 @@ use proc_macro2::TokenStream as TokenStream2;
 use syn::{
     parse::{self, ParseStream, Parser},
     spanned::Spanned,
-    ExprParen, Fields, ForeignItem, Ident, Item, Lit, Path, Token, Visibility,
+    Attribute, ExprParen, Fields, ForeignItem, Ident, Item, Lit, Path, Token, Visibility,
 };
 
 use super::Input;
@@ -89,6 +89,56 @@ impl AppArgs {
     }
 }
 
+enum AppAttribute {
+    Resources,
+    Init,
+    Idle,
+    Task,
+    Dispatch,
+}
+
+fn check_attr(attr: &Attribute) -> Option<AppAttribute> {
+    if util::attr_eq(attr, "resources") {
+        Some(AppAttribute::Resources)
+    } else if util::attr_eq(attr, "init") {
+        Some(AppAttribute::Init)
+    } else if util::attr_eq(attr, "idle") {
+        Some(AppAttribute::Idle)
+    } else if util::attr_eq(attr, "task") {
+        Some(AppAttribute::Task)
+    } else if util::attr_eq(attr, "dispatch") {
+        Some(AppAttribute::Dispatch)
+    } else {
+        None
+    }
+}
+
+fn parse_attr(
+    attrs: &mut Vec<Attribute>,
+) -> Result<(Option<AppAttribute>, Option<Attribute>), parse::Error> {
+    let mut r = (None, None);
+    loop {
+        if attrs
+            .iter()
+            .position(|attr| match check_attr(attr) {
+                Some(app_attr) => match r {
+                    (None, _) => {
+                        r.0 = Some(app_attr);
+                        true
+                    }
+                    (Some(_), _) => unimplemented!(),
+                },
+                None => false,
+            })
+            .map(|e| r.1 = Some(attrs.remove(e)))
+            .is_none()
+        {
+            break;
+        }
+    }
+    Ok(r)
+}
+
 impl App {
     pub(crate) fn parse(args: AppArgs, input: Input, settings: &Settings) -> parse::Result<Self> {
         let mut inits = Vec::new();
@@ -106,6 +156,7 @@ impl App {
 
         let mut seen_idents = HashSet::<Ident>::new();
         let mut bindings = HashSet::<Ident>::new();
+
         let mut check_binding = |ident: &Ident| {
             if bindings.contains(ident) {
                 return Err(parse::Error::new(
@@ -118,6 +169,7 @@ impl App {
 
             Ok(())
         };
+
         let mut check_ident = |ident: &Ident| {
             if seen_idents.contains(ident) {
                 return Err(parse::Error::new(
@@ -130,170 +182,160 @@ impl App {
 
             Ok(())
         };
+
         for mut item in input.items {
             match item {
                 Item::Fn(mut item) => {
                     let span = item.sig.ident.span();
-                    if let Some(pos) = item
-                        .attrs
-                        .iter()
-                        .position(|attr| util::attr_eq(attr, "init"))
-                    {
-                        let args = InitArgs::parse(item.attrs.remove(pos).tokens, settings)?;
-
-                        // If an init function already exists, error
-                        if !inits.is_empty() {
-                            return Err(parse::Error::new(
-                                span,
-                                "`#[init]` function must appear at most once",
-                            ));
-                        }
-
-                        check_ident(&item.sig.ident)?;
-
-                        inits.push(Init::parse(args, item)?);
-                    } else if let Some(pos) = item
-                        .attrs
-                        .iter()
-                        .position(|attr| util::attr_eq(attr, "idle"))
-                    {
-                        let args = IdleArgs::parse(item.attrs.remove(pos).tokens, settings)?;
-
-                        // If an idle function already exists, error
-                        if !idles.is_empty() {
-                            return Err(parse::Error::new(
-                                span,
-                                "`#[idle]` function must appear at most once",
-                            ));
-                        }
-
-                        check_ident(&item.sig.ident)?;
-
-                        idles.push(Idle::parse(args, item)?);
-                    } else if let Some(pos) = item
-                        .attrs
-                        .iter()
-                        .position(|attr| util::attr_eq(attr, "task"))
-                    {
-                        eprintln!("--- task ---");
-                        if hardware_tasks.contains_key(&item.sig.ident)
-                            || software_tasks.contains_key(&item.sig.ident)
-                        {
-                            return Err(parse::Error::new(
-                                span,
-                                "this task is defined multiple times",
-                            ));
-                        }
-
-                        match crate::parse::task_args(item.attrs.remove(pos).tokens, settings)? {
-                            Either::Left(args) => {
-                                check_binding(&args.binds)?;
-                                check_ident(&item.sig.ident)?;
-
-                                hardware_tasks.insert(
-                                    item.sig.ident.clone(),
-                                    HardwareTask::parse(args, item)?,
-                                );
+                    match parse_attr(&mut item.attrs)? {
+                        (Some(AppAttribute::Init), Some(init)) => {
+                            // If an init function already exists, error
+                            if !inits.is_empty() {
+                                return Err(parse::Error::new(
+                                    span,
+                                    "`#[init]` function must appear at most once",
+                                ));
                             }
 
-                            Either::Right(args) => {
-                                eprintln!("--- software task aaueaeu ---");
-                                check_ident(&item.sig.ident)?;
+                            check_ident(&item.sig.ident)?;
+                            let args = InitArgs::parse(init.tokens, settings)?;
 
-                                software_tasks.insert(
-                                    item.sig.ident.clone(),
-                                    SoftwareTask::parse(args, item)?,
-                                );
+                            inits.push(Init::parse(args, item)?);
+                        }
+                        (Some(AppAttribute::Idle), Some(idle)) => {
+                            // If an idle function already exists, error
+                            if !idles.is_empty() {
+                                return Err(parse::Error::new(
+                                    span,
+                                    "`#[idle]` function must appear at most once",
+                                ));
+                            }
+
+                            check_ident(&item.sig.ident)?;
+                            let args = IdleArgs::parse(idle.tokens, settings)?;
+
+                            idles.push(Idle::parse(args, item)?);
+                        }
+                        (Some(AppAttribute::Task), Some(task)) => {
+                            eprintln!("--- task ---");
+                            if hardware_tasks.contains_key(&item.sig.ident)
+                                || software_tasks.contains_key(&item.sig.ident)
+                            {
+                                return Err(parse::Error::new(
+                                    span,
+                                    "this task is defined multiple times",
+                                ));
+                            }
+
+                            match crate::parse::task_args(task.tokens, settings)? {
+                                Either::Left(args) => {
+                                    check_binding(&args.binds)?;
+                                    check_ident(&item.sig.ident)?;
+
+                                    hardware_tasks.insert(
+                                        item.sig.ident.clone(),
+                                        HardwareTask::parse(args, item)?,
+                                    );
+                                }
+
+                                Either::Right(args) => {
+                                    eprintln!("--- software task aaueaeu ---");
+                                    check_ident(&item.sig.ident)?;
+
+                                    software_tasks.insert(
+                                        item.sig.ident.clone(),
+                                        SoftwareTask::parse(args, item)?,
+                                    );
+                                }
                             }
                         }
-                    } else {
-                        return Err(parse::Error::new(
-                            span,
-                            "this item must live outside the `#[app]` module",
-                        ));
+                        _ => {
+                            return Err(parse::Error::new(
+                                span,
+                                "this item must live outside the `#[app]` module",
+                            ));
+                        }
                     }
                 }
 
                 Item::Struct(ref mut struct_item) => {
                     // Match structures with the attribute #[resources], name of structure is not
                     // important
-                    if let Some(_pos) = struct_item
-                        .attrs
-                        .iter()
-                        .position(|attr| util::attr_eq(attr, "resources"))
-                    {
-                        let span = struct_item.ident.span();
-
-                        if resource_struct.contains_key(&struct_item.ident) {
-                            return Err(parse::Error::new(
-                                span,
-                                "`#[resources]` struct must appear at most once",
-                            ));
-                        }
-
-                        if struct_item.vis != Visibility::Inherited {
-                            return Err(parse::Error::new(
-                                struct_item.span(),
-                                "this item must have inherited / private visibility",
-                            ));
-                        }
-
-                        if let Fields::Named(fields) = &mut struct_item.fields {
-                            for field in &mut fields.named {
-                                let ident = field.ident.as_ref().expect("UNREACHABLE");
-
-                                if late_resources.contains_key(ident)
-                                    || resources.contains_key(ident)
-                                {
-                                    return Err(parse::Error::new(
-                                        ident.span(),
-                                        "this resource is listed more than once",
-                                    ));
-                                }
-
-                                if let Some(pos) = field
-                                    .attrs
-                                    .iter()
-                                    .position(|attr| util::attr_eq(attr, "init"))
-                                {
-                                    let attr = field.attrs.remove(pos);
-
-                                    let late = LateResource::parse(field, ident.span())?;
-
-                                    resources.insert(
-                                        ident.clone(),
-                                        Resource {
-                                            late,
-                                            expr: syn::parse2::<ExprParen>(attr.tokens)?.expr,
-                                        },
-                                    );
-                                } else {
-                                    let late = LateResource::parse(field, ident.span())?;
-
-                                    late_resources.insert(ident.clone(), late);
-                                }
+                    let span = struct_item.ident.span();
+                    match parse_attr(&mut struct_item.attrs)? {
+                        (Some(AppAttribute::Resources), _) => {
+                            if resource_struct.contains_key(&struct_item.ident) {
+                                return Err(parse::Error::new(
+                                    span,
+                                    "`#[resources]` struct must appear at most once",
+                                ));
                             }
-                        } else {
-                            return Err(parse::Error::new(
-                                struct_item.span(),
-                                "this `struct` must have named fields",
-                            ));
+
+                            if struct_item.vis != Visibility::Inherited {
+                                return Err(parse::Error::new(
+                                    struct_item.span(),
+                                    "this item must have inherited / private visibility",
+                                ));
+                            }
+
+                            if let Fields::Named(fields) = &mut struct_item.fields {
+                                for field in &mut fields.named {
+                                    let ident = field.ident.as_ref().expect("UNREACHABLE");
+
+                                    if late_resources.contains_key(ident)
+                                        || resources.contains_key(ident)
+                                    {
+                                        return Err(parse::Error::new(
+                                            ident.span(),
+                                            "this resource is listed more than once",
+                                        ));
+                                    }
+
+                                    if let Some(pos) = field
+                                        .attrs
+                                        .iter()
+                                        .position(|attr| util::attr_eq(attr, "init"))
+                                    {
+                                        let attr = field.attrs.remove(pos);
+
+                                        let late = LateResource::parse(field, ident.span())?;
+
+                                        resources.insert(
+                                            ident.clone(),
+                                            Resource {
+                                                late,
+                                                expr: syn::parse2::<ExprParen>(attr.tokens)?.expr,
+                                            },
+                                        );
+                                    } else {
+                                        let late = LateResource::parse(field, ident.span())?;
+
+                                        late_resources.insert(ident.clone(), late);
+                                    }
+                                }
+                            } else {
+                                return Err(parse::Error::new(
+                                    struct_item.span(),
+                                    "this `struct` must have named fields",
+                                ));
+                            }
+                            // resource_struct will be non-empty if #[resources] was encountered before
+                            resource_struct.insert(struct_item.ident.clone(), struct_item.clone());
                         }
-                        // resource_struct will be non-empty if #[resources] was encountered before
-                        resource_struct.insert(struct_item.ident.clone(), struct_item.clone());
-                    } else {
-                        // Structure without the #[resources] attribute should just be passed along
-                        user_code.push(item.clone());
+                        _ => {
+                            // Structure without the #[resources] attribute should just be passed along
+                            user_code.push(item.clone());
+                        }
                     }
                 }
 
                 Item::ForeignMod(mod_) => {
-                    if !util::abi_is_c(&mod_.abi) {
-                        return Err(parse::Error::new(
-                            mod_.abi.extern_token.span(),
-                            "this `extern` block must use the \"C\" abi",
-                        ));
-                    }
+                    // if !util::abi_is_c(&mod_.abi) {
+                    //     return Err(parse::Error::new(
+                    //         mod_.abi.extern_token.span(),
+                    //         "this `extern` block must use the \"C\" abi",
+                    //     ));
+                    // }
 
                     for item in mod_.items {
                         if let ForeignItem::Fn(item) = item {
@@ -316,17 +358,18 @@ impl App {
                                     }
                                 }
                             } else {
-                                // return Err(parse::Error::new(
-                                //     item.sig.ident.span(),
-                                //     "this item must live outside the `#[app]` module",
-                                // ));
+                                return Err(parse::Error::new(
+                                    item.sig.ident.span(),
+                                    "this item must live outside the `#[app]` module",
+                                ));
                             }
                         } else {
-                            eprintln!("--- not fn ---");
-                            return Err(parse::Error::new(
-                                item.span(),
-                                "this item must live outside the `#[app]` module",
-                            ));
+                            panic!("not fn");
+                            // eprintln!("--- not fn ---");
+                            // return Err(parse::Error::new(
+                            //     item.span(),
+                            //     "this item must live outside the `#[app]` module",
+                            // ));
                         }
                     }
                 }

@@ -205,6 +205,7 @@ pub struct SoftwareTask {
 
     /// Static variables local to this context
     pub locals: Map<Local>,
+
     /// The statements that make up the task handler
     pub stmts: Vec<Stmt>,
 
@@ -262,8 +263,10 @@ pub struct HardwareTask {
 
     /// Static variables local to this context
     pub locals: Map<Local>,
+
     /// The statements that make up the task handler
     pub stmts: Vec<Stmt>,
+
     /// Set if the function is external
     pub is_extern: bool,
 
