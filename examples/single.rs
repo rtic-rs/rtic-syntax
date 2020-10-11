@@ -34,9 +34,9 @@ mod app {
     }
 
     #[task(
-        resources = [b, &c],
-        spawn = [bar],
-    )]
+            resources = [b, &c],
+            spawn = [bar],
+        )]
     fn foo(_: foo::Context) {
         static mut X: u32 = 0;
 
@@ -44,11 +44,11 @@ mod app {
     }
 
     #[task(
-        capacity = 2,
-        priority = 2,
-        resources = [d],
-        spawn = [foo],
-    )]
+            capacity = 2,
+            priority = 2,
+            resources = [d],
+            spawn = [foo],
+        )]
     fn bar(_: bar::Context, _: u32) {
         static mut X: u32 = 0;
 
@@ -58,15 +58,9 @@ mod app {
     extern "C" {
         #[task()]
         fn task_decl(_: task_decl::Context);
+        fn SSIO();
     }
 
-    #[task()]
-    extern "C" fn task_decl(_: task_decl::Context);
-
-    #[task()]
-    fn baz(_: baz::Context, _: u32) {
-        static mut X: u32 = 0;
-
-        *X += 1;
-    }
+    // #[task()]
+    // extern "C" fn task_decl2(_: task_decl2::Context);
 }

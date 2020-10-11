@@ -197,7 +197,7 @@ impl App {
                             }
 
                             Either::Right(args) => {
-                                eprintln!("--- software task ---");
+                                eprintln!("--- software task aaueaeu ---");
                                 check_ident(&item.sig.ident)?;
 
                                 software_tasks.insert(
@@ -298,7 +298,7 @@ impl App {
                     for item in mod_.items {
                         if let ForeignItem::Fn(item) = item {
                             eprintln!("--- foreign Fn -- {}", item.sig.ident);
-                            //  eprintln!("attr {:?}", item.attrs);
+                            eprintln!("attr {:?}", item.attrs);
                             if settings.parse_extern_interrupt {
                                 let (ident, extern_interrupt) = ExternInterrupt::parse(item)?;
 
@@ -334,9 +334,7 @@ impl App {
                     // Store the user provided use-statements
                     user_imports.push(itemuse_.clone());
                 }
-                Item::Type(_) => {
-                    eprintln!("-- type --");
-                }
+
                 _ => {
                     eprintln!("-- not recognized -- {:?}", &item);
                     // Anything else within the module should not make any difference

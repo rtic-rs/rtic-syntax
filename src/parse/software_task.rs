@@ -19,6 +19,7 @@ impl SoftwareTask {
                 eprintln!("item {:?}", &item.sig.ident);
                 let (locals, stmts) = util::extract_locals(item.block.stmts)?;
                 let (cfgs, attrs) = util::extract_cfgs(item.attrs);
+                let is_extern = item.sig.abi.is_none();
                 return Ok(SoftwareTask {
                     args,
                     attrs,
@@ -27,7 +28,7 @@ impl SoftwareTask {
                     inputs,
                     locals: Local::parse(locals)?,
                     stmts,
-                    is_defined: false,
+                    is_extern,
                     _extensible: (),
                 });
             }

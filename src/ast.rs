@@ -208,8 +208,8 @@ pub struct SoftwareTask {
     /// The statements that make up the task handler
     pub stmts: Vec<Stmt>,
 
-    /// Is true, defined with body, else defined elsewhere
-    pub is_defined: bool,
+    /// Set if the function is external
+    pub is_extern: bool,
 
     pub(crate) _extensible: (),
 }
@@ -264,6 +264,8 @@ pub struct HardwareTask {
     pub locals: Map<Local>,
     /// The statements that make up the task handler
     pub stmts: Vec<Stmt>,
+    /// Set if the function is external
+    pub is_extern: bool,
 
     pub(crate) _extensible: (),
 }

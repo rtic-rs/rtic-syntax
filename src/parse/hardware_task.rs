@@ -26,6 +26,7 @@ impl HardwareTask {
                 if rest.is_empty() {
                     let (locals, stmts) = util::extract_locals(item.block.stmts)?;
                     let attrs = item.attrs;
+                    let is_extern = item.sig.abi.is_none();
 
                     return Ok(HardwareTask {
                         args,
@@ -33,6 +34,7 @@ impl HardwareTask {
                         context,
                         locals: Local::parse(locals)?,
                         stmts,
+                        is_extern,
                         _extensible: (),
                     });
                 }
