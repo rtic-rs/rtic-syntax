@@ -1,4 +1,4 @@
-//! Full syntax
+//! examples/local.rs
 
 #[mock::app]
 mod app {
@@ -11,9 +11,12 @@ mod app {
         #[init(0)]
         d: u32,
         #[task_local]
-        m: u32,
+        tl: u32,
+        #[task_local]
+        #[init(0)]
+        tl_init: u32,
         #[lock_free]
-        e: u32u,
+        lf: u32,
     }
 
     #[init(
@@ -28,7 +31,7 @@ mod app {
     }
 
     #[idle(
-                resources = [&a, d, e],
+                resources = [&a, d, lf],
                 spawn = [foo],
             )]
     fn idle(_: idle::Context) -> ! {
@@ -58,4 +61,8 @@ mod app {
 
         *X += 1;
     }
+    #[task(
+                resources = [tl, tl_init],
+            )]
+    fn task_local_fn(_: task_local_fn::Context) {}
 }
