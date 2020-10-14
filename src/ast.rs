@@ -91,6 +91,7 @@ pub struct Init {
 
     /// Static variables local to this context
     pub locals: Map<Local>,
+
     /// The statements that make up this `init` function
     pub stmts: Vec<Stmt>,
 
@@ -159,9 +160,10 @@ pub struct IdleArgs {
 /// Resource properties
 #[derive(Debug)]
 pub struct ResourceProperties {
-    /// a task local resource
+    /// A task local resource
     pub task_local: bool,
-    /// a lock free (exclusive resource)
+
+    /// A lock free (exclusive resource)
     pub lock_free: bool,
 }
 
