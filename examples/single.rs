@@ -14,7 +14,6 @@ mod app {
 
     #[init(
         resources = [c],
-        spawn = [foo],
     )]
     fn init(_: init::Context) -> init::LateResources {
         #[cfg(debug_assertions)]
@@ -25,7 +24,6 @@ mod app {
 
     #[idle(
         resources = [&a, d],
-        spawn = [foo],
     )]
     fn idle(_: idle::Context) -> ! {
         static mut X: u32 = 0;
@@ -35,7 +33,6 @@ mod app {
 
     #[task(
         resources = [b, &c],
-        spawn = [bar],
     )]
     fn foo(_: foo::Context) {
         static mut X: u32 = 0;
@@ -47,7 +44,6 @@ mod app {
         capacity = 2,
         priority = 2,
         resources = [d],
-        spawn = [foo],
     )]
     fn bar(_: bar::Context, _: u32) {
         static mut X: u32 = 0;

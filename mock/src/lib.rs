@@ -17,8 +17,6 @@ pub fn app(args: TokenStream, input: TokenStream) -> TokenStream {
             settings.parse_binds = true;
         } else if arg.trim() == "parse_extern_interrupt" {
             settings.parse_extern_interrupt = true;
-        } else if arg.trim() == "parse_schedule" {
-            settings.parse_schedule = true;
         } else {
             rtic_args.push(arg.to_string());
         }

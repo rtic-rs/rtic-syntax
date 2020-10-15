@@ -5,12 +5,11 @@ use syn::{parse, ItemFn};
 use crate::{
     ast::{Init, InitArgs, Local},
     parse::util,
-    Settings,
 };
 
 impl InitArgs {
-    pub(crate) fn parse(tokens: TokenStream2, settings: &Settings) -> parse::Result<Self> {
-        crate::parse::init_idle_args(tokens, settings)
+    pub(crate) fn parse(tokens: TokenStream2) -> parse::Result<Self> {
+        crate::parse::init_idle_args(tokens)
     }
 }
 

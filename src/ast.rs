@@ -109,12 +109,6 @@ pub struct InitArgs {
     /// Resources that can be accessed from this context
     pub resources: Resources,
 
-    /// Software tasks that can be spawned from this context
-    pub spawn: Set<Ident>,
-
-    /// Software tasks that can be scheduled from this context
-    pub schedule: Set<Ident>,
-
     pub(crate) _extensible: (),
 }
 
@@ -147,12 +141,6 @@ pub struct Idle {
 pub struct IdleArgs {
     /// Resources that can be accessed from this context
     pub resources: Resources,
-
-    /// Software tasks that can be spawned from this context
-    pub spawn: Set<Ident>,
-
-    /// Software tasks that can be scheduled from this context
-    pub schedule: Set<Ident>,
 
     pub(crate) _extensible: (),
 }
@@ -237,12 +225,6 @@ pub struct SoftwareTaskArgs {
     /// Resources that can be accessed from this context
     pub resources: Resources,
 
-    /// Software tasks that can be spawned from this context
-    pub spawn: Set<Ident>,
-
-    /// Software tasks that can be scheduled from this context
-    pub schedule: Set<Ident>,
-
     pub(crate) _extensible: (),
 }
 
@@ -252,8 +234,6 @@ impl Default for SoftwareTaskArgs {
             capacity: 1,
             priority: 1,
             resources: Resources::new(),
-            spawn: Set::new(),
-            schedule: Set::new(),
             _extensible: (),
         }
     }
@@ -290,12 +270,6 @@ pub struct HardwareTaskArgs {
 
     /// Resources that can be accessed from this context
     pub resources: Resources,
-
-    /// Software tasks that can be spawned from this context
-    pub spawn: Set<Ident>,
-
-    /// Software tasks that can be scheduled from this context
-    pub schedule: Set<Ident>,
 
     pub(crate) _extensible: (),
 }
