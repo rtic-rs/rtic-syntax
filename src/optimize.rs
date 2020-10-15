@@ -11,11 +11,11 @@ pub fn app(app: &mut App, settings: &Settings) {
         let priorities = app
             .hardware_tasks
             .values()
-            .filter_map(|task| Some(task.args.priority))
+            .map(|task| Some(task.args.priority))
             .chain(
                 app.software_tasks
                     .values()
-                    .filter_map(|task| Some(task.args.priority)),
+                    .map(|task| Some(task.args.priority)),
             )
             .collect::<BTreeSet<_>>();
 
@@ -26,11 +26,11 @@ pub fn app(app: &mut App, settings: &Settings) {
             .collect::<HashMap<_, _>>();
 
         for task in app.hardware_tasks.values_mut() {
-            task.args.priority = map[&task.args.priority];
+            task.args.priority = map[&Some(task.args.priority)];
         }
 
         for task in app.software_tasks.values_mut() {
-            task.args.priority = map[&task.args.priority];
+            task.args.priority = map[&Some(task.args.priority)];
         }
     }
 }

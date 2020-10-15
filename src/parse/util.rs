@@ -21,7 +21,7 @@ pub fn abi_is_c(abi: &Abi) -> bool {
 pub fn attr_eq(attr: &Attribute, name: &str) -> bool {
     attr.style == AttrStyle::Outer && attr.path.segments.len() == 1 && {
         let segment = attr.path.segments.first().unwrap();
-        segment.arguments == PathArguments::None && segment.ident.to_string() == name
+        segment.arguments == PathArguments::None && *segment.ident.to_string() == *name
     }
 }
 
@@ -193,10 +193,9 @@ pub fn parse_resources(content: ParseStream<'_>) -> parse::Result<Map<Access>> {
     Ok(resources)
 }
 
-pub fn parse_inputs(
-    inputs: Punctuated<FnArg, Token![,]>,
-    name: &str,
-) -> Option<(Box<Pat>, Result<Vec<PatType>, FnArg>)> {
+type ParseInputResult = Option<(Box<Pat>, Result<Vec<PatType>, FnArg>)>;
+
+pub fn parse_inputs(inputs: Punctuated<FnArg, Token![,]>, name: &str) -> ParseInputResult {
     let mut inputs = inputs.into_iter();
 
     match inputs.next() {
@@ -221,11 +220,7 @@ pub fn parse_inputs(
 
 pub fn type_is_bottom(ty: &ReturnType) -> bool {
     if let ReturnType::Type(_, ty) = ty {
-        if let Type::Never(_) = **ty {
-            true
-        } else {
-            false
-        }
+        matches!(**ty, Type::Never(_))
     } else {
         false
     }

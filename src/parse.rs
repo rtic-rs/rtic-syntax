@@ -17,8 +17,8 @@ use syn::{
 };
 
 use crate::{
-    ast::{App, AppArgs, HardwareTaskArgs, InitArgs, Resources, SoftwareTaskArgs},
-    Either, Set, Settings,
+    ast::{App, AppArgs, HardwareTaskArgs, InitArgs, SoftwareTaskArgs},
+    Either, Settings,
 };
 
 pub fn app(args: TokenStream2, input: TokenStream2, settings: &Settings) -> parse::Result<App> {
@@ -48,11 +48,17 @@ impl Parse for Input {
         }
 
         let content;
+
+        let _mod_token = input.parse()?;
+        let ident = input.parse()?;
+        let _brace_token = braced!(content in input);
+        let items = content.call(parse_items)?;
+
         Ok(Input {
-            _mod_token: input.parse()?,
-            ident: input.parse()?,
-            _brace_token: braced!(content in input),
-            items: content.call(parse_items)?,
+            _mod_token,
+            ident,
+            _brace_token,
+            items,
         })
     }
 }
@@ -117,9 +123,9 @@ fn init_idle_args(tokens: TokenStream2) -> parse::Result<InitArgs> {
         }
 
         Ok(InitArgs {
-            late: late.unwrap_or(Set::new()),
+            late: late.unwrap_or_default(),
 
-            resources: resources.unwrap_or(Resources::new()),
+            resources: resources.unwrap_or_default(),
 
             _extensible: (),
         })
@@ -264,7 +270,7 @@ fn task_args(
             let _: Token![,] = content.parse()?;
         }
         let priority = priority.unwrap_or(1);
-        let resources = resources.unwrap_or(Resources::new());
+        let resources = resources.unwrap_or_default();
 
         Ok(if let Some(binds) = binds {
             Either::Left(HardwareTaskArgs {
