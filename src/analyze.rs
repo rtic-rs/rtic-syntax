@@ -1,14 +1,15 @@
 //! RTIC application analysis
 
 use core::cmp;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use indexmap::IndexMap;
+use quote::format_ident;
 use syn::{Ident, Type};
 
 use crate::{ast::App, Set};
 
-pub(crate) fn app(app: &App) -> Analysis {
+pub(crate) fn app(app: &App) -> Result<Analysis, syn::Error> {
     // a. Initialization of resources
     let mut late_resources = LateResources::new();
     if !app.late_resources.is_empty() {
@@ -30,6 +31,161 @@ pub(crate) fn app(app: &App) -> Analysis {
         if rest {
             late_resources.push(resources);
         }
+    }
+
+    // Collect task local resources
+    let task_local: Vec<&Ident> = app
+        .resources
+        .iter()
+        .filter(|(_, r)| r.properties.task_local)
+        .map(|(i, _)| i)
+        .chain(
+            app.late_resources
+                .iter()
+                .filter(|(_, r)| r.properties.task_local)
+                .map(|(i, _)| i),
+        )
+        .collect();
+
+    // Collect lock free resources
+    let lock_free: Vec<&Ident> = app
+        .resources
+        .iter()
+        .filter(|(_, r)| r.properties.lock_free)
+        .map(|(i, _)| i)
+        .chain(
+            app.late_resources
+                .iter()
+                .filter(|(_, r)| r.properties.lock_free)
+                .map(|(i, _)| i),
+        )
+        .collect();
+
+    // Collect all tasks into a vector
+    type TaskName = String;
+    type Priority = u8;
+
+    // The task list is a Tuple (Name, Resources, Priority)
+    let task_list: Vec<(TaskName, Vec<&Ident>, Priority)> = app
+        .idles
+        .iter()
+        .map(|ht| {
+            (
+                "idle".to_string(),
+                ht.args.resources.iter().map(|(v, _)| v).collect::<Vec<_>>(),
+                0,
+            )
+        })
+        .chain(app.software_tasks.iter().map(|(name, ht)| {
+            (
+                name.to_string(),
+                ht.args.resources.iter().map(|(v, _)| v).collect::<Vec<_>>(),
+                ht.args.priority,
+            )
+        }))
+        .chain(app.hardware_tasks.iter().map(|(name, ht)| {
+            (
+                name.to_string(),
+                ht.args.resources.iter().map(|(v, _)| v).collect::<Vec<_>>(),
+                ht.args.priority,
+            )
+        }))
+        .collect();
+
+    // Create the list of task Idents
+    let tasks = task_list.iter().map(|x| format_ident!("{}", x.0)).collect();
+
+    // Check that task_local resources are only used once
+    let mut error = vec![];
+    for task_local_id in task_local.iter() {
+        let mut used = vec![];
+        for (task, tr, priority) in task_list.iter() {
+            for r in tr {
+                if task_local_id == r {
+                    used.push((task, r, priority));
+                }
+            }
+        }
+        if used.len() > 1 {
+            error.push(syn::Error::new(
+                task_local_id.span(),
+                format!(
+                    "task local resource {:?} is used by multiple tasks",
+                    task_local_id.to_string()
+                ),
+            ));
+
+            used.iter().for_each(|(task, resource, priority)| {
+                error.push(syn::Error::new(
+                    resource.span(),
+                    format!(
+                        "task local resource {:?} is used by task {:?} with priority {:?}",
+                        resource.to_string(),
+                        task,
+                        priority
+                    ),
+                ))
+            });
+        }
+    }
+
+    let mut lf_res_with_error = vec![];
+    let mut lf_hash = HashMap::new();
+
+    // Check that lock_free resources are correct
+    for lf_res in lock_free.iter() {
+        for (task, tr, priority) in task_list.iter() {
+            for r in tr {
+                // Get all uses of resources annotated lock_free
+                if lf_res == r {
+                    // HashMap returns the previous existing object if old.key == new.key
+                    if let Some(lf_res) = lf_hash.insert(r.to_string(), (task, r, priority)) {
+                        // Check if priority differ, if it does, append to
+                        // list of resources which will be annotated with errors
+                        if priority != lf_res.2 {
+                            lf_res_with_error.push(lf_res.1);
+                            lf_res_with_error.push(r);
+                        }
+                        // If the resource already violates lock free properties
+                        if lf_res_with_error.contains(&r) {
+                            lf_res_with_error.push(lf_res.1);
+                            lf_res_with_error.push(r);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Add error message in the resource struct
+    for r in lock_free {
+        if lf_res_with_error.contains(&&r) {
+            error.push(syn::Error::new(
+                r.span(),
+                format!(
+                    "Lock free resource {:?} is used by tasks at different priorities",
+                    r.to_string(),
+                ),
+            ));
+        }
+    }
+
+    // Add error message for each use of the resource
+    for resource in lf_res_with_error.clone() {
+        error.push(syn::Error::new(
+            resource.span(),
+            format!(
+                "Resource {:?} is declared lock free but used by tasks at different priorities",
+                resource.to_string(),
+            ),
+        ));
+    }
+
+    // Collect errors if any and return/halt
+    if !error.is_empty() {
+        let mut err = error.iter().next().unwrap().clone();
+        error.iter().for_each(|e| err.combine(e.clone()));
+        return Err(err);
     }
 
     // e. Location of resources
@@ -128,14 +284,15 @@ pub(crate) fn app(app: &App) -> Analysis {
             .sum();
     }
 
-    Analysis {
+    Ok(Analysis {
         channels,
         late_resources,
         locations,
+        tasks,
         ownerships,
         send_types,
         sync_types,
-    }
+    })
 }
 
 /// Priority ceiling
@@ -149,6 +306,9 @@ pub type Resource = Ident;
 
 /// Task name
 pub type Task = Ident;
+
+/// List of tasks names
+pub type Tasks = Vec<Ident>;
 
 /// The result of analyzing an RTIC application
 pub struct Analysis {
@@ -165,6 +325,9 @@ pub struct Analysis {
     ///
     /// `None` indicates that the resource must reside in shared memory
     pub locations: Locations,
+
+    /// A vector containing all task names
+    pub tasks: Tasks,
 
     /// Resource ownership
     pub ownerships: Ownerships,
