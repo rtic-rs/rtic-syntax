@@ -176,9 +176,12 @@ pub fn parse2(
     let mut app = parse::app(args, input, settings)?;
     check::app(&app)?;
     optimize::app(&mut app, settings);
-    let analysis = analyze::app(&app);
 
-    Ok((P::new(app), P::new(analysis)))
+    match analyze::app(&app) {
+        Err(e) => Err(e),
+        // If no errors, return the app and analysis results
+        Ok(analysis) => Ok((P::new(app), P::new(analysis))),
+    }
 }
 
 enum Either<A, B> {

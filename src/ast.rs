@@ -91,6 +91,7 @@ pub struct Init {
 
     /// Static variables local to this context
     pub locals: Map<Local>,
+
     /// The statements that make up this `init` function
     pub stmts: Vec<Stmt>,
 
@@ -156,6 +157,16 @@ pub struct IdleArgs {
     pub(crate) _extensible: (),
 }
 
+/// Resource properties
+#[derive(Debug)]
+pub struct ResourceProperties {
+    /// A task local resource
+    pub task_local: bool,
+
+    /// A lock free (exclusive resource)
+    pub lock_free: bool,
+}
+
 /// An early (compile time initialized) resource
 #[derive(Debug)]
 pub struct Resource {
@@ -183,6 +194,9 @@ pub struct LateResource {
 
     /// The type of this resource
     pub ty: Box<Type>,
+
+    /// Resource properties
+    pub properties: ResourceProperties,
 
     pub(crate) _extensible: (),
 }
