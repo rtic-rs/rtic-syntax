@@ -5,6 +5,31 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Allow annotating resources to activate special resource locking behaviour.
+  - `#[lock_free]`, there might be several tasks with the same priority accessing
+    the resource without critical section.
+  - `#[task_local]`, there must be only one task, similar to a task local
+    resource, but (optionally) set-up by init. This is similar to move.
+
+### Changed
+
+- [breaking-change] Rework whole spawn/schedule, support `foo::spawn( ... )`,
+  `foo::schedule( ... )`.
+
+- [breaking-change] `struct Resources` changed to attribute `#[resources]` on a struct.
+
+- [breaking-change] Mod over const, instead of `const APP: () = {` use `mod app {`.
+
+- [breaking-change] Init function always return `LateResources` for a symmetric API.
+
+- Multi-core support was removed to reduce overall complexity.
+
+- CI Changed from Travis to GitHub Actions.
+
+- [breaking-change] rtfm-syntax is now known as rtic-syntax.
+
 ## [v0.4.0] - 2019-11-14
 
 ### Added
