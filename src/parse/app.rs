@@ -1,27 +1,31 @@
 use std::collections::HashSet;
 
-use indexmap::map::Entry;
+// use indexmap::map::Entry;
 use proc_macro2::TokenStream as TokenStream2;
 use syn::{
     parse::{self, ParseStream, Parser},
     spanned::Spanned,
-    ExprParen, Fields, ForeignItem, Ident, Item, Lit, Path, Token, Visibility,
+    Expr, ExprArray, ExprParen, Fields, ForeignItem, Ident, Item, LitBool, Path, Token, Visibility,
 };
 
 use super::Input;
 use crate::{
     ast::{
-        App, AppArgs, CustomArg, ExternInterrupt, ExternInterrupts, HardwareTask, Idle, IdleArgs,
-        Init, InitArgs, LateResource, Resource, SoftwareTask,
+        App, AppArgs, ExternInterrupt, ExternInterrupts, HardwareTask, Idle, IdleArgs, Init,
+        InitArgs, LateResource, Resource, SoftwareTask,
     },
     parse::util,
-    Either, Map, Settings,
+    Either, Map, Set, Settings,
 };
 
 impl AppArgs {
     pub(crate) fn parse(tokens: TokenStream2) -> parse::Result<Self> {
         (|input: ParseStream<'_>| -> parse::Result<Self> {
-            let mut custom = Map::new();
+            let mut custom = Set::new();
+            let mut device = None;
+            let mut monotonic = None;
+            let mut peripherals = true;
+            let mut extern_interrupts = ExternInterrupts::new();
 
             loop {
                 if input.is_empty() {
@@ -32,41 +36,101 @@ impl AppArgs {
                 let ident: Ident = input.parse()?;
                 let _eq_token: Token![=] = input.parse()?;
 
-                if custom.contains_key(&ident) {
+                if custom.contains(&ident) {
                     return Err(parse::Error::new(
                         ident.span(),
                         "argument appears more than once",
                     ));
                 }
 
-                // Parse as path
-                if let Ok(p) = input.parse::<Path>() {
-                    custom.insert(ident, CustomArg::Path(p));
-                } else {
-                    // Parse as literal
-                    match input.parse::<Lit>()? {
-                        Lit::Bool(lit) => {
-                            custom.insert(ident, CustomArg::Bool(lit.value));
-                        }
-                        Lit::Int(lit) => {
-                            if lit.suffix().is_empty() {
-                                custom.insert(
-                                    ident,
-                                    CustomArg::UInt(lit.base10_digits().to_string()),
-                                );
-                            } else {
-                                return Err(parse::Error::new(
-                                    ident.span(),
-                                    "integer must be unsuffixed",
-                                ));
-                            }
-                        }
-                        _ => {
+                custom.insert(ident.clone());
+
+                let ks = ident.to_string();
+
+                match &*ks {
+                    "device" => {
+                        if let Ok(p) = input.parse::<Path>() {
+                            device = Some(p);
+                        } else {
                             return Err(parse::Error::new(
                                 ident.span(),
-                                "argument has unexpected value",
+                                "unexpected argument value; this should be a path",
                             ));
                         }
+                    }
+
+                    "monotonic" => {
+                        if let Ok(p) = input.parse::<Path>() {
+                            monotonic = Some(p);
+                        } else {
+                            return Err(parse::Error::new(
+                                ident.span(),
+                                "unexpected argument value; this should be a path",
+                            ));
+                        }
+                    }
+
+                    "peripherals" => {
+                        if let Ok(p) = input.parse::<LitBool>() {
+                            peripherals = p.value;
+                        } else {
+                            return Err(parse::Error::new(
+                                ident.span(),
+                                "unexpected argument value; this should be a boolean",
+                            ));
+                        }
+                    }
+
+                    "dispatchers" => {
+                        if let Ok(p) = input.parse::<ExprArray>() {
+                            for e in p.elems {
+                                match e {
+                                    Expr::Path(ep) => {
+                                        let path = ep.path;
+                                        let ident = if path.leading_colon.is_some()
+                                            || path.segments.len() != 1
+                                        {
+                                            return Err(parse::Error::new(
+                                                path.span(),
+                                                "interrupt must be an identifier, not a path",
+                                            ));
+                                        } else {
+                                            path.segments[0].ident.clone()
+                                        };
+                                        let span = ident.span();
+                                        if extern_interrupts.contains_key(&ident) {
+                                            return Err(parse::Error::new(
+                                                span,
+                                                "this extern interrupt is listed more than once",
+                                            ));
+                                        } else {
+                                            extern_interrupts.insert(
+                                                ident,
+                                                ExternInterrupt {
+                                                    attrs: ep.attrs,
+                                                    _extensible: (),
+                                                },
+                                            );
+                                        }
+                                    }
+                                    _ => {
+                                        return Err(parse::Error::new(
+                                            e.span(),
+                                            "interrupt must be an identifier",
+                                        ));
+                                    }
+                                }
+                            }
+                        } else {
+                            return Err(parse::Error::new(
+                                ident.span(),
+                                // increasing the length of the error message will break rustfmt
+                                "unexpected argument value; expected an array",
+                            ));
+                        }
+                    }
+                    _ => {
+                        return Err(parse::Error::new(ident.span(), "unexpected argument"));
                     }
                 }
 
@@ -78,7 +142,12 @@ impl AppArgs {
                 let _: Token![,] = input.parse()?;
             }
 
-            Ok(AppArgs { custom })
+            Ok(AppArgs {
+                device,
+                monotonic,
+                peripherals,
+                extern_interrupts,
+            })
         })
         .parse2(tokens)
     }
@@ -96,8 +165,6 @@ impl App {
         let mut software_tasks = Map::new();
         let mut user_imports = vec![];
         let mut user_code = vec![];
-
-        let mut extern_interrupts = ExternInterrupts::new();
 
         let mut seen_idents = HashSet::<Ident>::new();
         let mut bindings = HashSet::<Ident>::new();
@@ -289,29 +356,8 @@ impl App {
                     }
 
                     for item in mod_.items {
-                        if let ForeignItem::Fn(item) = item {
-                            if settings.parse_extern_interrupt {
-                                let (ident, extern_interrupt) = ExternInterrupt::parse(item)?;
-
-                                let span = ident.span();
-                                match extern_interrupts.entry(ident) {
-                                    Entry::Occupied(..) => {
-                                        return Err(parse::Error::new(
-                                            span,
-                                            "this extern interrupt is listed more than once",
-                                        ));
-                                    }
-
-                                    Entry::Vacant(entry) => {
-                                        entry.insert(extern_interrupt);
-                                    }
-                                }
-                            } else {
-                                return Err(parse::Error::new(
-                                    item.sig.ident.span(),
-                                    "this item must live outside the `#[app]` module",
-                                ));
-                            }
+                        if let ForeignItem::Fn(_item) = item {
+                            // TODO: external task
                         } else {
                             return Err(parse::Error::new(
                                 item.span(),
@@ -346,8 +392,6 @@ impl App {
             hardware_tasks,
             software_tasks,
 
-            extern_interrupts,
-
             _extensible: (),
         })
     }
@@ -355,24 +399,35 @@ impl App {
 
 #[cfg(test)]
 mod tests {
-    use crate::{ast::AppArgs, ast::CustomArg};
+    use crate::ast::AppArgs;
 
     #[test]
-    fn parse_app_args() {
+    fn parse_app_args_true() {
         let s = "peripherals = true";
 
         let stream: proc_macro2::TokenStream = s.parse().unwrap();
         let result = AppArgs::parse(stream).unwrap();
 
-        // Check map
-        for (ident, value) in result.custom {
-            match ident.to_string().as_ref() {
-                "peripherals" => match value {
-                    CustomArg::Bool(true) => {}
-                    _ => panic!("Expected peripherals = true"),
-                },
-                _ => panic!("Unexpected identifier"),
-            }
-        }
+        assert!(result.peripherals);
+    }
+
+    #[test]
+    fn parse_app_args_false() {
+        let s = "peripherals = false";
+
+        let stream: proc_macro2::TokenStream = s.parse().unwrap();
+        let result = AppArgs::parse(stream).unwrap();
+
+        assert!(!result.peripherals);
+    }
+
+    #[test]
+    fn parse_app_args_default() {
+        let s = "";
+
+        let stream: proc_macro2::TokenStream = s.parse().unwrap();
+        let result = AppArgs::parse(stream).unwrap();
+
+        assert!(result.peripherals);
     }
 }

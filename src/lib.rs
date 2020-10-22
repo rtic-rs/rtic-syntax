@@ -55,9 +55,6 @@ impl<T> ops::Deref for P<T> {
 /// Execution context
 #[derive(Clone, Copy)]
 pub enum Context<'a> {
-    /// A hardware task: `#[exception]` or `#[interrupt]`
-    HardwareTask(&'a Ident),
-
     /// The `idle` context
     Idle,
 
@@ -66,6 +63,9 @@ pub enum Context<'a> {
 
     /// A software task: `#[task]`
     SoftwareTask(&'a Ident),
+
+    /// A hardware task: `#[exception]` or `#[interrupt]`
+    HardwareTask(&'a Ident),
 }
 
 impl<'a> Context<'a> {

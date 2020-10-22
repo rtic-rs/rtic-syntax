@@ -45,6 +45,8 @@ pub fn check_fn_signature(item: &ItemFn) -> bool {
         && item.sig.variadic.is_none()
 }
 
+// TODO: Fix later when dealing with external tasks
+#[allow(dead_code)]
 pub fn check_foreign_fn_signature(item: &ForeignItemFn) -> bool {
     item.vis == Visibility::Inherited
         // && item.constness.is_none()

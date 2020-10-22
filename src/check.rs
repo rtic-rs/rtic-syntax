@@ -81,10 +81,10 @@ pub fn app(app: &App) -> parse::Result<()> {
     for task in app.hardware_tasks.values() {
         let binds = &task.args.binds;
 
-        if app.extern_interrupts.contains_key(binds) {
+        if app.args.extern_interrupts.contains_key(binds) {
             return Err(parse::Error::new(
                 binds.span(),
-                "`extern` interrupts can't be used as hardware tasks",
+                "dispatcher interrupts can't be used as hardware tasks",
             ));
         }
     }
