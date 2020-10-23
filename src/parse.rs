@@ -1,5 +1,4 @@
 mod app;
-mod extern_interrupt;
 mod hardware_task;
 mod idle;
 mod init;
@@ -21,6 +20,7 @@ use crate::{
     Either, Settings,
 };
 
+// Parse the app, both app arguments and body (input)
 pub fn app(args: TokenStream2, input: TokenStream2, settings: &Settings) -> parse::Result<App> {
     let args = AppArgs::parse(args)?;
     let input: Input = syn::parse2(input)?;

@@ -13,7 +13,13 @@ This project adheres to [Semantic Versioning](http://semver.org/).
   - `#[task_local]`, there must be only one task, similar to a task local
     resource, but (optionally) set-up by init. This is similar to move.
 
+- `peripherals` is now enabled (*true*) by default, you no longer need to give `#[app(..., peripherals = true))`. This is the common case, and if forgotten it results in an error which may be confusing to the user.    
+
 ### Changed
+
+- [breaking-change] Move of dispatchers (interrupts) from `extern` to app arguments.
+  `app(..., dispatchers = [SSI0,...])` 
+  This should also work for ram functions and other attributes, see `examples/ramfunc.rs`.
 
 - [breaking-change] Rework whole spawn/schedule, support `foo::spawn( ... )`,
   `foo::schedule( ... )`.

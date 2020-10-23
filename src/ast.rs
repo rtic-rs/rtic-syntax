@@ -39,33 +39,35 @@ pub struct App {
     /// Software tasks: `#[task]`
     pub software_tasks: Map<SoftwareTask>,
 
-    /// Interrupts used to dispatch software tasks
-    pub extern_interrupts: ExternInterrupts,
-
     pub(crate) _extensible: (),
 }
 
 /// Interrupts used to dispatch software tasks
 pub type ExternInterrupts = Map<ExternInterrupt>;
 
+/// Interrupt that could be used to dispatch software tasks
+#[derive(Debug, Clone)]
+pub struct ExternInterrupt {
+    /// Attributes that will apply to this interrupt handler
+    pub attrs: Vec<Attribute>,
+
+    pub(crate) _extensible: (),
+}
+
 /// The arguments of the `#[app]` attribute
 #[derive(Debug)]
 pub struct AppArgs {
-    /// Custom arguments
-    pub custom: Map<CustomArg>,
-}
+    /// Device
+    pub device: Option<Path>,
 
-/// A custom argument
-#[derive(Debug)]
-pub enum CustomArg {
-    /// A boolean: `true` or `false`
-    Bool(bool),
+    /// Monotonic
+    pub monotonic: Option<Path>,
 
-    /// An unsuffixed, unsigned integer
-    UInt(String),
+    /// Peripherals
+    pub peripherals: bool,
 
-    /// An item path
-    Path(Path),
+    /// Interrupts used to dispatch software tasks
+    pub extern_interrupts: ExternInterrupts,
 }
 
 /// `init` function
@@ -270,15 +272,6 @@ pub struct HardwareTaskArgs {
 
     /// Resources that can be accessed from this context
     pub resources: Resources,
-
-    pub(crate) _extensible: (),
-}
-
-/// Interrupt that could be used to dispatch software tasks
-#[derive(Debug)]
-pub struct ExternInterrupt {
-    /// Attributes that will apply to this interrupt handler
-    pub attrs: Vec<Attribute>,
 
     pub(crate) _extensible: (),
 }
