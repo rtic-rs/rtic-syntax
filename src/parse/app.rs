@@ -356,8 +356,58 @@ impl App {
                     }
 
                     for item in mod_.items {
-                        if let ForeignItem::Fn(_item) = item {
-                            // TODO: external task
+                        if let ForeignItem::Fn(mut item) = item {
+                            let span = item.sig.ident.span();
+                            if let Some(pos) = item
+                                .attrs
+                                .iter()
+                                .position(|attr| util::attr_eq(attr, "task"))
+                            {
+                                if hardware_tasks.contains_key(&item.sig.ident)
+                                    || software_tasks.contains_key(&item.sig.ident)
+                                {
+                                    return Err(parse::Error::new(
+                                        span,
+                                        "this task is defined multiple times",
+                                    ));
+                                }
+
+                                if item.attrs.len() != 1 {
+                                    return Err(parse::Error::new(
+                                        span,
+                                        "`extern` task required `#[task(..)]` attribute",
+                                    ));
+                                }
+
+                                match crate::parse::task_args(
+                                    item.attrs.remove(pos).tokens,
+                                    settings,
+                                )? {
+                                    Either::Left(args) => {
+                                        check_binding(&args.binds)?;
+                                        check_ident(&item.sig.ident)?;
+
+                                        hardware_tasks.insert(
+                                            item.sig.ident.clone(),
+                                            HardwareTask::parse_foreign(args, item)?,
+                                        );
+                                    }
+
+                                    Either::Right(args) => {
+                                        check_ident(&item.sig.ident)?;
+
+                                        software_tasks.insert(
+                                            item.sig.ident.clone(),
+                                            SoftwareTask::parse_foreign(args, item)?,
+                                        );
+                                    }
+                                }
+                            } else {
+                                return Err(parse::Error::new(
+                                    span,
+                                    "`extern` task required `#[task(..)]` attribute",
+                                ));
+                            }
                         } else {
                             return Err(parse::Error::new(
                                 item.span(),
@@ -366,6 +416,7 @@ impl App {
                         }
                     }
                 }
+                // TODO: do we need to treat separately?
                 Item::Use(itemuse_) => {
                     // Store the user provided use-statements
                     user_imports.push(itemuse_.clone());
