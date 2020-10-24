@@ -34,6 +34,7 @@ impl HardwareTask {
                         context,
                         locals: Local::parse(locals)?,
                         stmts,
+                        external: false,
                         _extensible: (),
                     });
                 }
@@ -80,6 +81,7 @@ impl HardwareTask {
                         context,
                         locals: Map::<Local>::new(),
                         stmts: Vec::<Stmt>::new(),
+                        external: true,
                         _extensible: (),
                     });
                 }

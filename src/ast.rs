@@ -199,18 +199,24 @@ pub struct SoftwareTask {
 
     /// `#[cfg]` attributes like `#[cfg(debug_assertions)]`
     pub cfgs: Vec<Attribute>,
+
     /// Attributes that will apply to this interrupt handler
     pub attrs: Vec<Attribute>,
 
     /// The context argument
     pub context: Box<Pat>,
+
     /// The inputs of this software task
     pub inputs: Vec<PatType>,
 
     /// Static variables local to this context
     pub locals: Map<Local>,
+
     /// The statements that make up the task handler
     pub stmts: Vec<Stmt>,
+
+    /// The task is declared externally
+    pub external: bool,
 
     pub(crate) _extensible: (),
 }
@@ -255,8 +261,12 @@ pub struct HardwareTask {
 
     /// Static variables local to this context
     pub locals: Map<Local>,
+
     /// The statements that make up the task handler
     pub stmts: Vec<Stmt>,
+
+    /// The task is declared externally
+    pub external: bool,
 
     pub(crate) _extensible: (),
 }
