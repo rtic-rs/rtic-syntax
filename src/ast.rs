@@ -216,7 +216,7 @@ pub struct SoftwareTask {
     pub stmts: Vec<Stmt>,
 
     /// The task is declared externally
-    pub external: bool,
+    pub is_extern: bool,
 
     pub(crate) _extensible: (),
 }
@@ -266,7 +266,7 @@ pub struct HardwareTask {
     pub stmts: Vec<Stmt>,
 
     /// The task is declared externally
-    pub external: bool,
+    pub is_extern: bool,
 
     pub(crate) _extensible: (),
 }
