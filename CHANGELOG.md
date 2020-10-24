@@ -13,7 +13,10 @@ This project adheres to [Semantic Versioning](http://semver.org/).
   - `#[task_local]`, there must be only one task, similar to a task local
     resource, but (optionally) set-up by init. This is similar to move.
 
-- `peripherals` is now enabled (*true*) by default, you no longer need to give `#[app(..., peripherals = true))`. This is the common case, and if forgotten it results in an error which may be confusing to the user.    
+- `peripherals` is now enabled (*true*) by default, you no longer need to give `#[app(..., peripherals = true))`. This is the common case, and if forgotten it results in an error which may be confusing to the user.
+
+- Improved ergonimics allowing separation of task signatures to actual implementation in extern block `externt "C" { #[task(..)] fn t(..); }`.
+
 
 ### Changed
 
