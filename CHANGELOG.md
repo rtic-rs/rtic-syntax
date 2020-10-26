@@ -17,6 +17,8 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 - Improved ergonimics allowing separation of task signatures to actual implementation in extern block `externt "C" { #[task(..)] fn t(..); }`.
 
+- Experimental support for `async` tasks. See `examples/async`
+
 
 ### Changed
 

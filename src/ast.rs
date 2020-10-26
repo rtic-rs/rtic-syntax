@@ -218,6 +218,9 @@ pub struct SoftwareTask {
     /// The task is declared externally
     pub is_extern: bool,
 
+    /// The task is declared as async
+    pub is_async: bool,
+
     pub(crate) _extensible: (),
 }
 

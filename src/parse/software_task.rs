@@ -29,6 +29,7 @@ impl SoftwareTask {
                     locals: Local::parse(locals)?,
                     stmts,
                     is_extern: false,
+                    is_async: item.sig.asyncness.is_some(),
                     _extensible: (),
                 });
             }
@@ -69,6 +70,7 @@ impl SoftwareTask {
                     locals: Map::<Local>::new(),
                     stmts: Vec::<Stmt>::new(),
                     is_extern: true,
+                    is_async: item.sig.asyncness.is_some(),
                     _extensible: (),
                 });
             }
