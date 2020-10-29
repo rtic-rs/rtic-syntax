@@ -11,10 +11,10 @@ use syn::{
 
 use crate::{ast::Access, Map, Set};
 
-pub fn abi_is_c(abi: &Abi) -> bool {
+pub fn abi_is_rust(abi: &Abi) -> bool {
     match &abi.name {
         None => true,
-        Some(s) => s.value() == "C",
+        Some(s) => s.value() == "Rust",
     }
 }
 
@@ -31,7 +31,7 @@ pub fn attr_eq(attr: &Attribute, name: &str) -> bool {
 /// - is not `async`
 /// - is not `const`
 /// - is not `unsafe`
-/// - is not generic (has no type parametrs)
+/// - is not generic (has no type parameters)
 /// - is not variadic
 /// - uses the Rust ABI (and not e.g. "C")
 pub fn check_fn_signature(item: &ItemFn) -> bool {
@@ -45,14 +45,13 @@ pub fn check_fn_signature(item: &ItemFn) -> bool {
         && item.sig.variadic.is_none()
 }
 
-// TODO: Fix later when dealing with external tasks
 #[allow(dead_code)]
 pub fn check_foreign_fn_signature(item: &ForeignItemFn) -> bool {
     item.vis == Visibility::Inherited
-        // && item.constness.is_none()
-        // && item.asyncness.is_none()
-        // && item.abi.is_none()
-        // && item.unsafety.is_none()
+        && item.sig.constness.is_none()
+        && item.sig.asyncness.is_none()
+        && item.sig.abi.is_none()
+        && item.sig.unsafety.is_none()
         && item.sig.generics.params.is_empty()
         && item.sig.generics.where_clause.is_none()
         && item.sig.variadic.is_none()
