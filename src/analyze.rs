@@ -279,6 +279,8 @@ pub(crate) fn app(app: &App) -> Result<Analysis, syn::Error> {
             .sum();
     }
 
+    // TODO: Add analysis of monotonics and add it to Analysis
+
     Ok(Analysis {
         channels,
         late_resources,

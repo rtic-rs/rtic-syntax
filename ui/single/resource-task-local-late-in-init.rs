@@ -13,9 +13,7 @@ mod app {
         init::LateResources {}
     }
 
-    #[task(
-                resources = [x],
-            )]
+    #[task(resources = [x])]
     fn foo(c: foo::Context) {
         c.resources.x += 1;
     }

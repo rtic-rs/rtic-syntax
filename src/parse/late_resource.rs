@@ -29,7 +29,6 @@ impl LateResource {
                 task_local,
                 lock_free,
             },
-            _extensible: (),
         })
     }
 }

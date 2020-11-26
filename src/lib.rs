@@ -1,6 +1,6 @@
 //! The Real-Time Interrupt-driven Concurrency (RTIC) meta language
 
-#![deny(missing_docs)]
+// #![deny(missing_docs)]
 #![deny(rust_2018_compatibility)]
 #![deny(rust_2018_idioms)]
 #![deny(warnings)]

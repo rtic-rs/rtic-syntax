@@ -25,7 +25,6 @@ impl Local {
                         cfgs,
                         expr: item.expr,
                         ty: item.ty,
-                        _extensible: (),
                     });
                 }
             }

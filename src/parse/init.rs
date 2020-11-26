@@ -36,7 +36,6 @@ impl Init {
                             locals: Local::parse(locals)?,
                             name: item.sig.ident,
                             stmts,
-                            _extensible: (),
                         });
                     }
                 }

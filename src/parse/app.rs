@@ -12,7 +12,7 @@ use super::Input;
 use crate::{
     ast::{
         App, AppArgs, ExternInterrupt, ExternInterrupts, HardwareTask, Idle, IdleArgs, Init,
-        InitArgs, LateResource, Resource, SoftwareTask,
+        InitArgs, LateResource, Monotonic, MonotonicArgs, Resource, SoftwareTask,
     },
     parse::util,
     Either, Map, Set, Settings,
@@ -104,13 +104,8 @@ impl AppArgs {
                                                 "this extern interrupt is listed more than once",
                                             ));
                                         } else {
-                                            extern_interrupts.insert(
-                                                ident,
-                                                ExternInterrupt {
-                                                    attrs: ep.attrs,
-                                                    _extensible: (),
-                                                },
-                                            );
+                                            extern_interrupts
+                                                .insert(ident, ExternInterrupt { attrs: ep.attrs });
                                         }
                                     }
                                     _ => {
@@ -161,6 +156,7 @@ impl App {
         let mut late_resources = Map::new();
         let mut resources = Map::new();
         let mut resource_struct = Map::new();
+        let mut monotonics = Map::new();
         let mut hardware_tasks = Map::new();
         let mut software_tasks = Map::new();
         let mut user_imports = vec![];
@@ -420,6 +416,40 @@ impl App {
                     // Store the user provided use-statements
                     user_imports.push(itemuse_.clone());
                 }
+                Item::Type(ref mut type_item) => {
+                    // Match structures with the attribute #[resources], name of structure is not
+                    // important
+                    if let Some(pos) = type_item
+                        .attrs
+                        .iter()
+                        .position(|attr| util::attr_eq(attr, "monotonic"))
+                    {
+                        let span = type_item.ident.span();
+
+                        if monotonics.contains_key(&type_item.ident) {
+                            return Err(parse::Error::new(
+                                span,
+                                "`#[monotonic]` on a type must appear at most once",
+                            ));
+                        }
+
+                        if type_item.vis != Visibility::Inherited {
+                            return Err(parse::Error::new(
+                                type_item.span(),
+                                "this item must have inherited / private visibility",
+                            ));
+                        }
+
+                        let args = MonotonicArgs::parse(type_item.attrs.remove(pos).tokens)?;
+
+                        let monotonic = Monotonic::parse(args, type_item, span)?;
+
+                        monotonics.insert(type_item.ident.clone(), monotonic);
+                    } else {
+                        // Structure without the #[resources] attribute should just be passed along
+                        user_code.push(item.clone());
+                    }
+                }
                 _ => {
                     // Anything else within the module should not make any difference
                     user_code.push(item.clone());
@@ -441,8 +471,6 @@ impl App {
             user_code,
             hardware_tasks,
             software_tasks,
-
-            _extensible: (),
         })
     }
 }

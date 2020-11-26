@@ -8,6 +8,7 @@ use crate::{Map, Set};
 
 /// The `#[app]` attribute
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct App {
     /// The arguments to the `#[app]` attribute
     pub args: AppArgs,
@@ -38,8 +39,6 @@ pub struct App {
 
     /// Software tasks: `#[task]`
     pub software_tasks: Map<SoftwareTask>,
-
-    pub(crate) _extensible: (),
 }
 
 /// Interrupts used to dispatch software tasks
@@ -47,11 +46,10 @@ pub type ExternInterrupts = Map<ExternInterrupt>;
 
 /// Interrupt that could be used to dispatch software tasks
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct ExternInterrupt {
     /// Attributes that will apply to this interrupt handler
     pub attrs: Vec<Attribute>,
-
-    pub(crate) _extensible: (),
 }
 
 /// The arguments of the `#[app]` attribute
@@ -78,6 +76,7 @@ pub type Idles = Vec<Idle>;
 
 /// The `init`-ialization function
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct Init {
     /// `init` context metadata
     pub args: InitArgs,
@@ -96,12 +95,11 @@ pub struct Init {
 
     /// The statements that make up this `init` function
     pub stmts: Vec<Stmt>,
-
-    pub(crate) _extensible: (),
 }
 
 /// `init` context metadata
 #[derive(Debug, Default)]
+#[non_exhaustive]
 pub struct InitArgs {
     /// Late resources that will be initialized
     ///
@@ -110,12 +108,11 @@ pub struct InitArgs {
 
     /// Resources that can be accessed from this context
     pub resources: Resources,
-
-    pub(crate) _extensible: (),
 }
 
 /// The `idle` context
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct Idle {
     /// `idle` context metadata
     pub args: IdleArgs,
@@ -134,17 +131,14 @@ pub struct Idle {
 
     /// The statements that make up this `idle` function
     pub stmts: Vec<Stmt>,
-
-    pub(crate) _extensible: (),
 }
 
 /// `idle` context metadata
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct IdleArgs {
     /// Resources that can be accessed from this context
     pub resources: Resources,
-
-    pub(crate) _extensible: (),
 }
 
 /// Resource properties
@@ -175,6 +169,7 @@ impl Deref for Resource {
 
 /// A late (runtime initialized) resource
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct LateResource {
     /// `#[cfg]` attributes like `#[cfg(debug_assertions)]`
     pub cfgs: Vec<Attribute>,
@@ -187,12 +182,42 @@ pub struct LateResource {
 
     /// Resource properties
     pub properties: ResourceProperties,
+}
 
-    pub(crate) _extensible: (),
+/// Monotonic
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct Monotonic {
+    /// `#[cfg]` attributes like `#[cfg(debug_assertions)]`
+    pub cfgs: Vec<Attribute>,
+
+    /// Attributes that will apply to this resource
+    pub attrs: Vec<Attribute>,
+
+    /// The type of this resource
+    pub ty: Box<Type>,
+
+    /// Monotonic args
+    pub args: MonotonicArgs,
+}
+
+/// Monotonic metadata
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct MonotonicArgs {
+    /// The interrupt or exception that this monotonic is bound to
+    pub binds: Ident,
+
+    /// The priority of this monotonic
+    pub priority: u8,
+
+    /// If this is the default monotonic
+    pub default: bool,
 }
 
 /// A software task
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct SoftwareTask {
     /// Software task metadata
     pub args: SoftwareTaskArgs,
@@ -217,12 +242,11 @@ pub struct SoftwareTask {
 
     /// The task is declared externally
     pub is_extern: bool,
-
-    pub(crate) _extensible: (),
 }
 
 /// Software task metadata
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct SoftwareTaskArgs {
     /// The task capacity: the maximum number of pending messages that can be queued
     pub capacity: u8,
@@ -232,8 +256,6 @@ pub struct SoftwareTaskArgs {
 
     /// Resources that can be accessed from this context
     pub resources: Resources,
-
-    pub(crate) _extensible: (),
 }
 
 impl Default for SoftwareTaskArgs {
@@ -242,13 +264,13 @@ impl Default for SoftwareTaskArgs {
             capacity: 1,
             priority: 1,
             resources: Resources::new(),
-            _extensible: (),
         }
     }
 }
 
 /// A hardware task
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct HardwareTask {
     /// Hardware task metadata
     pub args: HardwareTaskArgs,
@@ -267,12 +289,11 @@ pub struct HardwareTask {
 
     /// The task is declared externally
     pub is_extern: bool,
-
-    pub(crate) _extensible: (),
 }
 
 /// Hardware task metadata
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct HardwareTaskArgs {
     /// The interrupt or exception that this task is bound to
     pub binds: Ident,
@@ -282,12 +303,11 @@ pub struct HardwareTaskArgs {
 
     /// Resources that can be accessed from this context
     pub resources: Resources,
-
-    pub(crate) _extensible: (),
 }
 
 /// A `static mut` variable local to and owned by a context
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct Local {
     /// Attributes like `#[link_section]`
     pub attrs: Vec<Attribute>,
@@ -300,8 +320,6 @@ pub struct Local {
 
     /// Initial value
     pub expr: Box<Expr>,
-
-    pub(crate) _extensible: (),
 }
 
 /// Resource access
