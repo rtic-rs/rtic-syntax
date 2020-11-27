@@ -188,13 +188,14 @@ pub struct LateResource {
 #[derive(Debug)]
 #[non_exhaustive]
 pub struct Monotonic {
+    /// TODO: Should this be an error?
     /// `#[cfg]` attributes like `#[cfg(debug_assertions)]`
     pub cfgs: Vec<Attribute>,
 
-    /// Attributes that will apply to this resource
+    /// Attributes ... TODO: Should this be an error?
     pub attrs: Vec<Attribute>,
 
-    /// The type of this resource
+    /// The type of this monotonic
     pub ty: Box<Type>,
 
     /// Monotonic args
