@@ -1,6 +1,6 @@
 use proc_macro2::Span;
 use proc_macro2::TokenStream as TokenStream2;
-use syn::{parse, ItemType, Visibility};
+use syn::{parse, spanned::Spanned, ItemType, Visibility};
 
 use crate::{
     ast::{Monotonic, MonotonicArgs},
@@ -24,15 +24,18 @@ impl Monotonic {
 
         let (cfgs, attrs) = util::extract_cfgs(item.attrs.clone());
 
+        if attrs.len() > 0 {
+            return Err(parse::Error::new(
+                attrs[0].path.span(),
+                "Monotonic does not support attributes other than `#[cfg]`",
+            ));
+        }
+
         Ok(Monotonic {
             cfgs,
-            attrs,
+            ident: item.ident.clone(),
             ty: item.ty.clone(),
             args,
-            // properties: ResourceProperties {
-            //     task_local,
-            //     lock_free,
-            // },
         })
     }
 }

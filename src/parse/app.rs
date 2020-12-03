@@ -5,7 +5,8 @@ use proc_macro2::TokenStream as TokenStream2;
 use syn::{
     parse::{self, ParseStream, Parser},
     spanned::Spanned,
-    Expr, ExprArray, ExprParen, Fields, ForeignItem, Ident, Item, LitBool, Path, Token, Visibility,
+    Expr, ExprArray, ExprParen, Fields, ForeignItem, Ident, Item, LitBool, Path, Token, Type,
+    Visibility,
 };
 
 use super::Input;
@@ -23,7 +24,6 @@ impl AppArgs {
         (|input: ParseStream<'_>| -> parse::Result<Self> {
             let mut custom = Set::new();
             let mut device = None;
-            let mut monotonic = None;
             let mut peripherals = true;
             let mut extern_interrupts = ExternInterrupts::new();
 
@@ -51,17 +51,6 @@ impl AppArgs {
                     "device" => {
                         if let Ok(p) = input.parse::<Path>() {
                             device = Some(p);
-                        } else {
-                            return Err(parse::Error::new(
-                                ident.span(),
-                                "unexpected argument value; this should be a path",
-                            ));
-                        }
-                    }
-
-                    "monotonic" => {
-                        if let Ok(p) = input.parse::<Path>() {
-                            monotonic = Some(p);
                         } else {
                             return Err(parse::Error::new(
                                 ident.span(),
@@ -139,7 +128,6 @@ impl AppArgs {
 
             Ok(AppArgs {
                 device,
-                monotonic,
                 peripherals,
                 extern_interrupts,
             })
@@ -164,11 +152,13 @@ impl App {
 
         let mut seen_idents = HashSet::<Ident>::new();
         let mut bindings = HashSet::<Ident>::new();
+        let mut monotonic_types = HashSet::<Type>::new();
+
         let mut check_binding = |ident: &Ident| {
             if bindings.contains(ident) {
                 return Err(parse::Error::new(
                     ident.span(),
-                    "a task has already been bound to this interrupt",
+                    "this interrupt is already bound",
                 ));
             } else {
                 bindings.insert(ident.clone());
@@ -176,6 +166,7 @@ impl App {
 
             Ok(())
         };
+
         let mut check_ident = |ident: &Ident| {
             if seen_idents.contains(ident) {
                 return Err(parse::Error::new(
@@ -188,6 +179,20 @@ impl App {
 
             Ok(())
         };
+
+        let mut check_monotonic = |ty: &Type| {
+            if monotonic_types.contains(ty) {
+                return Err(parse::Error::new(
+                    ty.span(),
+                    "this type is already used by another monotonic",
+                ));
+            } else {
+                monotonic_types.insert(ty.clone());
+            }
+
+            Ok(())
+        };
+
         for mut item in input.items {
             match item {
                 Item::Fn(mut item) => {
@@ -429,7 +434,7 @@ impl App {
                         if monotonics.contains_key(&type_item.ident) {
                             return Err(parse::Error::new(
                                 span,
-                                "`#[monotonic]` on a type must appear at most once",
+                                "`#[monotonic]` on a specific type must appear at most once",
                             ));
                         }
 
@@ -440,7 +445,11 @@ impl App {
                             ));
                         }
 
+                        check_monotonic(&*type_item.ty)?;
+
                         let args = MonotonicArgs::parse(type_item.attrs.remove(pos).tokens)?;
+
+                        check_binding(&args.binds)?;
 
                         let monotonic = Monotonic::parse(args, type_item, span)?;
 
@@ -465,6 +474,7 @@ impl App {
             inits,
             idles,
 
+            monotonics,
             late_resources,
             resources,
             user_imports,

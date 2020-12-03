@@ -1,4 +1,4 @@
-error: a task has already been bound to this interrupt
+error: this interrupt is already bound
  --> $DIR/interrupt-double.rs:8:20
   |
 8 |     #[task(binds = UART0)]

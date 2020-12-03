@@ -22,6 +22,9 @@ pub struct App {
     /// Vector containing the `#[idle]` function
     pub idles: Idles,
 
+    /// Monotonic clocks
+    pub monotonics: Map<Monotonic>,
+
     /// Late (runtime initialized) resources
     pub late_resources: Map<LateResource>,
 
@@ -57,9 +60,6 @@ pub struct ExternInterrupt {
 pub struct AppArgs {
     /// Device
     pub device: Option<Path>,
-
-    /// Monotonic
-    pub monotonic: Option<Path>,
 
     /// Peripherals
     pub peripherals: bool,
@@ -188,12 +188,11 @@ pub struct LateResource {
 #[derive(Debug)]
 #[non_exhaustive]
 pub struct Monotonic {
-    /// TODO: Should this be an error?
     /// `#[cfg]` attributes like `#[cfg(debug_assertions)]`
     pub cfgs: Vec<Attribute>,
 
-    /// Attributes ... TODO: Should this be an error?
-    pub attrs: Vec<Attribute>,
+    /// The identifier of the monotonic
+    pub ident: Ident,
 
     /// The type of this monotonic
     pub ty: Box<Type>,
