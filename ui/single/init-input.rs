@@ -3,5 +3,5 @@
 #[mock::app]
 mod app {
     #[init]
-    fn init(_: init::Context, _undef: u32) {}
+    fn init(_: init::Context, _undef: u32) -> (init::LateResources, init::Monotonics) {}
 }

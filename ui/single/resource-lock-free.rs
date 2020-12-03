@@ -15,9 +15,7 @@ mod app {
     }
 
     #[init]
-    fn init(_: init::Context) -> init::LateResources {
-        init::LateResources { e2: 2 }
-    }
+    fn init(_: init::Context) -> (init::LateResources, init::Monotonics) {}
 
     // e2 ok
     #[idle(resources =[e2])]

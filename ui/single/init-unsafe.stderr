@@ -1,5 +1,5 @@
-error: this `#[init]` function must have signature `fn(init::Context) -> init::LateResources`
+error: this `#[init]` function must have signature `fn(init::Context) -> (init::LateResources, init::Monotonics)`
  --> $DIR/init-unsafe.rs:6:15
   |
-6 |     unsafe fn init(_: init::Context) {}
+6 |     unsafe fn init(_: init::Context) -> (init::LateResources, init::Monotonics) {}
   |               ^^^^

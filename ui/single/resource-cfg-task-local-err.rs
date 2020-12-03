@@ -16,7 +16,7 @@ mod app {
     }
 
     #[init]
-    fn init(_: init::Context) -> init::LateResources {
+    fn init(_: init::Context) -> (init::LateResources, init::Monotonics) {
         init::LateResources {
             #[cfg(feature = "feature_l2")]
             l2: 2,
@@ -36,13 +36,11 @@ mod app {
     #[task(priority = 1, resources = [
         #[cfg(feature = "feature_l2")]l2,
     ])]
-    fn uart0(_cx: uart0::Context) {
-    }
+    fn uart0(_cx: uart0::Context) {}
 
     // l2 error, conflicting with uart0 for l2 (task_local)
     #[task(priority = 1, resources = [
         #[cfg(not(feature = "feature_l2"))]l2
     ])]
-    fn uart1(_cx: uart1::Context) {
-    }
+    fn uart1(_cx: uart1::Context) {}
 }

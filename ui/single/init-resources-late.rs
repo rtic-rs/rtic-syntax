@@ -8,5 +8,5 @@ mod app {
     }
 
     #[init(resources = [x])]
-    fn init(_: init::Context) -> init::LateResources {}
+    fn init(_: init::Context) -> (init::LateResources, init::Monotonics) {}
 }

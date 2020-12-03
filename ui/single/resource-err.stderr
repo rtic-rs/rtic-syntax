@@ -5,21 +5,21 @@ error: task local resource "l2" is used by multiple tasks
    |         ^^
 
 error: task local resource "l2" is used by task "idle" with priority 0
-  --> $DIR/resource-err.rs:39:28
+  --> $DIR/resource-err.rs:37:28
    |
-39 |     #[idle(resources =[l1, l2, e2])]
+37 |     #[idle(resources =[l1, l2, e2])]
    |                            ^^
 
 error: task local resource "l2" is used by task "uart0" with priority 1
-  --> $DIR/resource-err.rs:48:47
+  --> $DIR/resource-err.rs:46:47
    |
-48 |     #[task(priority = 1, resources = [shared, l2, e1])]
+46 |     #[task(priority = 1, resources = [shared, l2, e1])]
    |                                               ^^
 
 error: task local resource "l2" is used by task "uart1" with priority 2
-  --> $DIR/resource-err.rs:56:47
+  --> $DIR/resource-err.rs:54:47
    |
-56 |     #[task(priority = 2, resources = [shared, l2, e1])]
+54 |     #[task(priority = 2, resources = [shared, l2, e1])]
    |                                               ^^
 
 error: Lock free resource "e1" is used by tasks at different priorities
@@ -29,13 +29,13 @@ error: Lock free resource "e1" is used by tasks at different priorities
    |         ^^
 
 error: Resource "e1" is declared lock free but used by tasks at different priorities
-  --> $DIR/resource-err.rs:48:51
+  --> $DIR/resource-err.rs:46:51
    |
-48 |     #[task(priority = 1, resources = [shared, l2, e1])]
+46 |     #[task(priority = 1, resources = [shared, l2, e1])]
    |                                                   ^^
 
 error: Resource "e1" is declared lock free but used by tasks at different priorities
-  --> $DIR/resource-err.rs:56:51
+  --> $DIR/resource-err.rs:54:51
    |
-56 |     #[task(priority = 2, resources = [shared, l2, e1])]
+54 |     #[task(priority = 2, resources = [shared, l2, e1])]
    |                                                   ^^

@@ -227,25 +227,21 @@ pub fn type_is_bottom(ty: &ReturnType) -> bool {
     }
 }
 
-pub fn type_is_late_resources(ty: &ReturnType, name: &str) -> Result<bool, ()> {
+pub fn type_is_init_return(ty: &ReturnType, name: &str) -> Result<(), ()> {
     match ty {
-        ReturnType::Default => Ok(false),
+        ReturnType::Default => Err(()),
 
         ReturnType::Type(_, ty) => match &**ty {
             Type::Tuple(t) => {
-                if t.elems.is_empty() {
-                    Ok(false)
-                } else {
-                    Err(())
+                if t.elems.len() == 2 {
+                    if type_is_path(&t.elems[0], &[name, "LateResources"])
+                        && type_is_path(&t.elems[1], &[name, "Monotonics"])
+                    {
+                        return Ok(());
+                    }
                 }
-            }
 
-            Type::Path(_) => {
-                if type_is_path(ty, &[name, "LateResources"]) {
-                    Ok(true)
-                } else {
-                    Err(())
-                }
+                Err(())
             }
 
             _ => Err(()),

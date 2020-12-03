@@ -11,7 +11,7 @@ error: task local resource "l2" is used by task "uart0" with priority 1
    |                                       ^^
 
 error: task local resource "l2" is used by task "uart1" with priority 1
-  --> $DIR/resource-cfg-task-local-err.rs:44:44
+  --> $DIR/resource-cfg-task-local-err.rs:43:44
    |
-44 |         #[cfg(not(feature = "feature_l2"))]l2
+43 |         #[cfg(not(feature = "feature_l2"))]l2
    |                                            ^^
