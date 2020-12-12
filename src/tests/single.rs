@@ -133,7 +133,7 @@ fn no_send_late_resources_idle() {
                 }
 
                 #[init]
-                fn init(_: init::Context) -> init::LateResources {
+                fn init(_: init::Context) -> (init::LateResources, init::Monotonics) {
                     ..
                 }
 
@@ -185,7 +185,7 @@ fn send_late_resource() {
                 }
 
                 #[init]
-                fn init(_: init::Context) -> init::LateResources {
+                fn init(_: init::Context) -> (init::LateResources, init::Monotonics) {
                     ..
                 }
 
@@ -215,7 +215,7 @@ fn send_shared_with_init() {
                 }
 
                 #[init(resources = [x])]
-                fn init(_: init::Context) -> init::LateResources {}
+                fn init(_: init::Context) -> (init::LateResources, init::Monotonics) {}
 
                 #[task(resources = [x])]
                 fn foo(_: foo::Context) {}
@@ -297,7 +297,7 @@ fn late_resources() {
                 }
 
                 #[init]
-                fn init(_: init::Context) -> init::LateResources {
+                fn init(_: init::Context) -> (init::LateResources, init::Monotonics) {
                     ..
                 }
             }

@@ -377,7 +377,10 @@ fn monotonic_args(tokens: TokenStream2) -> parse::Result<MonotonicArgs> {
         let binds = if let Some(r) = binds {
             r
         } else {
-            return Err(parse::Error::new(content.span(), "`binds = ...` is missing"));
+            return Err(parse::Error::new(
+                content.span(),
+                "`binds = ...` is missing",
+            ));
         };
         let priority = priority.unwrap_or(1);
         let default = default.unwrap_or(false);
