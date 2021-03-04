@@ -22,11 +22,9 @@ impl Init {
         let name = item.sig.ident.to_string();
 
         if valid_signature {
-            if let Ok(returns_late_resources) =
-                util::type_is_late_resources(&item.sig.output, &name)
-            {
+            if util::type_is_init_return(&item.sig.output, &name).is_ok() {
                 if let Some((context, Ok(rest))) = util::parse_inputs(item.sig.inputs, &name) {
-                    if rest.is_empty() && returns_late_resources {
+                    if rest.is_empty() {
                         let (locals, stmts) = util::extract_locals(item.block.stmts)?;
 
                         return Ok(Init {
@@ -36,7 +34,6 @@ impl Init {
                             locals: Local::parse(locals)?,
                             name: item.sig.ident,
                             stmts,
-                            _extensible: (),
                         });
                     }
                 }
@@ -46,7 +43,7 @@ impl Init {
         Err(parse::Error::new(
             span,
             &format!(
-                "this `#[init]` function must have signature `fn({}::Context) -> {0}::LateResources`",
+                "this `#[init]` function must have signature `fn({}::Context) -> ({0}::LateResources, {0}::Monotonics)`",
                 name
             ),
         ))

@@ -5,13 +5,13 @@ error: task local resource "x" is used by multiple tasks
   |         ^
 
 error: task local resource "x" is used by task "foo" with priority 1
-  --> $DIR/resource-task-local-in-two-tasks.rs:17:30
+  --> $DIR/resource-task-local-in-two-tasks.rs:15:25
    |
-17 |                 resources = [x],
-   |                              ^
+15 |     #[task(resources = [x])]
+   |                         ^
 
 error: task local resource "x" is used by task "bar" with priority 1
-  --> $DIR/resource-task-local-in-two-tasks.rs:24:30
+  --> $DIR/resource-task-local-in-two-tasks.rs:20:25
    |
-24 |                 resources = [x],
-   |                              ^
+20 |     #[task(resources = [x])]
+   |                         ^

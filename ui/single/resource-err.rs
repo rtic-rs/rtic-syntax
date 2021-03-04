@@ -28,9 +28,7 @@ mod app {
     }
 
     #[init]
-    fn init(_: init::Context) -> init::LateResources {
-        init::LateResources { e2: 2, l2: 2 }
-    }
+    fn init(_: init::Context) -> (init::LateResources, init::Monotonics) {}
 
     // `shared` cannot be accessed from this context
     // l1 ok

@@ -9,13 +9,9 @@ mod app {
     }
 
     #[init(resources = [x])]
-    fn init(_: init::Context) -> init::LateResources {
-        init::LateResources {}
-    }
+    fn init(_: init::Context) -> (init::LateResources, init::Monotonics) {}
 
-    #[task(
-                resources = [x],
-            )]
+    #[task(resources = [x])]
     fn foo(c: foo::Context) {
         c.resources.x += 1;
     }

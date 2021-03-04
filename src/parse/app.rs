@@ -5,14 +5,15 @@ use proc_macro2::TokenStream as TokenStream2;
 use syn::{
     parse::{self, ParseStream, Parser},
     spanned::Spanned,
-    Expr, ExprArray, ExprParen, Fields, ForeignItem, Ident, Item, LitBool, Path, Token, Visibility,
+    Expr, ExprArray, ExprParen, Fields, ForeignItem, Ident, Item, LitBool, Path, Token, Type,
+    Visibility,
 };
 
 use super::Input;
 use crate::{
     ast::{
         App, AppArgs, ExternInterrupt, ExternInterrupts, HardwareTask, Idle, IdleArgs, Init,
-        InitArgs, LateResource, Resource, SoftwareTask,
+        InitArgs, LateResource, Monotonic, MonotonicArgs, Resource, SoftwareTask,
     },
     parse::util,
     Either, Map, Set, Settings,
@@ -23,7 +24,6 @@ impl AppArgs {
         (|input: ParseStream<'_>| -> parse::Result<Self> {
             let mut custom = Set::new();
             let mut device = None;
-            let mut monotonic = None;
             let mut peripherals = true;
             let mut extern_interrupts = ExternInterrupts::new();
 
@@ -51,17 +51,6 @@ impl AppArgs {
                     "device" => {
                         if let Ok(p) = input.parse::<Path>() {
                             device = Some(p);
-                        } else {
-                            return Err(parse::Error::new(
-                                ident.span(),
-                                "unexpected argument value; this should be a path",
-                            ));
-                        }
-                    }
-
-                    "monotonic" => {
-                        if let Ok(p) = input.parse::<Path>() {
-                            monotonic = Some(p);
                         } else {
                             return Err(parse::Error::new(
                                 ident.span(),
@@ -104,13 +93,8 @@ impl AppArgs {
                                                 "this extern interrupt is listed more than once",
                                             ));
                                         } else {
-                                            extern_interrupts.insert(
-                                                ident,
-                                                ExternInterrupt {
-                                                    attrs: ep.attrs,
-                                                    _extensible: (),
-                                                },
-                                            );
+                                            extern_interrupts
+                                                .insert(ident, ExternInterrupt { attrs: ep.attrs });
                                         }
                                     }
                                     _ => {
@@ -144,7 +128,6 @@ impl AppArgs {
 
             Ok(AppArgs {
                 device,
-                monotonic,
                 peripherals,
                 extern_interrupts,
             })
@@ -161,6 +144,7 @@ impl App {
         let mut late_resources = Map::new();
         let mut resources = Map::new();
         let mut resource_struct = Map::new();
+        let mut monotonics = Map::new();
         let mut hardware_tasks = Map::new();
         let mut software_tasks = Map::new();
         let mut user_imports = vec![];
@@ -168,11 +152,13 @@ impl App {
 
         let mut seen_idents = HashSet::<Ident>::new();
         let mut bindings = HashSet::<Ident>::new();
+        let mut monotonic_types = HashSet::<Type>::new();
+
         let mut check_binding = |ident: &Ident| {
             if bindings.contains(ident) {
                 return Err(parse::Error::new(
                     ident.span(),
-                    "a task has already been bound to this interrupt",
+                    "this interrupt is already bound",
                 ));
             } else {
                 bindings.insert(ident.clone());
@@ -180,6 +166,7 @@ impl App {
 
             Ok(())
         };
+
         let mut check_ident = |ident: &Ident| {
             if seen_idents.contains(ident) {
                 return Err(parse::Error::new(
@@ -192,6 +179,20 @@ impl App {
 
             Ok(())
         };
+
+        let mut check_monotonic = |ty: &Type| {
+            if monotonic_types.contains(ty) {
+                return Err(parse::Error::new(
+                    ty.span(),
+                    "this type is already used by another monotonic",
+                ));
+            } else {
+                monotonic_types.insert(ty.clone());
+            }
+
+            Ok(())
+        };
+
         for mut item in input.items {
             match item {
                 Item::Fn(mut item) => {
@@ -420,6 +421,44 @@ impl App {
                     // Store the user provided use-statements
                     user_imports.push(itemuse_.clone());
                 }
+                Item::Type(ref mut type_item) => {
+                    // Match structures with the attribute #[resources], name of structure is not
+                    // important
+                    if let Some(pos) = type_item
+                        .attrs
+                        .iter()
+                        .position(|attr| util::attr_eq(attr, "monotonic"))
+                    {
+                        let span = type_item.ident.span();
+
+                        if monotonics.contains_key(&type_item.ident) {
+                            return Err(parse::Error::new(
+                                span,
+                                "`#[monotonic]` on a specific type must appear at most once",
+                            ));
+                        }
+
+                        if type_item.vis != Visibility::Inherited {
+                            return Err(parse::Error::new(
+                                type_item.span(),
+                                "this item must have inherited / private visibility",
+                            ));
+                        }
+
+                        check_monotonic(&*type_item.ty)?;
+
+                        let args = MonotonicArgs::parse(type_item.attrs.remove(pos).tokens)?;
+
+                        check_binding(&args.binds)?;
+
+                        let monotonic = Monotonic::parse(args, type_item, span)?;
+
+                        monotonics.insert(type_item.ident.clone(), monotonic);
+                    } else {
+                        // Structure without the #[resources] attribute should just be passed along
+                        user_code.push(item.clone());
+                    }
+                }
                 _ => {
                     // Anything else within the module should not make any difference
                     user_code.push(item.clone());
@@ -435,14 +474,13 @@ impl App {
             inits,
             idles,
 
+            monotonics,
             late_resources,
             resources,
             user_imports,
             user_code,
             hardware_tasks,
             software_tasks,
-
-            _extensible: (),
         })
     }
 }

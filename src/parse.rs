@@ -4,6 +4,7 @@ mod idle;
 mod init;
 mod late_resource;
 mod local;
+mod monotonic;
 mod software_task;
 mod util;
 
@@ -12,11 +13,11 @@ use syn::{
     braced, parenthesized,
     parse::{self, Parse, ParseStream, Parser},
     token::Brace,
-    Ident, Item, LitInt, Token,
+    Ident, Item, LitBool, LitInt, Token,
 };
 
 use crate::{
-    ast::{App, AppArgs, HardwareTaskArgs, InitArgs, SoftwareTaskArgs},
+    ast::{App, AppArgs, HardwareTaskArgs, InitArgs, MonotonicArgs, SoftwareTaskArgs},
     Either, Settings,
 };
 
@@ -126,8 +127,6 @@ fn init_idle_args(tokens: TokenStream2) -> parse::Result<InitArgs> {
             late: late.unwrap_or_default(),
 
             resources: resources.unwrap_or_default(),
-
-            _extensible: (),
         })
     })
     .parse2(tokens)
@@ -277,15 +276,119 @@ fn task_args(
                 binds,
                 priority,
                 resources,
-                _extensible: (),
             })
         } else {
             Either::Right(SoftwareTaskArgs {
                 capacity: capacity.unwrap_or(1),
                 priority,
                 resources,
-                _extensible: (),
             })
+        })
+    })
+    .parse2(tokens)
+}
+
+fn monotonic_args(tokens: TokenStream2) -> parse::Result<MonotonicArgs> {
+    (|input: ParseStream<'_>| -> parse::Result<MonotonicArgs> {
+        let mut binds = None;
+        let mut priority = None;
+        let mut default = None;
+
+        let content;
+        parenthesized!(content in input);
+        loop {
+            if content.is_empty() {
+                break;
+            }
+
+            // #ident = ..
+            let ident: Ident = content.parse()?;
+            let _: Token![=] = content.parse()?;
+
+            let ident_s = ident.to_string();
+            match &*ident_s {
+                "binds" => {
+                    if binds.is_some() {
+                        return Err(parse::Error::new(
+                            ident.span(),
+                            "argument appears more than once",
+                        ));
+                    }
+
+                    // #ident
+                    let ident = content.parse()?;
+
+                    binds = Some(ident);
+                }
+
+                "priority" => {
+                    if priority.is_some() {
+                        return Err(parse::Error::new(
+                            ident.span(),
+                            "argument appears more than once",
+                        ));
+                    }
+
+                    // #lit
+                    let lit: LitInt = content.parse()?;
+
+                    if !lit.suffix().is_empty() {
+                        return Err(parse::Error::new(
+                            lit.span(),
+                            "this literal must be unsuffixed",
+                        ));
+                    }
+
+                    let value = lit.base10_parse::<u8>().ok();
+                    if value.is_none() || value == Some(0) {
+                        return Err(parse::Error::new(
+                            lit.span(),
+                            "this literal must be in the range 1...255",
+                        ));
+                    }
+
+                    priority = Some(value.unwrap());
+                }
+
+                "default" => {
+                    if default.is_some() {
+                        return Err(parse::Error::new(
+                            ident.span(),
+                            "argument appears more than once",
+                        ));
+                    }
+
+                    let lit: LitBool = content.parse()?;
+                    default = Some(lit.value);
+                }
+
+                _ => {
+                    return Err(parse::Error::new(ident.span(), "unexpected argument"));
+                }
+            }
+
+            if content.is_empty() {
+                break;
+            }
+
+            // ,
+            let _: Token![,] = content.parse()?;
+        }
+        let binds = if let Some(r) = binds {
+            r
+        } else {
+            return Err(parse::Error::new(
+                content.span(),
+                "`binds = ...` is missing",
+            ));
+        };
+        let priority = priority.unwrap_or(1);
+        let default = default.unwrap_or(false);
+
+        Ok(MonotonicArgs {
+            binds,
+            priority,
+            default,
         })
     })
     .parse2(tokens)

@@ -10,7 +10,6 @@ impl IdleArgs {
     pub(crate) fn parse(tokens: TokenStream2) -> parse::Result<Self> {
         crate::parse::init_idle_args(tokens).map(|args| IdleArgs {
             resources: args.resources,
-            _extensible: (),
         })
     }
 }
@@ -35,7 +34,6 @@ impl Idle {
                         locals: Local::parse(locals)?,
                         name: item.sig.ident,
                         stmts,
-                        _extensible: (),
                     });
                 }
             }

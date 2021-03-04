@@ -5,13 +5,13 @@ error: Lock free resource "e1" is used by tasks at different priorities
    |         ^^
 
 error: Resource "e1" is declared lock free but used by tasks at different priorities
-  --> $DIR/resource-lock-free.rs:30:39
+  --> $DIR/resource-lock-free.rs:28:39
    |
-30 |     #[task(priority = 1, resources = [e1])]
+28 |     #[task(priority = 1, resources = [e1])]
    |                                       ^^
 
 error: Resource "e1" is declared lock free but used by tasks at different priorities
-  --> $DIR/resource-lock-free.rs:36:39
+  --> $DIR/resource-lock-free.rs:34:39
    |
-36 |     #[task(priority = 2, resources = [e1])]
+34 |     #[task(priority = 2, resources = [e1])]
    |                                       ^^

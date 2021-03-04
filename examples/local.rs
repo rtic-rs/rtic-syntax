@@ -22,7 +22,7 @@ mod app {
     #[init(
                 resources = [c],
             )]
-    fn init(_: init::Context) -> init::LateResources {
+    fn init(_: init::Context) -> (init::LateResources, init::Monotonics) {
         #[cfg(debug_assertions)]
         static mut X: u32 = 0;
 
