@@ -26,10 +26,11 @@ impl HardwareTask {
             if let Some((context, Ok(rest))) = util::parse_inputs(item.sig.inputs, &name) {
                 if rest.is_empty() {
                     let (locals, stmts) = util::extract_locals(item.block.stmts)?;
-                    let attrs = item.attrs;
+                    let (cfgs, attrs) = util::extract_cfgs(item.attrs);
 
                     return Ok(HardwareTask {
                         args,
+                        cfgs,
                         attrs,
                         context,
                         locals: Local::parse(locals)?,
@@ -72,10 +73,11 @@ impl HardwareTask {
         if valid_signature {
             if let Some((context, Ok(rest))) = util::parse_inputs(item.sig.inputs, &name) {
                 if rest.is_empty() {
-                    let attrs = item.attrs;
+                    let (cfgs, attrs) = util::extract_cfgs(item.attrs);
 
                     return Ok(HardwareTask {
                         args,
+                        cfgs,
                         attrs,
                         context,
                         locals: Map::<Local>::new(),
