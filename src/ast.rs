@@ -275,6 +275,9 @@ pub struct HardwareTask {
     /// Hardware task metadata
     pub args: HardwareTaskArgs,
 
+    /// `#[cfg]` attributes like `#[cfg(debug_assertions)]`
+    pub cfgs: Vec<Attribute>,
+
     /// Attributes that will apply to this interrupt handler
     pub attrs: Vec<Attribute>,
 
