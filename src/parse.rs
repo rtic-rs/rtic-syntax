@@ -159,6 +159,13 @@ fn task_args(
 
             let ident_s = ident.to_string();
             match &*ident_s {
+                "binds" if !settings.parse_binds => {
+                    return Err(parse::Error::new(
+                        ident.span(),
+                        "Unexpected bind in task argument. Binds are only parsed if Settings::parse_binds is set.",
+                    ));
+                }
+
                 "binds" if settings.parse_binds => {
                     if binds.is_some() {
                         return Err(parse::Error::new(
