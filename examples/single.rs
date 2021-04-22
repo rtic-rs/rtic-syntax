@@ -12,6 +12,11 @@ mod app {
         d: u32,
     }
 
+    #[monotonic(binds = Tim1)]
+    type Fast = hal::Tim1Monotonic;
+
+    fn test() {}
+
     #[init(
         resources = [c],
     )]

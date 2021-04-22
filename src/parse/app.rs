@@ -269,10 +269,8 @@ impl App {
                             }
                         }
                     } else {
-                        return Err(parse::Error::new(
-                            span,
-                            "this item must live outside the `#[app]` module",
-                        ));
+                        // Forward normal functions
+                        user_code.push(Item::Fn(item.clone()));
                     }
                 }
 
