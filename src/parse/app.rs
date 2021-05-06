@@ -421,7 +421,8 @@ impl App {
                     user_imports.push(itemuse_.clone());
                 }
                 Item::Type(ref mut type_item) => {
-                    // Match structures with the attribute #[monotonic]
+                    // Match structures with the attribute #[resources], name of structure is not
+                    // important
                     if let Some(pos) = type_item
                         .attrs
                         .iter()
@@ -455,9 +456,8 @@ impl App {
                     } else {
                         // Pass along any other type aliases
                         user_types.push(type_item.clone());
+                        user_code.push(item.clone());
                     }
-
-                    user_code.push(item.clone());
                 }
                 _ => {
                     // Anything else within the module should not make any difference
