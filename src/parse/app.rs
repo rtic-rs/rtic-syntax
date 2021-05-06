@@ -420,8 +420,7 @@ impl App {
                     user_imports.push(itemuse_.clone());
                 }
                 Item::Type(ref mut type_item) => {
-                    // Match structures with the attribute #[resources], name of structure is not
-                    // important
+                    // Match types with the attribute #[monotonic]
                     if let Some(pos) = type_item
                         .attrs
                         .iter()
@@ -452,10 +451,10 @@ impl App {
                         let monotonic = Monotonic::parse(args, type_item, span)?;
 
                         monotonics.insert(type_item.ident.clone(), monotonic);
-                    } else {
-                        // Structure without the #[resources] attribute should just be passed along
-                        user_code.push(item.clone());
                     }
+
+                    // All types are passed on
+                    user_code.push(item.clone());
                 }
                 _ => {
                     // Anything else within the module should not make any difference
