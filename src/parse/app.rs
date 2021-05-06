@@ -149,7 +149,6 @@ impl App {
         let mut software_tasks = Map::new();
         let mut user_imports = vec![];
         let mut user_code = vec![];
-        let mut user_types = vec![];
 
         let mut seen_idents = HashSet::<Ident>::new();
         let mut bindings = HashSet::<Ident>::new();
@@ -454,8 +453,7 @@ impl App {
 
                         monotonics.insert(type_item.ident.clone(), monotonic);
                     } else {
-                        // Pass along any other type aliases
-                        user_types.push(type_item.clone());
+                        // Structure without the #[resources] attribute should just be passed along
                         user_code.push(item.clone());
                     }
                 }
@@ -479,7 +477,6 @@ impl App {
             resources,
             user_imports,
             user_code,
-            user_types,
             hardware_tasks,
             software_tasks,
         })

@@ -17,13 +17,11 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 - Improved ergonomics allowing separation of task signatures to actual implementation in extern block `extern "Rust" { #[task(..)] fn t(..); }`.
 
-- Added type alias definitions to the `App` struct.
-
 
 ### Changed
 
 - [breaking-change] Move of dispatchers (interrupts) from `extern` to app arguments.
-  `app(..., dispatchers = [SSI0,...])`
+  `app(..., dispatchers = [SSI0,...])` 
   This should also work for ram functions and other attributes, see `examples/ramfunc.rs`.
 
 - [breaking-change] Rework whole spawn/schedule, support `foo::spawn( ... )`,
