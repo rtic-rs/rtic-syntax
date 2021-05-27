@@ -3,6 +3,7 @@ use syn::{parse, ItemStatic};
 
 use crate::{ast::Local, parse::util, Map};
 
+// TODO: This should be converted to parse the `asd: Type = Expr`...
 impl Local {
     pub(crate) fn parse(items: Vec<ItemStatic>) -> parse::Result<Map<Local>> {
         let mut locals = Map::new();

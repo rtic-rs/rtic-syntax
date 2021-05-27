@@ -5,15 +5,14 @@ use proc_macro2::TokenStream as TokenStream2;
 use syn::{
     parse::{self, ParseStream, Parser},
     spanned::Spanned,
-    Expr, ExprArray, ExprParen, Fields, ForeignItem, Ident, Item, LitBool, Path, Token, Type,
-    Visibility,
+    Expr, ExprArray, Fields, ForeignItem, Ident, Item, LitBool, Path, Token, Type, Visibility,
 };
 
 use super::Input;
 use crate::{
     ast::{
         App, AppArgs, ExternInterrupt, ExternInterrupts, HardwareTask, Idle, IdleArgs, Init,
-        InitArgs, LateResource, Monotonic, MonotonicArgs, Resource, SoftwareTask,
+        InitArgs, LocalResource, Monotonic, MonotonicArgs, SharedResource, SoftwareTask,
     },
     parse::util,
     Either, Map, Set, Settings,
@@ -138,12 +137,11 @@ impl AppArgs {
 
 impl App {
     pub(crate) fn parse(args: AppArgs, input: Input, settings: &Settings) -> parse::Result<Self> {
-        let mut inits = Vec::new();
-        let mut idles = Vec::new();
+        let mut init = None;
+        let mut idle = None;
 
-        let mut late_resources = Map::new();
-        let mut resources = Map::new();
-        let mut resource_struct = Map::new();
+        let mut shared_resources = Map::new();
+        let mut local_resources = Map::new();
         let mut monotonics = Map::new();
         let mut hardware_tasks = Map::new();
         let mut software_tasks = Map::new();
@@ -205,7 +203,7 @@ impl App {
                         let args = InitArgs::parse(item.attrs.remove(pos).tokens)?;
 
                         // If an init function already exists, error
-                        if !inits.is_empty() {
+                        if init.is_some() {
                             return Err(parse::Error::new(
                                 span,
                                 "`#[init]` function must appear at most once",
@@ -214,7 +212,7 @@ impl App {
 
                         check_ident(&item.sig.ident)?;
 
-                        inits.push(Init::parse(args, item)?);
+                        init = Some(Init::parse(args, item)?);
                     } else if let Some(pos) = item
                         .attrs
                         .iter()
@@ -223,7 +221,7 @@ impl App {
                         let args = IdleArgs::parse(item.attrs.remove(pos).tokens)?;
 
                         // If an idle function already exists, error
-                        if !idles.is_empty() {
+                        if idle.is_some() {
                             return Err(parse::Error::new(
                                 span,
                                 "`#[idle]` function must appear at most once",
@@ -232,7 +230,7 @@ impl App {
 
                         check_ident(&item.sig.ident)?;
 
-                        idles.push(Idle::parse(args, item)?);
+                        idle = Some(Idle::parse(args, item)?);
                     } else if let Some(pos) = item
                         .attrs
                         .iter()
@@ -274,19 +272,19 @@ impl App {
                 }
 
                 Item::Struct(ref mut struct_item) => {
-                    // Match structures with the attribute #[resources], name of structure is not
+                    // Match structures with the attribute #[shared], name of structure is not
                     // important
                     if let Some(_pos) = struct_item
                         .attrs
                         .iter()
-                        .position(|attr| util::attr_eq(attr, "resources"))
+                        .position(|attr| util::attr_eq(attr, "shared"))
                     {
                         let span = struct_item.ident.span();
 
-                        if resource_struct.contains_key(&struct_item.ident) {
+                        if !shared_resources.is_empty() {
                             return Err(parse::Error::new(
                                 span,
-                                "`#[resources]` struct must appear at most once",
+                                "`#[shared]` struct must appear at most once",
                             ));
                         }
 
@@ -301,36 +299,15 @@ impl App {
                             for field in &mut fields.named {
                                 let ident = field.ident.as_ref().expect("UNREACHABLE");
 
-                                if late_resources.contains_key(ident)
-                                    || resources.contains_key(ident)
-                                {
+                                if shared_resources.contains_key(ident) {
                                     return Err(parse::Error::new(
                                         ident.span(),
                                         "this resource is listed more than once",
                                     ));
                                 }
 
-                                if let Some(pos) = field
-                                    .attrs
-                                    .iter()
-                                    .position(|attr| util::attr_eq(attr, "init"))
-                                {
-                                    let attr = field.attrs.remove(pos);
-
-                                    let late = LateResource::parse(field, ident.span())?;
-
-                                    resources.insert(
-                                        ident.clone(),
-                                        Resource {
-                                            late,
-                                            expr: syn::parse2::<ExprParen>(attr.tokens)?.expr,
-                                        },
-                                    );
-                                } else {
-                                    let late = LateResource::parse(field, ident.span())?;
-
-                                    late_resources.insert(ident.clone(), late);
-                                }
+                                shared_resources
+                                    .insert(ident.clone(), SharedResource::parse(field, ident.span())?);
                             }
                         } else {
                             return Err(parse::Error::new(
@@ -338,8 +315,47 @@ impl App {
                                 "this `struct` must have named fields",
                             ));
                         }
-                        // resource_struct will be non-empty if #[resources] was encountered before
-                        resource_struct.insert(struct_item.ident.clone(), struct_item.clone());
+                    } else if let Some(_pos) = struct_item
+                        .attrs
+                        .iter()
+                        .position(|attr| util::attr_eq(attr, "local"))
+                    {
+                        let span = struct_item.ident.span();
+
+                        if !local_resources.is_empty() {
+                            return Err(parse::Error::new(
+                                span,
+                                "`#[local]` struct must appear at most once",
+                            ));
+                        }
+
+                        if struct_item.vis != Visibility::Inherited {
+                            return Err(parse::Error::new(
+                                struct_item.span(),
+                                "this item must have inherited / private visibility",
+                            ));
+                        }
+
+                        if let Fields::Named(fields) = &mut struct_item.fields {
+                            for field in &mut fields.named {
+                                let ident = field.ident.as_ref().expect("UNREACHABLE");
+
+                                if local_resources.contains_key(ident) {
+                                    return Err(parse::Error::new(
+                                        ident.span(),
+                                        "this resource is listed more than once",
+                                    ));
+                                }
+
+                                local_resources
+                                    .insert(ident.clone(), LocalResource::parse(field, ident.span())?);
+                            }
+                        } else {
+                            return Err(parse::Error::new(
+                                struct_item.span(),
+                                "this `struct` must have named fields",
+                            ));
+                        }
                     } else {
                         // Structure without the #[resources] attribute should just be passed along
                         user_code.push(item.clone());
@@ -465,15 +481,12 @@ impl App {
 
         Ok(App {
             args,
-
             name: input.ident,
-
-            inits,
-            idles,
-
+            init: init.expect("No `#[idle]` function defined"),
+            idle,
             monotonics,
-            late_resources,
-            resources,
+            shared_resources,
+            local_resources,
             user_imports,
             user_code,
             hardware_tasks,

@@ -2,15 +2,13 @@ use proc_macro2::TokenStream as TokenStream2;
 use syn::{parse, ItemFn};
 
 use crate::{
-    ast::{Idle, IdleArgs, Local},
+    ast::{Idle, IdleArgs},
     parse::util,
 };
 
 impl IdleArgs {
     pub(crate) fn parse(tokens: TokenStream2) -> parse::Result<Self> {
-        crate::parse::init_idle_args(tokens).map(|args| IdleArgs {
-            resources: args.resources,
-        })
+        crate::parse::idle_args(tokens)
     }
 }
 
@@ -25,15 +23,12 @@ impl Idle {
         if valid_signature {
             if let Some((context, Ok(rest))) = util::parse_inputs(item.sig.inputs, &name) {
                 if rest.is_empty() {
-                    let (locals, stmts) = util::extract_locals(item.block.stmts)?;
-
                     return Ok(Idle {
                         args,
                         attrs: item.attrs,
                         context,
-                        locals: Local::parse(locals)?,
                         name: item.sig.ident,
-                        stmts,
+                        stmts: item.block.stmts,
                     });
                 }
             }

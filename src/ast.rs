@@ -1,10 +1,8 @@
 //! Abstract Syntax Tree
 
-use core::ops::Deref;
-
 use syn::{Attribute, Expr, Ident, Item, ItemUse, Pat, PatType, Path, Stmt, Type};
 
-use crate::{Map, Set};
+use crate::Map;
 
 /// The `#[app]` attribute
 #[derive(Debug)]
@@ -16,20 +14,20 @@ pub struct App {
     /// The name of the `const` item on which the `#[app]` attribute has been placed
     pub name: Ident,
 
-    /// Vector containing the `#[init]` function
-    pub inits: Inits,
+    /// The `#[init]` function
+    pub init: Init,
 
-    /// Vector containing the `#[idle]` function
-    pub idles: Idles,
+    /// The `#[idle]` function
+    pub idle: Option<Idle>,
 
     /// Monotonic clocks
     pub monotonics: Map<Monotonic>,
 
-    /// Late (runtime initialized) resources
-    pub late_resources: Map<LateResource>,
+    /// Resources shared between tasks defined in `#[shared]`
+    pub shared_resources: Map<SharedResource>,
 
-    /// Early (compile time initialized) resources
-    pub resources: Map<Resource>,
+    /// Task local resources defined in `#[local]`
+    pub local_resources: Map<LocalResource>,
 
     /// User imports
     pub user_imports: Vec<ItemUse>,
@@ -68,12 +66,6 @@ pub struct AppArgs {
     pub extern_interrupts: ExternInterrupts,
 }
 
-/// `init` function
-pub type Inits = Vec<Init>;
-
-/// `idle` function
-pub type Idles = Vec<Idle>;
-
 /// The `init`-ialization function
 #[derive(Debug)]
 #[non_exhaustive]
@@ -90,24 +82,24 @@ pub struct Init {
     /// The context argument
     pub context: Box<Pat>,
 
-    /// Static variables local to this context
-    pub locals: Map<Local>,
-
     /// The statements that make up this `init` function
     pub stmts: Vec<Stmt>,
 }
 
 /// `init` context metadata
-#[derive(Debug, Default)]
+#[derive(Debug)]
 #[non_exhaustive]
 pub struct InitArgs {
-    /// Late resources that will be initialized
-    ///
-    /// NOTE do not use this field for codegen; use `Analysis.late_resources` instead
-    pub late: Set<Ident>,
+    /// Local resources that can be accessed from this context
+    pub local_resources: LocalResources,
+}
 
-    /// Resources that can be accessed from this context
-    pub resources: Resources,
+impl Default for InitArgs {
+    fn default() -> Self {
+        Self {
+            local_resources: LocalResources::new(),
+        }
+    }
 }
 
 /// The `idle` context
@@ -126,9 +118,6 @@ pub struct Idle {
     /// The context argument
     pub context: Box<Pat>,
 
-    /// Static variables local to this context
-    pub locals: Map<Local>,
-
     /// The statements that make up this `idle` function
     pub stmts: Vec<Stmt>,
 }
@@ -137,40 +126,33 @@ pub struct Idle {
 #[derive(Debug)]
 #[non_exhaustive]
 pub struct IdleArgs {
-    /// Resources that can be accessed from this context
-    pub resources: Resources,
+    /// Local resources that can be accessed from this context
+    pub local_resources: LocalResources,
+
+    /// Shared resources that can be accessed from this context
+    pub shared_resources: SharedResources,
 }
 
-/// Resource properties
-#[derive(Debug)]
-pub struct ResourceProperties {
-    /// A task local resource
-    pub task_local: bool,
+impl Default for IdleArgs {
+    fn default() -> Self {
+        Self {
+            local_resources: LocalResources::new(),
+            shared_resources: SharedResources::new(),
+        }
+    }
+}
 
+/// Shared resource properties
+#[derive(Debug)]
+pub struct SharedResourceProperties {
     /// A lock free (exclusive resource)
     pub lock_free: bool,
 }
 
-/// An early (compile time initialized) resource
-#[derive(Debug)]
-pub struct Resource {
-    pub(crate) late: LateResource,
-    /// The initial value of this resource
-    pub expr: Box<Expr>,
-}
-
-impl Deref for Resource {
-    type Target = LateResource;
-
-    fn deref(&self) -> &LateResource {
-        &self.late
-    }
-}
-
-/// A late (runtime initialized) resource
+/// A shared resource, defined in `#[shared]`
 #[derive(Debug)]
 #[non_exhaustive]
-pub struct LateResource {
+pub struct SharedResource {
     /// `#[cfg]` attributes like `#[cfg(debug_assertions)]`
     pub cfgs: Vec<Attribute>,
 
@@ -180,8 +162,22 @@ pub struct LateResource {
     /// The type of this resource
     pub ty: Box<Type>,
 
-    /// Resource properties
-    pub properties: ResourceProperties,
+    /// Shared resource properties
+    pub properties: SharedResourceProperties,
+}
+
+/// A local resource, defined in `#[local]`
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct LocalResource {
+    /// `#[cfg]` attributes like `#[cfg(debug_assertions)]`
+    pub cfgs: Vec<Attribute>,
+
+    /// Attributes that will apply to this resource
+    pub attrs: Vec<Attribute>,
+
+    /// The type of this resource
+    pub ty: Box<Type>,
 }
 
 /// Monotonic
@@ -234,9 +230,6 @@ pub struct SoftwareTask {
     /// The inputs of this software task
     pub inputs: Vec<PatType>,
 
-    /// Static variables local to this context
-    pub locals: Map<Local>,
-
     /// The statements that make up the task handler
     pub stmts: Vec<Stmt>,
 
@@ -254,8 +247,11 @@ pub struct SoftwareTaskArgs {
     /// The priority of this task
     pub priority: u8,
 
-    /// Resources that can be accessed from this context
-    pub resources: Resources,
+    /// Local resources that can be accessed from this context
+    pub local_resources: LocalResources,
+
+    /// Shared resources that can be accessed from this context
+    pub shared_resources: SharedResources,
 }
 
 impl Default for SoftwareTaskArgs {
@@ -263,7 +259,8 @@ impl Default for SoftwareTaskArgs {
         Self {
             capacity: 1,
             priority: 1,
-            resources: Resources::new(),
+            local_resources: LocalResources::new(),
+            shared_resources: SharedResources::new(),
         }
     }
 }
@@ -284,9 +281,6 @@ pub struct HardwareTask {
     /// The context argument
     pub context: Box<Pat>,
 
-    /// Static variables local to this context
-    pub locals: Map<Local>,
-
     /// The statements that make up the task handler
     pub stmts: Vec<Stmt>,
 
@@ -304,10 +298,14 @@ pub struct HardwareTaskArgs {
     /// The priority of this task
     pub priority: u8,
 
-    /// Resources that can be accessed from this context
-    pub resources: Resources,
+    /// Local resources that can be accessed from this context
+    pub local_resources: LocalResources,
+
+    /// Shared resources that can be accessed from this context
+    pub shared_resources: SharedResources,
 }
 
+// TODO: This should be converted to fit the new `local` resources
 /// A `static mut` variable local to and owned by a context
 #[derive(Debug)]
 #[non_exhaustive]
@@ -323,6 +321,16 @@ pub struct Local {
 
     /// Initial value
     pub expr: Box<Expr>,
+}
+
+/// A wrapper of the 2 kinds of locals that tasks can have
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum TaskLocal {
+    /// The local is declared externally (i.e. `#[local]` struct)
+    External,
+    /// The local is declared in the task
+    Declared(Local),
 }
 
 /// Resource access
@@ -347,5 +355,8 @@ impl Access {
     }
 }
 
-/// Resource access list
-pub type Resources = Map<Access>;
+/// Shared resource access list in task attribute
+pub type SharedResources = Map<Access>;
+
+/// Local resource access/declaration list in task attribute
+pub type LocalResources = Map<TaskLocal>;
