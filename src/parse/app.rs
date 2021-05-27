@@ -149,7 +149,6 @@ impl App {
         let mut software_tasks = Map::new();
         let mut user_imports = vec![];
         let mut user_code = vec![];
-        let mut user_types = vec![];
 
         let mut seen_idents = HashSet::<Ident>::new();
         let mut bindings = HashSet::<Ident>::new();
@@ -421,7 +420,7 @@ impl App {
                     user_imports.push(itemuse_.clone());
                 }
                 Item::Type(ref mut type_item) => {
-                    // Match structures with the attribute #[monotonic]
+                    // Match types with the attribute #[monotonic]
                     if let Some(pos) = type_item
                         .attrs
                         .iter()
@@ -452,11 +451,9 @@ impl App {
                         let monotonic = Monotonic::parse(args, type_item, span)?;
 
                         monotonics.insert(type_item.ident.clone(), monotonic);
-                    } else {
-                        // Pass along any other type aliases
-                        user_types.push(type_item.clone());
                     }
 
+                    // All types are passed on
                     user_code.push(item.clone());
                 }
                 _ => {
@@ -479,7 +476,6 @@ impl App {
             resources,
             user_imports,
             user_code,
-            user_types,
             hardware_tasks,
             software_tasks,
         })
