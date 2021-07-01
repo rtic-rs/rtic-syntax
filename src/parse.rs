@@ -16,7 +16,10 @@ use syn::{
 };
 
 use crate::{
-    ast::{App, AppArgs, HardwareTaskArgs, IdleArgs, InitArgs, MonotonicArgs, SoftwareTaskArgs},
+    ast::{
+        App, AppArgs, HardwareTaskArgs, IdleArgs, InitArgs, MonotonicArgs, SoftwareTaskArgs,
+        TaskLocal,
+    },
     Either, Settings,
 };
 
@@ -106,6 +109,20 @@ fn init_args(tokens: TokenStream2) -> parse::Result<InitArgs> {
 
             // ,
             let _: Token![,] = content.parse()?;
+        }
+
+        if let Some(locals) = &local_resources {
+            for (ident, task_local) in locals {
+                match task_local {
+                    TaskLocal::External => {
+                        return Err(parse::Error::new(
+                            ident.span(),
+                            "only declared local resources are allowed in init",
+                        ));
+                    }
+                    _ => {}
+                }
+            }
         }
 
         Ok(InitArgs {

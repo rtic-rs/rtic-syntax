@@ -18,9 +18,14 @@ mod app {
         d: u32,
     }
 
-    #[init]
+    #[init(local = [a: u32 = 3, b: u8 = 2])]
     fn init(_: init::Context) -> (init::LateResources, init::Monotonics) {
         init::LateResources { }
+    }
+
+    #[idle]
+    fn idle(_: idle::Context) -> ! {
+        loop {}
     }
 
     #[task(shared = [a], local = [b])]
