@@ -140,7 +140,9 @@ impl App {
         let mut init = None;
         let mut idle = None;
 
+        let mut shared_resources_ident = None;
         let mut shared_resources = Map::new();
+        let mut local_resources_ident = None;
         let mut local_resources = Map::new();
         let mut monotonics = Map::new();
         let mut hardware_tasks = Map::new();
@@ -281,6 +283,8 @@ impl App {
                     {
                         let span = struct_item.ident.span();
 
+                        shared_resources_ident = Some(struct_item.ident.clone());
+
                         if !shared_resources.is_empty() {
                             return Err(parse::Error::new(
                                 span,
@@ -306,8 +310,10 @@ impl App {
                                     ));
                                 }
 
-                                shared_resources
-                                    .insert(ident.clone(), SharedResource::parse(field, ident.span())?);
+                                shared_resources.insert(
+                                    ident.clone(),
+                                    SharedResource::parse(field, ident.span())?,
+                                );
                             }
                         } else {
                             return Err(parse::Error::new(
@@ -321,6 +327,8 @@ impl App {
                         .position(|attr| util::attr_eq(attr, "local"))
                     {
                         let span = struct_item.ident.span();
+
+                        local_resources_ident = Some(struct_item.ident.clone());
 
                         if !local_resources.is_empty() {
                             return Err(parse::Error::new(
@@ -347,8 +355,10 @@ impl App {
                                     ));
                                 }
 
-                                local_resources
-                                    .insert(ident.clone(), LocalResource::parse(field, ident.span())?);
+                                local_resources.insert(
+                                    ident.clone(),
+                                    LocalResource::parse(field, ident.span())?,
+                                );
                             }
                         } else {
                             return Err(parse::Error::new(
@@ -479,10 +489,36 @@ impl App {
             }
         }
 
+        let shared_resources_ident =
+            shared_resources_ident.expect("No `#[shared]` resource struct defined");
+        let local_resources_ident =
+            local_resources_ident.expect("No `#[local]` resource struct defined");
+        let init = init.expect("No `#[idle]` function defined");
+
+        if shared_resources_ident != init.user_shared_struct {
+            return Err(parse::Error::new(
+                init.user_shared_struct.span(),
+                format!(
+                    "This name and the one defined on `#[shared]` are not the same. Should this be `{}`?",
+                    shared_resources_ident
+                ),
+            ));
+        }
+
+        if local_resources_ident != init.user_local_struct {
+            return Err(parse::Error::new(
+                init.user_local_struct.span(),
+                format!(
+                    "This name and the one defined on `#[local]` are not the same. Should this be `{}`?",
+                    local_resources_ident
+                ),
+            ));
+        }
+
         Ok(App {
             args,
             name: input.ident,
-            init: init.expect("No `#[idle]` function defined"),
+            init,
             idle,
             monotonics,
             shared_resources,

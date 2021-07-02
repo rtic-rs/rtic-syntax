@@ -256,17 +256,42 @@ pub fn type_is_bottom(ty: &ReturnType) -> bool {
     }
 }
 
-pub fn type_is_init_return(ty: &ReturnType, name: &str) -> Result<(), ()> {
+fn extract_init_resource_name_ident(ty: Type) -> Result<Ident, ()> {
+    match ty {
+        Type::Path(path) => {
+            let path = path.path;
+
+            if path.leading_colon.is_some()
+                || path.segments.len() != 1
+                || path.segments[0].arguments != PathArguments::None
+            {
+                Err(())
+            } else {
+                Ok(path.segments[0].ident.clone())
+            }
+        }
+        _ => Err(())
+    }
+}
+
+/// Checks Init's return type and returns the user provided types for use in the analysis
+pub fn type_is_init_return(ty: &ReturnType, name: &str) -> Result<(Ident, Ident), ()> {
     match ty {
         ReturnType::Default => Err(()),
 
         ReturnType::Type(_, ty) => match &**ty {
             Type::Tuple(t) => {
-                if t.elems.len() == 2 {
-                    if type_is_path(&t.elems[0], &[name, "LateResources"])
-                        && type_is_path(&t.elems[1], &[name, "Monotonics"])
-                    {
-                        return Ok(());
+                // return should be:
+                // fn -> (User's #[shared] struct, User's #[local] struct, {name}::Monotonics)
+                //
+                // We check the length and the last one here, analysis checks that the user
+                // provided structs are correct.
+                if t.elems.len() == 3 {
+                    if type_is_path(&t.elems[2], &[name, "Monotonics"]) {
+                        return Ok((
+                            extract_init_resource_name_ident(t.elems[0].clone())?,
+                            extract_init_resource_name_ident(t.elems[1].clone())?,
+                        ));
                     }
                 }
 

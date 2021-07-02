@@ -84,6 +84,12 @@ pub struct Init {
 
     /// The statements that make up this `init` function
     pub stmts: Vec<Stmt>,
+
+    /// The name of the user provided shared resources struct
+    pub user_shared_struct: Ident,
+
+    /// The name of the user provided local resources struct
+    pub user_local_struct: Ident,
 }
 
 /// `init` context metadata

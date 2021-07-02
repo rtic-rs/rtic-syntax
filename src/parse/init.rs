@@ -22,7 +22,9 @@ impl Init {
         let name = item.sig.ident.to_string();
 
         if valid_signature {
-            if util::type_is_init_return(&item.sig.output, &name).is_ok() {
+            if let Ok((user_shared_struct, user_local_struct)) =
+                util::type_is_init_return(&item.sig.output, &name)
+            {
                 if let Some((context, Ok(rest))) = util::parse_inputs(item.sig.inputs, &name) {
                     if rest.is_empty() {
                         return Ok(Init {
@@ -31,6 +33,8 @@ impl Init {
                             context,
                             name: item.sig.ident,
                             stmts: item.block.stmts,
+                            user_shared_struct,
+                            user_local_struct,
                         });
                     }
                 }
