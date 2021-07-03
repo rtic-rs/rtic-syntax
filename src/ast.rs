@@ -311,7 +311,6 @@ pub struct HardwareTaskArgs {
     pub shared_resources: SharedResources,
 }
 
-// TODO: This should be converted to fit the new `local` resources
 /// A `static mut` variable local to and owned by a context
 #[derive(Debug)]
 #[non_exhaustive]
