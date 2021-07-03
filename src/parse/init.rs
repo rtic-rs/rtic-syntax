@@ -44,7 +44,7 @@ impl Init {
         Err(parse::Error::new(
             span,
             &format!(
-                "this `#[init]` function must have signature `fn({}::Context) -> ({0}::LateResources, {0}::Monotonics)`",
+                "the `#[init]` function must have signature `fn({}::Context) -> (Shared resources struct, Local resources struct, {0}::Monotonics)`",
                 name
             ),
         ))

@@ -1,5 +1,0 @@
-error: late resources can NOT be assigned to `init`
-  --> $DIR/init-resources-late.rs:10:25
-   |
-10 |     #[init(resources = [x])]
-   |                         ^

@@ -12,7 +12,7 @@ pub fn app(app: &App) -> parse::Result<()> {
         if app.shared_resources.get(name).is_none() {
             return Err(parse::Error::new(
                 name.span(),
-                "this resource has NOT been declared",
+                "this shared resource has NOT been declared",
             ));
         }
 
@@ -25,7 +25,7 @@ pub fn app(app: &App) -> parse::Result<()> {
         if app.local_resources.get(name).is_none() {
             return Err(parse::Error::new(
                 name.span(),
-                "this resource has NOT been declared",
+                "this local resource has NOT been declared",
             ));
         }
     }

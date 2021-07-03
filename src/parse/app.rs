@@ -493,7 +493,7 @@ impl App {
             shared_resources_ident.expect("No `#[shared]` resource struct defined");
         let local_resources_ident =
             local_resources_ident.expect("No `#[local]` resource struct defined");
-        let init = init.expect("No `#[idle]` function defined");
+        let init = init.expect("No `#[init]` function defined");
 
         if shared_resources_ident != init.user_shared_struct {
             return Err(parse::Error::new(

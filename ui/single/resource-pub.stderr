@@ -1,5 +1,0 @@
-error: this field must have inherited / private visibility
- --> $DIR/resource-pub.rs:8:13
-  |
-8 |         pub x: u32,
-  |             ^

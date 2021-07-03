@@ -1,0 +1,11 @@
+error: Local resource "a" is used by or collides with multiple tasks
+  --> $DIR/local-collision.rs:13:21
+   |
+13 |     #[task(local = [a])]
+   |                     ^
+
+error: Local resource "a" is used by or collides with multiple tasks
+  --> $DIR/local-collision.rs:16:21
+   |
+16 |     #[task(local = [a: u8 = 3])]
+   |                     ^

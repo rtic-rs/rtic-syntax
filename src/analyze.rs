@@ -10,6 +10,74 @@ use syn::{Ident, Type};
 use crate::{ast::App, Set};
 
 pub(crate) fn app(app: &App) -> Result<Analysis, syn::Error> {
+    // Collect all tasks into a vector
+    type TaskName = String;
+    type Priority = u8;
+
+    // The task list is a Tuple (Name, Shared Resources, Local Resources, Priority)
+    let task_resources_list: Vec<(TaskName, Vec<&Ident>, Vec<&Ident>, Priority)> = app
+        .idle
+        .iter()
+        .map(|ht| {
+            (
+                "idle".to_string(),
+                ht.args
+                    .shared_resources
+                    .iter()
+                    .map(|(v, _)| v)
+                    .collect::<Vec<_>>(),
+                ht.args
+                    .local_resources
+                    .iter()
+                    .map(|(v, _)| v)
+                    .collect::<Vec<_>>(),
+                0,
+            )
+        })
+        .chain(app.software_tasks.iter().map(|(name, ht)| {
+            (
+                name.to_string(),
+                ht.args
+                    .shared_resources
+                    .iter()
+                    .map(|(v, _)| v)
+                    .collect::<Vec<_>>(),
+                ht.args
+                    .local_resources
+                    .iter()
+                    .map(|(v, _)| v)
+                    .collect::<Vec<_>>(),
+                ht.args.priority,
+            )
+        }))
+        .chain(app.hardware_tasks.iter().map(|(name, ht)| {
+            (
+                name.to_string(),
+                ht.args
+                    .shared_resources
+                    .iter()
+                    .map(|(v, _)| v)
+                    .collect::<Vec<_>>(),
+                ht.args
+                    .local_resources
+                    .iter()
+                    .map(|(v, _)| v)
+                    .collect::<Vec<_>>(),
+                ht.args.priority,
+            )
+        }))
+        .collect();
+
+    // Create the list of task Idents
+    let tasks: Vec<_> = task_resources_list
+        .iter()
+        .map(|x| format_ident!("{}", x.0))
+        .collect();
+
+    let mut error = vec![];
+    let mut lf_res_with_error = vec![];
+    let mut lf_hash = HashMap::new();
+
     // Collect lock free resources
     let lock_free: Vec<&Ident> = app
         .shared_resources
@@ -18,47 +86,9 @@ pub(crate) fn app(app: &App) -> Result<Analysis, syn::Error> {
         .map(|(i, _)| i)
         .collect();
 
-    // Collect all tasks into a vector
-    type TaskName = String;
-    type Priority = u8;
-
-    // The task list is a Tuple (Name, Resources, Priority)
-    let task_list: Vec<(TaskName, Vec<&Ident>, Priority)> = app
-        .idle
-        .iter()
-        .map(|ht| {
-            (
-                "idle".to_string(),
-                ht.args.shared_resources.iter().map(|(v, _)| v).collect::<Vec<_>>(),
-                0,
-            )
-        })
-        .chain(app.software_tasks.iter().map(|(name, ht)| {
-            (
-                name.to_string(),
-                ht.args.shared_resources.iter().map(|(v, _)| v).collect::<Vec<_>>(),
-                ht.args.priority,
-            )
-        }))
-        .chain(app.hardware_tasks.iter().map(|(name, ht)| {
-            (
-                name.to_string(),
-                ht.args.shared_resources.iter().map(|(v, _)| v).collect::<Vec<_>>(),
-                ht.args.priority,
-            )
-        }))
-        .collect();
-
-    // Create the list of task Idents
-    let tasks: Vec<_> = task_list.iter().map(|x| format_ident!("{}", x.0)).collect();
-
-    let mut error = vec![];
-    let mut lf_res_with_error = vec![];
-    let mut lf_hash = HashMap::new();
-
     // Check that lock_free resources are correct
     for lf_res in lock_free.iter() {
-        for (task, tr, priority) in task_list.iter() {
+        for (task, tr, _, priority) in task_resources_list.iter() {
             for r in tr {
                 // Get all uses of resources annotated lock_free
                 if lf_res == r {
@@ -94,12 +124,45 @@ pub(crate) fn app(app: &App) -> Result<Analysis, syn::Error> {
         }
     }
 
-    // Add error message for each use of the resource
+    // Add error message for each use of the shared resource
     for resource in lf_res_with_error.clone() {
         error.push(syn::Error::new(
             resource.span(),
             format!(
                 "Shared resource {:?} is declared lock free but used by tasks at different priorities",
+                resource.to_string(),
+            ),
+        ));
+    }
+
+    // Collect local resources
+    let local: Vec<&Ident> = app.local_resources.iter().map(|(i, _)| i).collect();
+
+    let mut lr_with_error = vec![];
+    let mut lr_hash = HashMap::new();
+
+    // Check that local resources are not shared
+    for lr in local {
+        for (task, _, local_resources, _) in task_resources_list.iter() {
+            for r in local_resources {
+                // Get all uses of resources annotated lock_free
+                if lr == *r {
+                    // HashMap returns the previous existing object if old.key == new.key
+                    if let Some(lr) = lr_hash.insert(r.to_string(), (task, r)) {
+                        lr_with_error.push(lr.1);
+                        lr_with_error.push(r);
+                    }
+                }
+            }
+        }
+    }
+
+    // Add error message for each use of the local resource
+    for resource in lr_with_error.clone() {
+        error.push(syn::Error::new(
+            resource.span(),
+            format!(
+                "Local resource {:?} is used by or collides with multiple tasks",
                 resource.to_string(),
             ),
         ));
@@ -153,7 +216,7 @@ pub(crate) fn app(app: &App) -> Result<Analysis, syn::Error> {
         }
     }
 
-    // Most late resources need to be `Send`
+    // Most shared resources need to be `Send`
     let mut send_types = SendTypes::new();
     let owned_by_idle = Ownership::Owned { priority: 0 };
     for (name, res) in app.shared_resources.iter() {
@@ -163,6 +226,18 @@ pub(crate) fn app(app: &App) -> Result<Analysis, syn::Error> {
             .map(|ownership| *ownership != owned_by_idle)
             .unwrap_or(false)
         {
+            send_types.insert(res.ty.clone());
+        }
+    }
+
+    // Most local resources need to be `Send` as well
+    for (name, res) in app.local_resources.iter() {
+        if let Some(idle) = &app.idle {
+            // Only Send if not in idle
+            if idle.args.local_resources.get(name).is_none() {
+                send_types.insert(res.ty.clone());
+            }
+        } else {
             send_types.insert(res.ty.clone());
         }
     }

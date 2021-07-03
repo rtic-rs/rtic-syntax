@@ -270,7 +270,7 @@ fn extract_init_resource_name_ident(ty: Type) -> Result<Ident, ()> {
                 Ok(path.segments[0].ident.clone())
             }
         }
-        _ => Err(())
+        _ => Err(()),
     }
 }
 

@@ -1,27 +1,5 @@
-use quote::quote;
-
 use crate::{analyze::Ownership, Settings};
-
-#[test]
-fn unused_resource() {
-    // this shouldn't crash the analysis pass
-    let (_app, analysis) = crate::parse2(
-        quote!(),
-        quote!(
-            mod app {
-                struct Resources {
-                    #[init(0)]
-                    x: i32,
-                }
-            }
-        ),
-        Settings::default(),
-    )
-    .unwrap();
-
-    // `x` shouldn't be listed in `locations`
-    assert!(analysis.locations.is_empty());
-}
+use quote::quote;
 
 #[test]
 fn unused_task() {
@@ -30,6 +8,15 @@ fn unused_task() {
         quote!(),
         quote!(
             mod app {
+                #[shared]
+                struct Shared {}
+
+                #[local]
+                struct Local {}
+
+                #[init]
+                fn init(_: init::Context) -> (Shared, Local, init::Monotonics) {}
+
                 #[task]
                 fn foo(_: foo::Context) {}
             }
@@ -40,18 +27,23 @@ fn unused_task() {
 }
 
 #[test]
-fn resource_owned() {
+fn shared_resource_owned() {
     let (_app, analysis) = crate::parse2(
         quote!(),
         quote!(
             mod app {
-                #[resources]
-                struct Resources {
-                    #[init(0)]
+                #[shared]
+                struct Shared {
                     x: i32,
                 }
 
-                #[task(resources = [x])]
+                #[local]
+                struct Local {}
+
+                #[init]
+                fn init(_: init::Context) -> (Shared, Local, init::Monotonics) {}
+
+                #[task(shared = [x])]
                 fn foo(_: foo::Context) {}
             }
         ),
@@ -65,21 +57,26 @@ fn resource_owned() {
 }
 
 #[test]
-fn resource_coowned() {
+fn shared_resource_coowned() {
     let (_app, analysis) = crate::parse2(
         quote!(),
         quote!(
             mod app {
-                #[resources]
-                struct Resources {
-                    #[init(0)]
+                #[shared]
+                struct Shared {
                     x: i32,
                 }
 
-                #[task(resources = [x])]
+                #[local]
+                struct Local {}
+
+                #[init]
+                fn init(_: init::Context) -> (Shared, Local, init::Monotonics) {}
+
+                #[task(shared = [x])]
                 fn foo(_: foo::Context) {}
 
-                #[task(resources = [x])]
+                #[task(shared = [x])]
                 fn bar(_: bar::Context) {}
             }
         ),
@@ -93,21 +90,26 @@ fn resource_coowned() {
 }
 
 #[test]
-fn resource_contended() {
+fn shared_resource_contended() {
     let (_app, analysis) = crate::parse2(
         quote!(),
         quote!(
             mod app {
-                #[resources]
-                struct Resources {
-                    #[init(0)]
+                #[shared]
+                struct Shared {
                     x: i32,
                 }
 
-                #[task(resources = [x])]
+                #[local]
+                struct Local {}
+
+                #[init]
+                fn init(_: init::Context) -> (Shared, Local, init::Monotonics) {}
+
+                #[task(shared = [x])]
                 fn foo(_: foo::Context) {}
 
-                #[task(priority = 2, resources = [x])]
+                #[task(priority = 2, shared = [x])]
                 fn bar(_: bar::Context) {}
             }
         ),
@@ -121,23 +123,24 @@ fn resource_contended() {
 }
 
 #[test]
-fn no_send_late_resources_idle() {
+fn no_send_late_shared_resources_idle() {
     // late resources owned by `idle` don't need to be `Send`
     let (_app, analysis) = crate::parse2(
         quote!(),
         quote!(
             mod app {
-                #[resources]
-                struct Resources {
+                #[shared]
+                struct Shared {
                     x: i32,
                 }
 
-                #[init]
-                fn init(_: init::Context) -> (init::LateResources, init::Monotonics) {
-                    ..
-                }
+                #[local]
+                struct Local {}
 
-                #[idle(resources = [x])]
+                #[init]
+                fn init(_: init::Context) -> (Shared, Local, init::Monotonics) {}
+
+                #[idle(shared = [x])]
                 fn idle(_: idle::Context) -> ! {
                     loop {}
                 }
@@ -157,6 +160,15 @@ fn send_spawn() {
         quote!(),
         quote!(
             mod app {
+                #[shared]
+                struct Shared {}
+
+                #[local]
+                struct Local {}
+
+                #[init]
+                fn init(_: init::Context) -> (Shared, Local, init::Monotonics) {}
+
                 #[task(priority = 2)]
                 fn foo(_: foo::Context) {}
 
@@ -173,23 +185,54 @@ fn send_spawn() {
 }
 
 #[test]
-fn send_late_resource() {
-    // late resources used by tasks must be `Send`
+fn send_shared_resource() {
+    // shared resources used by tasks must be `Send`
     let (_app, analysis) = crate::parse2(
         quote!(),
         quote!(
             mod app {
-                #[resources]
-                struct Resources {
+                #[shared]
+                struct Shared {
+                    a: X,
+                }
+
+                #[local]
+                struct Local {}
+
+                #[init]
+                fn init(_: init::Context) -> (Shared, Local, init::Monotonics) {}
+
+                #[task(shared = [a])]
+                fn foo(_: foo::Context) {}
+            }
+        ),
+        Settings::default(),
+    )
+    .unwrap();
+
+    let ty = analysis.send_types.iter().next().unwrap();
+    assert_eq!(quote!(#ty).to_string(), "X");
+}
+
+#[test]
+fn send_local_resource() {
+    // local resources used by tasks from the Local struct must be `Send`
+    let (_app, analysis) = crate::parse2(
+        quote!(),
+        quote!(
+            mod app {
+                #[shared]
+                struct Shared {}
+
+                #[local]
+                struct Local {
                     a: X,
                 }
 
                 #[init]
-                fn init(_: init::Context) -> (init::LateResources, init::Monotonics) {
-                    ..
-                }
+                fn init(_: init::Context) -> (Shared, Local, init::Monotonics) {}
 
-                #[task(resources = [a])]
+                #[task(local = [a])]
                 fn foo(_: foo::Context) {}
             }
         ),
@@ -208,16 +251,18 @@ fn send_shared_with_init() {
         quote!(),
         quote!(
             mod app {
-                #[resources]
-                struct Resources {
-                    #[init(0)]
+                #[shared]
+                struct Shared {
                     x: i32,
                 }
 
-                #[init(resources = [x])]
-                fn init(_: init::Context) -> (init::LateResources, init::Monotonics) {}
+                #[local]
+                struct Local {}
 
-                #[task(resources = [x])]
+                #[init]
+                fn init(_: init::Context) -> (Shared, Local, init::Monotonics) {}
+
+                #[task(shared = [x])]
                 fn foo(_: foo::Context) {}
             }
         ),
@@ -236,16 +281,21 @@ fn not_sync() {
         quote!(),
         quote!(
             mod app {
-                #[resources]
-                struct Resources {
-                    #[init(0)]
+                #[shared]
+                struct Shared {
                     x: i32,
                 }
 
-                #[task(resources = [x])]
+                #[local]
+                struct Local {}
+
+                #[init]
+                fn init(_: init::Context) -> (Shared, Local, init::Monotonics) {}
+
+                #[task(shared = [x])]
                 fn foo(_: foo::Context) {}
 
-                #[task(resources = [x])]
+                #[task(shared = [x])]
                 fn bar(_: bar::Context) {}
             }
         ),
@@ -263,16 +313,21 @@ fn sync() {
         quote!(),
         quote!(
             mod app {
-                #[resources]
-                struct Resources {
-                    #[init(0)]
+                #[shared]
+                struct Shared {
                     x: i32,
                 }
 
-                #[task(resources = [&x])]
+                #[local]
+                struct Local {}
+
+                #[init]
+                fn init(_: init::Context) -> (Shared, Local, init::Monotonics) {}
+
+                #[task(shared = [&x])]
                 fn foo(_: foo::Context) {}
 
-                #[task(priority = 2, resources = [&x])]
+                #[task(priority = 2, shared = [&x])]
                 fn bar(_: bar::Context) {}
             }
         ),
@@ -287,17 +342,20 @@ fn sync() {
 #[test]
 fn late_resources() {
     // Check so that late resources gets initialized
-    let (_app, analysis) = crate::parse2(
+    let (app, _analysis) = crate::parse2(
         quote!(),
         quote!(
             mod app {
-                #[resources]
-                struct Resources {
+                #[shared]
+                struct Shared {
                     x: i32,
                 }
 
+                #[local]
+                struct Local {}
+
                 #[init]
-                fn init(_: init::Context) -> (init::LateResources, init::Monotonics) {
+                fn init(_: init::Context) -> (Shared, Local, init::Monotonics) {
                     ..
                 }
             }
@@ -306,6 +364,6 @@ fn late_resources() {
     )
     .unwrap();
 
-    let late = &analysis.late_resources;
+    let late = &app.shared_resources;
     assert_eq!(late.len(), 1);
 }

@@ -1,5 +1,0 @@
-error: `init` has direct exclusive access to resources; use `x` instead of `&x`
-  --> $DIR/init-shared-access.rs:11:26
-   |
-11 |     #[init(resources = [&x])]
-   |                          ^

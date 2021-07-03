@@ -9,10 +9,14 @@
     ])
 ]
 mod app {
+    #[shared]
+    struct Shared {}
+
+    #[local]
+    struct Local {}
+
     #[init]
-    fn init(_: init::Context) -> (init::LateResources, init::Monotonics) {
-        init::LateResources {}
-    }
+    fn init(_: init::Context) -> (Shared, Local, init::Monotonics) {}
 
     #[idle]
     fn idle(_: idle::Context) -> ! {}

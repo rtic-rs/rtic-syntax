@@ -1,5 +1,0 @@
-error: late resources can NOT be assigned to `init`
-  --> $DIR/resource-task-local-late-in-init.rs:11:25
-   |
-11 |     #[init(resources = [x])]
-   |                         ^
