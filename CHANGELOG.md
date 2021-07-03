@@ -20,8 +20,10 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Changed
 
+- [breaking-change] "Resource handling take 2" implemented
+
 - [breaking-change] Move of dispatchers (interrupts) from `extern` to app arguments.
-  `app(..., dispatchers = [SSI0,...])` 
+  `app(..., dispatchers = [SSI0,...])`
   This should also work for ram functions and other attributes, see `examples/ramfunc.rs`.
 
 - [breaking-change] Rework whole spawn/schedule, support `foo::spawn( ... )`,
