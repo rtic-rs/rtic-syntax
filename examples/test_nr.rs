@@ -18,7 +18,7 @@ mod app {
         d: u32,
     }
 
-    #[init(local = [a: u32 = 3, b: u8 = 2])]
+    #[init]
     fn init(_: init::Context) -> (Shared, Local, init::Monotonics) {
         init::LateResources {}
     }
@@ -28,9 +28,14 @@ mod app {
         loop {}
     }
 
-    #[task(shared = [a], local = [b])]
+    #[task]
     fn t1(_: t1::Context) {}
 
-    #[task(shared = [a], local = [q: (u32, core::u8) = (4, 3)])]
+    #[task(local = [
+        #[testing1]
+        #[testing2]
+        #[link_section = ".example_section"]
+        q: (u32, core::u8) = (4, 3),
+    ])]
     fn t2(_: t2::Context) {}
 }
