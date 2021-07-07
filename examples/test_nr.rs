@@ -38,4 +38,10 @@ mod app {
         q: (u32, core::u8) = (4, 3),
     ])]
     fn t2(_: t2::Context) {}
+
+    #[task(local = [ohno: u32 = 0])]
+    fn t3(_: t3::Context) {}
+
+    #[task(local = [ohno: u32 = 0])]
+    fn t4(_: t4::Context) {}
 }

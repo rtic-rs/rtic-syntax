@@ -76,29 +76,40 @@ impl App {
     }
 
     /// Get all declared local resources, i.e. `local = [NAME: TYPE = EXPR]`.
-    pub fn declared_local_resources(&self) -> Vec<(&Ident, &Local)> {
+    ///
+    /// Returns a vector of (task name, resource name, `Local` struct)
+    pub fn declared_local_resources(&self) -> Vec<(&Ident, &Ident, &Local)> {
         self.init
             .args
             .local_resources
             .iter()
-            .filter_map(move |(name, tl)| Self::get_declared_local(tl).map(|l| (name, l)))
+            .filter_map(move |(name, tl)| {
+                Self::get_declared_local(tl).map(|l| (&self.init.name, name, l))
+            })
             .chain(self.idle.iter().flat_map(|idle| {
                 idle.args
                     .local_resources
                     .iter()
-                    .filter_map(move |(name, tl)| Self::get_declared_local(tl).map(|l| (name, l)))
+                    .filter_map(move |(name, tl)| {
+                        Self::get_declared_local(tl)
+                            .map(|l| (&self.idle.as_ref().unwrap().name, name, l))
+                    })
             }))
-            .chain(self.hardware_tasks.values().flat_map(|task| {
+            .chain(self.hardware_tasks.iter().flat_map(|(task_name, task)| {
                 task.args
                     .local_resources
                     .iter()
-                    .filter_map(move |(name, tl)| Self::get_declared_local(tl).map(|l| (name, l)))
+                    .filter_map(move |(name, tl)| {
+                        Self::get_declared_local(tl).map(|l| (task_name, name, l))
+                    })
             }))
-            .chain(self.software_tasks.values().flat_map(|task| {
+            .chain(self.software_tasks.iter().flat_map(|(task_name, task)| {
                 task.args
                     .local_resources
                     .iter()
-                    .filter_map(move |(name, tl)| Self::get_declared_local(tl).map(|l| (name, l)))
+                    .filter_map(move |(name, tl)| {
+                        Self::get_declared_local(tl).map(|l| (task_name, name, l))
+                    })
             }))
             .collect()
     }
