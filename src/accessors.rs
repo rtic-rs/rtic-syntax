@@ -2,7 +2,7 @@ use syn::Ident;
 
 use crate::{
     analyze::Priority,
-    ast::{Access, App, TaskLocal},
+    ast::{Access, App, Local, TaskLocal},
 };
 
 impl App {
@@ -65,5 +65,40 @@ impl App {
                     .filter(|(_, task_local)| Self::is_external(task_local)) // Only check the resources declared in `#[local]`
                     .map(move |(name, _)| name)
             }))
+    }
+
+    fn get_declared_local(tl: &TaskLocal) -> Option<&Local> {
+        match tl {
+            TaskLocal::External => None,
+            TaskLocal::Declared(l) => Some(l),
+        }
+    }
+
+    /// Get all declared local resources, i.e. `local = [NAME: TYPE = EXPR]`.
+    pub fn declared_local_resources(&self) -> Vec<(&Ident, &Local)> {
+        self.init
+            .args
+            .local_resources
+            .iter()
+            .filter_map(move |(name, tl)| Self::get_declared_local(tl).map(|l| (name, l)))
+            .chain(self.idle.iter().flat_map(|idle| {
+                idle.args
+                    .local_resources
+                    .iter()
+                    .filter_map(move |(name, tl)| Self::get_declared_local(tl).map(|l| (name, l)))
+            }))
+            .chain(self.hardware_tasks.values().flat_map(|task| {
+                task.args
+                    .local_resources
+                    .iter()
+                    .filter_map(move |(name, tl)| Self::get_declared_local(tl).map(|l| (name, l)))
+            }))
+            .chain(self.software_tasks.values().flat_map(|task| {
+                task.args
+                    .local_resources
+                    .iter()
+                    .filter_map(move |(name, tl)| Self::get_declared_local(tl).map(|l| (name, l)))
+            }))
+            .collect()
     }
 }
