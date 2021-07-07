@@ -7,7 +7,10 @@ use indexmap::IndexMap;
 use quote::format_ident;
 use syn::{Ident, Type};
 
-use crate::{ast::App, Set};
+use crate::{
+    ast::{App, LocalResources, TaskLocal},
+    Set,
+};
 
 pub(crate) fn app(app: &App) -> Result<Analysis, syn::Error> {
     // Collect all tasks into a vector
@@ -15,58 +18,47 @@ pub(crate) fn app(app: &App) -> Result<Analysis, syn::Error> {
     type Priority = u8;
 
     // The task list is a Tuple (Name, Shared Resources, Local Resources, Priority)
-    let task_resources_list: Vec<(TaskName, Vec<&Ident>, Vec<&Ident>, Priority)> = app
-        .idle
-        .iter()
-        .map(|ht| {
-            (
-                "idle".to_string(),
-                ht.args
-                    .shared_resources
-                    .iter()
-                    .map(|(v, _)| v)
-                    .collect::<Vec<_>>(),
-                ht.args
-                    .local_resources
-                    .iter()
-                    .map(|(v, _)| v)
-                    .collect::<Vec<_>>(),
-                0,
-            )
-        })
-        .chain(app.software_tasks.iter().map(|(name, ht)| {
-            (
-                name.to_string(),
-                ht.args
-                    .shared_resources
-                    .iter()
-                    .map(|(v, _)| v)
-                    .collect::<Vec<_>>(),
-                ht.args
-                    .local_resources
-                    .iter()
-                    .map(|(v, _)| v)
-                    .collect::<Vec<_>>(),
-                ht.args.priority,
-            )
-        }))
-        .chain(app.hardware_tasks.iter().map(|(name, ht)| {
-            (
-                name.to_string(),
-                ht.args
-                    .shared_resources
-                    .iter()
-                    .map(|(v, _)| v)
-                    .collect::<Vec<_>>(),
-                ht.args
-                    .local_resources
-                    .iter()
-                    .map(|(v, _)| v)
-                    .collect::<Vec<_>>(),
-                ht.args.priority,
-            )
-        }))
-        .collect();
+    let task_resources_list: Vec<(TaskName, Vec<&Ident>, &LocalResources, Priority)> =
+        Some(&app.init)
+            .iter()
+            .map(|ht| ("init".to_string(), Vec::new(), &ht.args.local_resources, 0))
+            .chain(app.idle.iter().map(|ht| {
+                (
+                    "idle".to_string(),
+                    ht.args
+                        .shared_resources
+                        .iter()
+                        .map(|(v, _)| v)
+                        .collect::<Vec<_>>(),
+                    &ht.args.local_resources,
+                    0,
+                )
+            }))
+            .chain(app.software_tasks.iter().map(|(name, ht)| {
+                (
+                    name.to_string(),
+                    ht.args
+                        .shared_resources
+                        .iter()
+                        .map(|(v, _)| v)
+                        .collect::<Vec<_>>(),
+                    &ht.args.local_resources,
+                    ht.args.priority,
+                )
+            }))
+            .chain(app.hardware_tasks.iter().map(|(name, ht)| {
+                (
+                    name.to_string(),
+                    ht.args
+                        .shared_resources
+                        .iter()
+                        .map(|(v, _)| v)
+                        .collect::<Vec<_>>(),
+                    &ht.args.local_resources,
+                    ht.args.priority,
+                )
+            }))
+            .collect();
 
     // Create the list of task Idents
     let tasks: Vec<_> = task_resources_list
@@ -144,13 +136,23 @@ pub(crate) fn app(app: &App) -> Result<Analysis, syn::Error> {
     // Check that local resources are not shared
     for lr in local {
         for (task, _, local_resources, _) in task_resources_list.iter() {
-            for r in local_resources {
+            for (name, res) in local_resources.iter() {
                 // Get all uses of resources annotated lock_free
-                if lr == *r {
-                    // HashMap returns the previous existing object if old.key == new.key
-                    if let Some(lr) = lr_hash.insert(r.to_string(), (task, r)) {
-                        lr_with_error.push(lr.1);
-                        lr_with_error.push(r);
+                if lr == name {
+                    match res {
+                        TaskLocal::External => {
+                            // HashMap returns the previous existing object if old.key == new.key
+                            if let Some(lr) = lr_hash.insert(name.to_string(), (task, name)) {
+                                lr_with_error.push(lr.1);
+                                lr_with_error.push(name);
+                            }
+                        }
+                        // If a declared local has the same name as the `#[local]` struct, it's an
+                        // direct error
+                        TaskLocal::Declared(_) => {
+                            lr_with_error.push(lr);
+                            lr_with_error.push(name);
+                        }
                     }
                 }
             }
@@ -162,7 +164,7 @@ pub(crate) fn app(app: &App) -> Result<Analysis, syn::Error> {
         error.push(syn::Error::new(
             resource.span(),
             format!(
-                "Local resource {:?} is used by or collides with multiple tasks",
+                "Local resource {:?} is used by multiple tasks or collides with multiple definitions",
                 resource.to_string(),
             ),
         ));
@@ -220,8 +222,8 @@ pub(crate) fn app(app: &App) -> Result<Analysis, syn::Error> {
     let mut local_resource_locations = IndexMap::new();
 
     for (_, _, locals, _) in task_resources_list {
-        for l in locals {
-            local_resource_locations.insert(l.clone(), Location::Owned);
+        for (local, _) in locals {
+            local_resource_locations.insert(local.clone(), Location::Owned);
         }
     }
 

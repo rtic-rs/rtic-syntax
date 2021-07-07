@@ -18,7 +18,7 @@ mod app {
         d: u32,
     }
 
-    #[init]
+    #[init(local = [a: u32 = 2])]
     fn init(_: init::Context) -> (Shared, Local, init::Monotonics) {
         init::LateResources {}
     }
