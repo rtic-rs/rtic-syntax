@@ -43,6 +43,7 @@ impl App {
             .args
             .local_resources
             .iter()
+            .filter(|(_, task_local)| Self::is_external(task_local)) // Only check the resources declared in `#[local]`
             .map(move |(name, _)| name)
             .chain(self.idle.iter().flat_map(|idle| {
                 idle.args
