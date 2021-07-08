@@ -82,25 +82,6 @@ pub fn extract_lock_free(attrs: &mut Vec<Attribute>) -> parse::Result<bool> {
     }
 }
 
-// pub fn parse_idents(content: ParseStream<'_>) -> parse::Result<Set<Ident>> {
-//     let inner;
-//     bracketed!(inner in content);
-//
-//     let mut idents = Set::new();
-//     for ident in inner.call(Punctuated::<Ident, Token![,]>::parse_terminated)? {
-//         if idents.contains(&ident) {
-//             return Err(parse::Error::new(
-//                 ident.span(),
-//                 "identifier appears more than once in list",
-//             ));
-//         }
-//
-//         idents.insert(ident);
-//     }
-//
-//     Ok(idents)
-// }
-
 pub fn parse_shared_resources(content: ParseStream<'_>) -> parse::Result<SharedResources> {
     let inner;
     bracketed!(inner in content);
@@ -169,18 +150,31 @@ pub fn parse_local_resources(content: ParseStream<'_>) -> parse::Result<LocalRes
         let (name, local) = match e {
             // local = [IDENT],
             Expr::Path(path) => {
+                if !path.attrs.is_empty() {
+                    return Err(parse::Error::new(
+                        path.span(),
+                        "attributes are not supported here",
+                    ));
+                }
+
                 let ident = extract_resource_name_ident(path.path)?;
+                // let (cfgs, attrs) = extract_cfgs(path.attrs);
 
                 (ident, TaskLocal::External)
             }
 
             // local = [IDENT: TYPE = EXPR]
             Expr::Assign(e) => {
-                let (name, ty) = match *e.left {
+                let (name, ty, cfgs, attrs) = match *e.left {
                     Expr::Type(t) => {
-                        // Extract name
-                        let name = match *t.expr {
-                            Expr::Path(path) => extract_resource_name_ident(path.path)?,
+                        // Extract name and attributes
+                        let (name, cfgs, attrs) = match *t.expr {
+                            Expr::Path(path) => {
+                                let name = extract_resource_name_ident(path.path)?;
+                                let (cfgs, attrs) = extract_cfgs(path.attrs);
+
+                                (name, cfgs, attrs)
+                            }
                             _ => return err,
                         };
 
@@ -198,7 +192,7 @@ pub fn parse_local_resources(content: ParseStream<'_>) -> parse::Result<LocalRes
                             )),
                         };
 
-                        (name, ty)
+                        (name, ty, cfgs, attrs)
                     }
                     _ => return Err(parse::Error::new(e.span(), "not a type")),
                 };
@@ -208,8 +202,8 @@ pub fn parse_local_resources(content: ParseStream<'_>) -> parse::Result<LocalRes
                 (
                     name,
                     TaskLocal::Declared(Local {
-                        attrs: Vec::new(),
-                        cfgs: Vec::new(),
+                        attrs,
+                        cfgs,
                         ty,
                         expr,
                     }),

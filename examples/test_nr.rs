@@ -1,6 +1,13 @@
 //! Full syntax
 
-#[mock::app]
+#[mock::app(parse_binds,
+    dispatchers = [
+        #[link_section = ".data.UART1"]
+        A,
+        #[link_section = ".data.UART2"]
+        B
+    ])
+]
 mod app {
     #[shared]
     struct Shared {
