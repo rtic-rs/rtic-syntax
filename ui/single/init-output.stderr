@@ -1,5 +1,0 @@
-error: this `#[init]` function must have signature `fn(init::Context) -> (init::LateResources, init::Monotonics)`
- --> $DIR/init-output.rs:6:8
-  |
-6 |     fn init(_: init::Context) -> u32 {
-  |        ^^^^

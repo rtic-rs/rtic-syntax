@@ -73,8 +73,8 @@ impl<'a> Context<'a> {
     pub fn ident(&self, app: &'a App) -> &'a Ident {
         match self {
             Context::HardwareTask(ident) => ident,
-            Context::Idle => &app.idles.first().unwrap().name,
-            Context::Init => &app.inits.first().unwrap().name,
+            Context::Idle => &app.idle.as_ref().unwrap().name,
+            Context::Init => &app.init.name,
             Context::SoftwareTask(ident) => ident,
         }
     }
@@ -94,23 +94,31 @@ impl<'a> Context<'a> {
         self.is_init() || self.is_idle()
     }
 
-    /// Whether this context has local `static` variables
-    pub fn has_locals(&self, app: &App) -> bool {
+    /// Whether this context has shared resources
+    pub fn has_shared_resources(&self, app: &App) -> bool {
         match *self {
-            Context::HardwareTask(name) => !app.hardware_tasks[name].locals.is_empty(),
-            Context::Idle => !app.idles.first().unwrap().locals.is_empty(),
-            Context::Init => !app.inits.first().unwrap().locals.is_empty(),
-            Context::SoftwareTask(name) => !app.software_tasks[name].locals.is_empty(),
+            Context::HardwareTask(name) => {
+                !app.hardware_tasks[name].args.shared_resources.is_empty()
+            }
+            Context::Idle => !app.idle.as_ref().unwrap().args.shared_resources.is_empty(),
+            Context::Init => false,
+            Context::SoftwareTask(name) => {
+                !app.software_tasks[name].args.shared_resources.is_empty()
+            }
         }
     }
 
-    /// Whether this context has resources
-    pub fn has_resources(&self, app: &App) -> bool {
+    /// Whether this context has local resources
+    pub fn has_local_resources(&self, app: &App) -> bool {
         match *self {
-            Context::HardwareTask(name) => !app.hardware_tasks[name].args.resources.is_empty(),
-            Context::Idle => !app.idles.first().unwrap().args.resources.is_empty(),
-            Context::Init => !app.inits.first().unwrap().args.resources.is_empty(),
-            Context::SoftwareTask(name) => !app.software_tasks[name].args.resources.is_empty(),
+            Context::HardwareTask(name) => {
+                !app.hardware_tasks[name].args.local_resources.is_empty()
+            }
+            Context::Idle => !app.idle.as_ref().unwrap().args.local_resources.is_empty(),
+            Context::Init => !app.init.args.local_resources.is_empty(),
+            Context::SoftwareTask(name) => {
+                !app.software_tasks[name].args.local_resources.is_empty()
+            }
         }
     }
 }

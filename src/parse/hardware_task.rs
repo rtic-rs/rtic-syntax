@@ -1,9 +1,8 @@
 use syn::{parse, ForeignItemFn, ItemFn, Stmt};
 
 use crate::{
-    ast::{HardwareTask, HardwareTaskArgs, Local},
+    ast::{HardwareTask, HardwareTaskArgs},
     parse::util,
-    Map,
 };
 
 impl HardwareTask {
@@ -25,7 +24,6 @@ impl HardwareTask {
         if valid_signature {
             if let Some((context, Ok(rest))) = util::parse_inputs(item.sig.inputs, &name) {
                 if rest.is_empty() {
-                    let (locals, stmts) = util::extract_locals(item.block.stmts)?;
                     let (cfgs, attrs) = util::extract_cfgs(item.attrs);
 
                     return Ok(HardwareTask {
@@ -33,8 +31,7 @@ impl HardwareTask {
                         cfgs,
                         attrs,
                         context,
-                        locals: Local::parse(locals)?,
-                        stmts,
+                        stmts: item.block.stmts,
                         is_extern: false,
                     });
                 }
@@ -80,7 +77,6 @@ impl HardwareTask {
                         cfgs,
                         attrs,
                         context,
-                        locals: Map::<Local>::new(),
                         stmts: Vec::<Stmt>::new(),
                         is_extern: true,
                     });

@@ -1,9 +1,8 @@
 use syn::{parse, ForeignItemFn, ItemFn, Stmt};
 
 use crate::{
-    ast::{Local, SoftwareTask, SoftwareTaskArgs},
+    ast::{SoftwareTask, SoftwareTaskArgs},
     parse::util,
-    Map,
 };
 
 impl SoftwareTask {
@@ -17,7 +16,6 @@ impl SoftwareTask {
 
         if valid_signature {
             if let Some((context, Ok(inputs))) = util::parse_inputs(item.sig.inputs, &name) {
-                let (locals, stmts) = util::extract_locals(item.block.stmts)?;
                 let (cfgs, attrs) = util::extract_cfgs(item.attrs);
 
                 return Ok(SoftwareTask {
@@ -26,8 +24,7 @@ impl SoftwareTask {
                     cfgs,
                     context,
                     inputs,
-                    locals: Local::parse(locals)?,
-                    stmts,
+                    stmts: item.block.stmts,
                     is_extern: false,
                 });
             }
@@ -65,7 +62,6 @@ impl SoftwareTask {
                     cfgs,
                     context,
                     inputs,
-                    locals: Map::<Local>::new(),
                     stmts: Vec::<Stmt>::new(),
                     is_extern: true,
                 });

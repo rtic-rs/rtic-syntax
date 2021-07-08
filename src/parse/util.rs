@@ -1,15 +1,16 @@
-use std::collections::HashSet;
-
 use syn::{
     bracketed,
     parse::{self, ParseStream},
     punctuated::Punctuated,
     spanned::Spanned,
-    Abi, AttrStyle, Attribute, Expr, FnArg, ForeignItemFn, Ident, Item, ItemFn, ItemStatic, Pat,
-    PatType, PathArguments, ReturnType, Stmt, Token, Type, Visibility,
+    Abi, AttrStyle, Attribute, Expr, FnArg, ForeignItemFn, Ident, ItemFn, Pat, PatType, Path,
+    PathArguments, ReturnType, Token, Type, Visibility,
 };
 
-use crate::{ast::Access, Map, Set};
+use crate::{
+    ast::{Access, Local, LocalResources, SharedResources, TaskLocal},
+    Map,
+};
 
 pub fn abi_is_rust(abi: &Abi) -> bool {
     match &abi.name {
@@ -72,53 +73,6 @@ pub fn extract_cfgs(attrs: Vec<Attribute>) -> (Vec<Attribute>, Vec<Attribute>) {
     (cfgs, not_cfgs)
 }
 
-pub fn extract_locals(stmts: Vec<Stmt>) -> parse::Result<(Vec<ItemStatic>, Vec<Stmt>)> {
-    let mut istmts = stmts.into_iter();
-
-    let mut seen = HashSet::new();
-    let mut locals = vec![];
-    let mut stmts = vec![];
-    while let Some(stmt) = istmts.next() {
-        match stmt {
-            Stmt::Item(Item::Static(static_)) => {
-                if static_.mutability.is_some() {
-                    if seen.contains(&static_.ident) {
-                        return Err(parse::Error::new(
-                            static_.ident.span(),
-                            "this local `static` appears more than once",
-                        ));
-                    }
-
-                    seen.insert(static_.ident.clone());
-                    locals.push(static_);
-                } else {
-                    stmts.push(Stmt::Item(Item::Static(static_)));
-                    break;
-                }
-            }
-
-            _ => {
-                stmts.push(stmt);
-                break;
-            }
-        }
-    }
-
-    stmts.extend(istmts);
-
-    Ok((locals, stmts))
-}
-
-pub fn extract_task_local(attrs: &mut Vec<Attribute>) -> parse::Result<bool> {
-    if let Some(pos) = attrs.iter().position(|attr| attr_eq(attr, "task_local")) {
-        attrs.remove(pos);
-
-        Ok(true)
-    } else {
-        Ok(false)
-    }
-}
-
 pub fn extract_lock_free(attrs: &mut Vec<Attribute>) -> parse::Result<bool> {
     if let Some(pos) = attrs.iter().position(|attr| attr_eq(attr, "lock_free")) {
         attrs.remove(pos);
@@ -128,26 +82,7 @@ pub fn extract_lock_free(attrs: &mut Vec<Attribute>) -> parse::Result<bool> {
     }
 }
 
-pub fn parse_idents(content: ParseStream<'_>) -> parse::Result<Set<Ident>> {
-    let inner;
-    bracketed!(inner in content);
-
-    let mut idents = Set::new();
-    for ident in inner.call(Punctuated::<Ident, Token![,]>::parse_terminated)? {
-        if idents.contains(&ident) {
-            return Err(parse::Error::new(
-                ident.span(),
-                "identifier appears more than once in list",
-            ));
-        }
-
-        idents.insert(ident);
-    }
-
-    Ok(idents)
-}
-
-pub fn parse_resources(content: ParseStream<'_>) -> parse::Result<Map<Access>> {
+pub fn parse_shared_resources(content: ParseStream<'_>) -> parse::Result<SharedResources> {
     let inner;
     bracketed!(inner in content);
 
@@ -169,17 +104,7 @@ pub fn parse_resources(content: ParseStream<'_>) -> parse::Result<Map<Access>> {
             _ => return err,
         };
 
-        let ident = if path.leading_colon.is_some()
-            || path.segments.len() != 1
-            || path.segments[0].arguments != PathArguments::None
-        {
-            return Err(parse::Error::new(
-                path.span(),
-                "resource must be an identifier, not a path",
-            ));
-        } else {
-            path.segments[0].ident.clone()
-        };
+        let ident = extract_resource_name_ident(path)?;
 
         if resources.contains_key(&ident) {
             return Err(parse::Error::new(
@@ -189,6 +114,106 @@ pub fn parse_resources(content: ParseStream<'_>) -> parse::Result<Map<Access>> {
         }
 
         resources.insert(ident, access);
+    }
+
+    Ok(resources)
+}
+
+fn extract_resource_name_ident(path: Path) -> parse::Result<Ident> {
+    if path.leading_colon.is_some()
+        || path.segments.len() != 1
+        || path.segments[0].arguments != PathArguments::None
+    {
+        Err(parse::Error::new(
+            path.span(),
+            "resource must be an identifier, not a path",
+        ))
+    } else {
+        Ok(path.segments[0].ident.clone())
+    }
+}
+
+pub fn parse_local_resources(content: ParseStream<'_>) -> parse::Result<LocalResources> {
+    let inner;
+    bracketed!(inner in content);
+
+    let mut resources = Map::new();
+
+    for e in inner.call(Punctuated::<Expr, Token![,]>::parse_terminated)? {
+        let err = Err(parse::Error::new(
+            e.span(),
+            "identifier appears more than once in list",
+        ));
+
+        // println!("e: {:#?}", e);
+
+        let (name, local) = match e {
+            // local = [IDENT],
+            Expr::Path(path) => {
+                if !path.attrs.is_empty() {
+                    return Err(parse::Error::new(
+                        path.span(),
+                        "attributes are not supported here",
+                    ));
+                }
+
+                let ident = extract_resource_name_ident(path.path)?;
+                // let (cfgs, attrs) = extract_cfgs(path.attrs);
+
+                (ident, TaskLocal::External)
+            }
+
+            // local = [IDENT: TYPE = EXPR]
+            Expr::Assign(e) => {
+                let (name, ty, cfgs, attrs) = match *e.left {
+                    Expr::Type(t) => {
+                        // Extract name and attributes
+                        let (name, cfgs, attrs) = match *t.expr {
+                            Expr::Path(path) => {
+                                let name = extract_resource_name_ident(path.path)?;
+                                let (cfgs, attrs) = extract_cfgs(path.attrs);
+
+                                (name, cfgs, attrs)
+                            }
+                            _ => return err,
+                        };
+
+                        let ty = t.ty;
+
+                        // Error check
+                        match &*ty {
+                            Type::Array(_) => {}
+                            Type::Path(_) => {}
+                            Type::Ptr(_) => {}
+                            Type::Tuple(_) => {}
+                            _ => return Err(parse::Error::new(
+                                ty.span(),
+                                "unsupported type, must be an array, tuple, pointer or type path",
+                            )),
+                        };
+
+                        (name, ty, cfgs, attrs)
+                    }
+                    _ => return Err(parse::Error::new(e.span(), "not a type")),
+                };
+
+                let expr = e.right; // Expr
+
+                (
+                    name,
+                    TaskLocal::Declared(Local {
+                        attrs,
+                        cfgs,
+                        ty,
+                        expr,
+                    }),
+                )
+            }
+
+            _ => return err,
+        };
+
+        resources.insert(name, local);
     }
 
     Ok(resources)
@@ -227,17 +252,42 @@ pub fn type_is_bottom(ty: &ReturnType) -> bool {
     }
 }
 
-pub fn type_is_init_return(ty: &ReturnType, name: &str) -> Result<(), ()> {
+fn extract_init_resource_name_ident(ty: Type) -> Result<Ident, ()> {
+    match ty {
+        Type::Path(path) => {
+            let path = path.path;
+
+            if path.leading_colon.is_some()
+                || path.segments.len() != 1
+                || path.segments[0].arguments != PathArguments::None
+            {
+                Err(())
+            } else {
+                Ok(path.segments[0].ident.clone())
+            }
+        }
+        _ => Err(()),
+    }
+}
+
+/// Checks Init's return type and returns the user provided types for use in the analysis
+pub fn type_is_init_return(ty: &ReturnType, name: &str) -> Result<(Ident, Ident), ()> {
     match ty {
         ReturnType::Default => Err(()),
 
         ReturnType::Type(_, ty) => match &**ty {
             Type::Tuple(t) => {
-                if t.elems.len() == 2 {
-                    if type_is_path(&t.elems[0], &[name, "LateResources"])
-                        && type_is_path(&t.elems[1], &[name, "Monotonics"])
-                    {
-                        return Ok(());
+                // return should be:
+                // fn -> (User's #[shared] struct, User's #[local] struct, {name}::Monotonics)
+                //
+                // We check the length and the last one here, analysis checks that the user
+                // provided structs are correct.
+                if t.elems.len() == 3 {
+                    if type_is_path(&t.elems[2], &[name, "Monotonics"]) {
+                        return Ok((
+                            extract_init_resource_name_ident(t.elems[0].clone())?,
+                            extract_init_resource_name_ident(t.elems[1].clone())?,
+                        ));
                     }
                 }
 

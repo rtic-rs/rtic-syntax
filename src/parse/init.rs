@@ -3,13 +3,13 @@ use proc_macro2::TokenStream as TokenStream2;
 use syn::{parse, ItemFn};
 
 use crate::{
-    ast::{Init, InitArgs, Local},
+    ast::{Init, InitArgs},
     parse::util,
 };
 
 impl InitArgs {
     pub(crate) fn parse(tokens: TokenStream2) -> parse::Result<Self> {
-        crate::parse::init_idle_args(tokens)
+        crate::parse::init_args(tokens)
     }
 }
 
@@ -22,18 +22,19 @@ impl Init {
         let name = item.sig.ident.to_string();
 
         if valid_signature {
-            if util::type_is_init_return(&item.sig.output, &name).is_ok() {
+            if let Ok((user_shared_struct, user_local_struct)) =
+                util::type_is_init_return(&item.sig.output, &name)
+            {
                 if let Some((context, Ok(rest))) = util::parse_inputs(item.sig.inputs, &name) {
                     if rest.is_empty() {
-                        let (locals, stmts) = util::extract_locals(item.block.stmts)?;
-
                         return Ok(Init {
                             args,
                             attrs: item.attrs,
                             context,
-                            locals: Local::parse(locals)?,
                             name: item.sig.ident,
-                            stmts,
+                            stmts: item.block.stmts,
+                            user_shared_struct,
+                            user_local_struct,
                         });
                     }
                 }
@@ -43,7 +44,7 @@ impl Init {
         Err(parse::Error::new(
             span,
             &format!(
-                "this `#[init]` function must have signature `fn({}::Context) -> ({0}::LateResources, {0}::Monotonics)`",
+                "the `#[init]` function must have signature `fn({}::Context) -> (Shared resources struct, Local resources struct, {0}::Monotonics)`",
                 name
             ),
         ))

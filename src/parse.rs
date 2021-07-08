@@ -2,9 +2,8 @@ mod app;
 mod hardware_task;
 mod idle;
 mod init;
-mod late_resource;
-mod local;
 mod monotonic;
+mod resource;
 mod software_task;
 mod util;
 
@@ -17,7 +16,10 @@ use syn::{
 };
 
 use crate::{
-    ast::{App, AppArgs, HardwareTaskArgs, InitArgs, MonotonicArgs, SoftwareTaskArgs},
+    ast::{
+        App, AppArgs, HardwareTaskArgs, IdleArgs, InitArgs, MonotonicArgs, SoftwareTaskArgs,
+        TaskLocal,
+    },
     Either, Settings,
 };
 
@@ -64,14 +66,13 @@ impl Parse for Input {
     }
 }
 
-fn init_idle_args(tokens: TokenStream2) -> parse::Result<InitArgs> {
+fn init_args(tokens: TokenStream2) -> parse::Result<InitArgs> {
     (|input: ParseStream<'_>| -> parse::Result<InitArgs> {
         if input.is_empty() {
             return Ok(InitArgs::default());
         }
 
-        let mut late = None;
-        let mut resources = None;
+        let mut local_resources = None;
 
         let content;
         parenthesized!(content in input);
@@ -86,28 +87,15 @@ fn init_idle_args(tokens: TokenStream2) -> parse::Result<InitArgs> {
 
             let ident_s = ident.to_string();
             match &*ident_s {
-                "late" => {
-                    if late.is_some() {
+                "local" => {
+                    if local_resources.is_some() {
                         return Err(parse::Error::new(
                             ident.span(),
                             "argument appears more than once",
                         ));
                     }
 
-                    let idents = util::parse_idents(&content)?;
-
-                    late = Some(idents);
-                }
-
-                "resources" => {
-                    if resources.is_some() {
-                        return Err(parse::Error::new(
-                            ident.span(),
-                            "argument appears more than once",
-                        ));
-                    }
-
-                    resources = Some(util::parse_resources(&content)?);
+                    local_resources = Some(util::parse_local_resources(&content)?);
                 }
 
                 _ => {
@@ -123,10 +111,87 @@ fn init_idle_args(tokens: TokenStream2) -> parse::Result<InitArgs> {
             let _: Token![,] = content.parse()?;
         }
 
-        Ok(InitArgs {
-            late: late.unwrap_or_default(),
+        if let Some(locals) = &local_resources {
+            for (ident, task_local) in locals {
+                match task_local {
+                    TaskLocal::External => {
+                        return Err(parse::Error::new(
+                            ident.span(),
+                            "only declared local resources are allowed in init",
+                        ));
+                    }
+                    _ => {}
+                }
+            }
+        }
 
-            resources: resources.unwrap_or_default(),
+        Ok(InitArgs {
+            local_resources: local_resources.unwrap_or_default(),
+        })
+    })
+    .parse2(tokens)
+}
+
+fn idle_args(tokens: TokenStream2) -> parse::Result<IdleArgs> {
+    (|input: ParseStream<'_>| -> parse::Result<IdleArgs> {
+        if input.is_empty() {
+            return Ok(IdleArgs::default());
+        }
+
+        let mut shared_resources = None;
+        let mut local_resources = None;
+
+        let content;
+        parenthesized!(content in input);
+        loop {
+            if content.is_empty() {
+                break;
+            }
+
+            // #ident = ..
+            let ident: Ident = content.parse()?;
+            let _: Token![=] = content.parse()?;
+
+            let ident_s = ident.to_string();
+            match &*ident_s {
+                "shared" => {
+                    if shared_resources.is_some() {
+                        return Err(parse::Error::new(
+                            ident.span(),
+                            "argument appears more than once",
+                        ));
+                    }
+
+                    shared_resources = Some(util::parse_shared_resources(&content)?);
+                }
+
+                "local" => {
+                    if local_resources.is_some() {
+                        return Err(parse::Error::new(
+                            ident.span(),
+                            "argument appears more than once",
+                        ));
+                    }
+
+                    local_resources = Some(util::parse_local_resources(&content)?);
+                }
+
+                _ => {
+                    return Err(parse::Error::new(ident.span(), "unexpected argument"));
+                }
+            }
+
+            if content.is_empty() {
+                break;
+            }
+
+            // ,
+            let _: Token![,] = content.parse()?;
+        }
+
+        Ok(IdleArgs {
+            shared_resources: shared_resources.unwrap_or_default(),
+            local_resources: local_resources.unwrap_or_default(),
         })
     })
     .parse2(tokens)
@@ -144,7 +209,9 @@ fn task_args(
         let mut binds = None;
         let mut capacity = None;
         let mut priority = None;
-        let mut resources = None;
+        let mut shared_resources = None;
+        let mut local_resources = None;
+
 
         let content;
         parenthesized!(content in input);
@@ -252,15 +319,26 @@ fn task_args(
                     priority = Some(value.unwrap());
                 }
 
-                "resources" => {
-                    if resources.is_some() {
+                "shared" => {
+                    if shared_resources.is_some() {
                         return Err(parse::Error::new(
                             ident.span(),
                             "argument appears more than once",
                         ));
                     }
 
-                    resources = Some(util::parse_resources(&content)?);
+                    shared_resources = Some(util::parse_shared_resources(&content)?);
+                }
+
+                "local" => {
+                    if local_resources.is_some() {
+                        return Err(parse::Error::new(
+                            ident.span(),
+                            "argument appears more than once",
+                        ));
+                    }
+
+                    local_resources = Some(util::parse_local_resources(&content)?);
                 }
 
                 _ => {
@@ -276,19 +354,22 @@ fn task_args(
             let _: Token![,] = content.parse()?;
         }
         let priority = priority.unwrap_or(1);
-        let resources = resources.unwrap_or_default();
+        let shared_resources = shared_resources.unwrap_or_default();
+        let local_resources = local_resources.unwrap_or_default();
 
         Ok(if let Some(binds) = binds {
             Either::Left(HardwareTaskArgs {
                 binds,
                 priority,
-                resources,
+                shared_resources,
+                local_resources,
             })
         } else {
             Either::Right(SoftwareTaskArgs {
                 capacity: capacity.unwrap_or(1),
                 priority,
-                resources,
+                shared_resources,
+                local_resources,
             })
         })
     })

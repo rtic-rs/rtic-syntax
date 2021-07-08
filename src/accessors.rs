@@ -1,63 +1,116 @@
-use syn::{Expr, Ident};
+use syn::Ident;
 
 use crate::{
-    analyze::{Analysis, Location, Priority},
-    ast::{Access, App, LateResource},
+    analyze::Priority,
+    ast::{Access, App, Local, TaskLocal},
 };
 
 impl App {
-    /// Returns information about the resource that matches `name`
-    pub fn resource(&self, name: &Ident) -> Option<(&LateResource, Option<&Expr>)> {
-        self.late_resources
-            .get(name)
-            .map(|late| (late, None))
-            .or_else(|| {
-                self.resources
-                    .get(name)
-                    .map(|res| (&res.late, Some(&*res.expr)))
-            })
-    }
-
-    /// Returns an iterator over all *live* resources
-    pub fn resources<'a>(
-        &'a self,
-        analysis: &'a Analysis,
-    ) -> impl Iterator<Item = (&'a Ident, &'a LateResource, Option<&'a Expr>, &'a Location)> {
-        analysis.locations.iter().map(move |(name, loc)| {
-            let (res, expr) = self.resource(name).expect("UNREACHABLE");
-
-            (name, res, expr, loc)
-        })
-    }
-
-    pub(crate) fn resource_accesses(
+    pub(crate) fn shared_resource_accesses(
         &self,
     ) -> impl Iterator<Item = (Option<Priority>, &Ident, Access)> {
-        self.inits
+        self.idle
             .iter()
-            .flat_map(|init| {
-                init.args
-                    .resources
-                    .iter()
-                    .map(move |(name, access)| (None, name, *access))
-            })
-            .chain(self.idles.iter().flat_map(|idle| {
+            .flat_map(|idle| {
                 idle.args
-                    .resources
+                    .shared_resources
                     .iter()
                     .map(move |(name, access)| (Some(0), name, *access))
-            }))
+            })
             .chain(self.hardware_tasks.values().flat_map(|task| {
                 task.args
-                    .resources
+                    .shared_resources
                     .iter()
                     .map(move |(name, access)| (Some(task.args.priority), name, *access))
             }))
             .chain(self.software_tasks.values().flat_map(|task| {
                 task.args
-                    .resources
+                    .shared_resources
                     .iter()
                     .map(move |(name, access)| (Some(task.args.priority), name, *access))
             }))
+    }
+
+    fn is_external(task_local: &TaskLocal) -> bool {
+        match task_local {
+            TaskLocal::External => true,
+            _ => false,
+        }
+    }
+
+    pub(crate) fn local_resource_accesses(&self) -> impl Iterator<Item = &Ident> {
+        self.init
+            .args
+            .local_resources
+            .iter()
+            .filter(|(_, task_local)| Self::is_external(task_local)) // Only check the resources declared in `#[local]`
+            .map(move |(name, _)| name)
+            .chain(self.idle.iter().flat_map(|idle| {
+                idle.args
+                    .local_resources
+                    .iter()
+                    .filter(|(_, task_local)| Self::is_external(task_local)) // Only check the resources declared in `#[local]`
+                    .map(move |(name, _)| name)
+            }))
+            .chain(self.hardware_tasks.values().flat_map(|task| {
+                task.args
+                    .local_resources
+                    .iter()
+                    .filter(|(_, task_local)| Self::is_external(task_local)) // Only check the resources declared in `#[local]`
+                    .map(move |(name, _)| name)
+            }))
+            .chain(self.software_tasks.values().flat_map(|task| {
+                task.args
+                    .local_resources
+                    .iter()
+                    .filter(|(_, task_local)| Self::is_external(task_local)) // Only check the resources declared in `#[local]`
+                    .map(move |(name, _)| name)
+            }))
+    }
+
+    fn get_declared_local(tl: &TaskLocal) -> Option<&Local> {
+        match tl {
+            TaskLocal::External => None,
+            TaskLocal::Declared(l) => Some(l),
+        }
+    }
+
+    /// Get all declared local resources, i.e. `local = [NAME: TYPE = EXPR]`.
+    ///
+    /// Returns a vector of (task name, resource name, `Local` struct)
+    pub fn declared_local_resources(&self) -> Vec<(&Ident, &Ident, &Local)> {
+        self.init
+            .args
+            .local_resources
+            .iter()
+            .filter_map(move |(name, tl)| {
+                Self::get_declared_local(tl).map(|l| (&self.init.name, name, l))
+            })
+            .chain(self.idle.iter().flat_map(|idle| {
+                idle.args
+                    .local_resources
+                    .iter()
+                    .filter_map(move |(name, tl)| {
+                        Self::get_declared_local(tl)
+                            .map(|l| (&self.idle.as_ref().unwrap().name, name, l))
+                    })
+            }))
+            .chain(self.hardware_tasks.iter().flat_map(|(task_name, task)| {
+                task.args
+                    .local_resources
+                    .iter()
+                    .filter_map(move |(name, tl)| {
+                        Self::get_declared_local(tl).map(|l| (task_name, name, l))
+                    })
+            }))
+            .chain(self.software_tasks.iter().flat_map(|(task_name, task)| {
+                task.args
+                    .local_resources
+                    .iter()
+                    .filter_map(move |(name, tl)| {
+                        Self::get_declared_local(tl).map(|l| (task_name, name, l))
+                    })
+            }))
+            .collect()
     }
 }

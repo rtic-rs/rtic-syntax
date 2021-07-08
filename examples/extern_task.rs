@@ -4,28 +4,28 @@
 mod app {
     // task externally implemented
     use crate::{bar, foo};
-    #[resources]
-    struct Resources {
+
+    #[shared]
+    struct Shared {
         a: u32,
     }
 
-    #[init()]
-    fn init(_: init::Context) -> (init::LateResources, init::Monotonics) {
-        init::LateResources {}
-    }
+    #[local]
+    struct Local {}
 
-    #[idle()]
-    fn idle(_: idle::Context) -> ! {
-        loop {}
-    }
+    #[init]
+    fn init(_: init::Context) -> (Shared, Local, init::Monotonics) {}
+
+    #[idle]
+    fn idle(_: idle::Context) -> ! {}
 
     extern "Rust" {
         // Software task
-        #[task(resources = [a], priority = 2)]
+        #[task(shared = [a], priority = 2)]
         fn foo(_: foo::Context, _: u32);
 
         // Hardware task
-        #[task(binds = UART0, resources = [a], priority = 2)]
+        #[task(binds = UART0, shared = [a], priority = 2)]
         // #[inline(always)] // would be rejected
         fn bar(_: bar::Context);
     }
