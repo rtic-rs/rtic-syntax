@@ -340,6 +340,71 @@ fn sync() {
 }
 
 #[test]
+fn not_sync2() {
+    // `static` resources shared between same priority tasks do not need to be `Sync`
+    let (_app, analysis) = crate::parse2(
+        quote!(),
+        quote!(
+            mod app {
+                #[shared]
+                struct Shared {
+                    x: i32,
+                }
+
+                #[local]
+                struct Local {}
+
+                #[init]
+                fn init(_: init::Context) -> (Shared, Local, init::Monotonics) {}
+
+                #[task(shared = [&x])]
+                fn foo(_: foo::Context) {}
+
+                #[task(shared = [&x])]
+                fn bar(_: bar::Context) {}
+            }
+        ),
+        Settings::default(),
+    )
+    .unwrap();
+
+    assert!(analysis.sync_types.is_empty());
+}
+
+#[test]
+fn not_sync3() {
+    // `static` resources between different priority tasks do not need to be `Sync`, protected by
+    // the mutex
+    let (_app, analysis) = crate::parse2(
+        quote!(),
+        quote!(
+            mod app {
+                #[shared]
+                struct Shared {
+                    x: i32,
+                }
+
+                #[local]
+                struct Local {}
+
+                #[init]
+                fn init(_: init::Context) -> (Shared, Local, init::Monotonics) {}
+
+                #[task(shared = [x])]
+                fn foo(_: foo::Context) {}
+
+                #[task(priority = 2, shared = [x])]
+                fn bar(_: bar::Context) {}
+            }
+        ),
+        Settings::default(),
+    )
+    .unwrap();
+
+    assert!(analysis.sync_types.is_empty());
+}
+
+#[test]
 fn late_resources() {
     // Check so that late resources gets initialized
     let (app, _analysis) = crate::parse2(
