@@ -4,7 +4,6 @@ use core::cmp;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use indexmap::{IndexMap, IndexSet};
-use quote::format_ident;
 use syn::{Ident, Type};
 
 use crate::{
@@ -59,12 +58,6 @@ pub(crate) fn app(app: &App) -> Result<Analysis, syn::Error> {
                 )
             }))
             .collect();
-
-    // Create the list of task Idents
-    let tasks: Vec<_> = task_resources_list
-        .iter()
-        .map(|x| format_ident!("{}", x.0))
-        .collect();
 
     let mut error = vec![];
     let mut lf_res_with_error = vec![];
@@ -283,7 +276,6 @@ pub(crate) fn app(app: &App) -> Result<Analysis, syn::Error> {
         channels,
         shared_resources: used_shared_resource,
         local_resources: used_local_resource,
-        tasks,
         ownerships,
         send_types,
         sync_types,
@@ -302,9 +294,6 @@ pub type Resource = Ident;
 /// Task name
 pub type Task = Ident;
 
-/// List of tasks names
-pub type Tasks = Vec<Ident>;
-
 /// The result of analyzing an RTIC application
 pub struct Analysis {
     /// SPSC message channels
@@ -321,9 +310,6 @@ pub struct Analysis {
     /// If a resource is not listed here it means that's a "dead" (never
     /// accessed) resource and the backend should not generate code for it
     pub local_resources: UsedLocalResource,
-
-    /// A vector containing all task names
-    pub tasks: Tasks,
 
     /// Resource ownership
     pub ownerships: Ownerships,
