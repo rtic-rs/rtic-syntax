@@ -211,7 +211,7 @@ pub struct MonotonicArgs {
     pub binds: Ident,
 
     /// The priority of this monotonic
-    pub priority: u8,
+    pub priority: Option<u8>,
 
     /// If this is the default monotonic
     pub default: bool,

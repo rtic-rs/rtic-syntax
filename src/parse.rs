@@ -470,7 +470,6 @@ fn monotonic_args(tokens: TokenStream2) -> parse::Result<MonotonicArgs> {
                 "`binds = ...` is missing",
             ));
         };
-        let priority = priority.unwrap_or(1);
         let default = default.unwrap_or(false);
 
         Ok(MonotonicArgs {
