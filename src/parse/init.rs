@@ -22,7 +22,7 @@ impl Init {
         let name = item.sig.ident.to_string();
 
         if valid_signature {
-            if let Ok((user_shared_struct, user_local_struct)) =
+            if let Ok((user_shared_struct, user_local_struct, user_actors_struct)) =
                 util::type_is_init_return(&item.sig.output, &name)
             {
                 if let Some((context, Ok(rest))) = util::parse_inputs(item.sig.inputs, &name) {
@@ -35,6 +35,7 @@ impl Init {
                             stmts: item.block.stmts,
                             user_shared_struct,
                             user_local_struct,
+                            user_actors_struct,
                         });
                     }
                 }
