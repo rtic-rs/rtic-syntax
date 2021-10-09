@@ -58,19 +58,28 @@ pub fn check_foreign_fn_signature(item: &ForeignItemFn) -> bool {
         && item.sig.variadic.is_none()
 }
 
-pub fn extract_cfgs(attrs: Vec<Attribute>) -> (Vec<Attribute>, Vec<Attribute>) {
-    let mut cfgs = vec![];
-    let mut not_cfgs = vec![];
+pub struct FilterAttrs {
+    pub cfgs: Vec<Attribute>,
+    pub docs: Vec<Attribute>,
+    pub attrs: Vec<Attribute>,
+}
 
-    for attr in attrs {
+pub fn filter_attributes(input_attrs: Vec<Attribute>) -> FilterAttrs {
+    let mut cfgs = vec![];
+    let mut docs = vec![];
+    let mut attrs = vec![];
+
+    for attr in input_attrs {
         if attr_eq(&attr, "cfg") {
             cfgs.push(attr);
+        } else if attr_eq(&attr, "doc") {
+            docs.push(attr);
         } else {
-            not_cfgs.push(attr);
+            attrs.push(attr);
         }
     }
 
-    (cfgs, not_cfgs)
+    FilterAttrs { cfgs, docs, attrs }
 }
 
 pub fn extract_lock_free(attrs: &mut Vec<Attribute>) -> parse::Result<bool> {
@@ -171,7 +180,7 @@ pub fn parse_local_resources(content: ParseStream<'_>) -> parse::Result<LocalRes
                         let (name, cfgs, attrs) = match *t.expr {
                             Expr::Path(path) => {
                                 let name = extract_resource_name_ident(path.path)?;
-                                let (cfgs, attrs) = extract_cfgs(path.attrs);
+                                let FilterAttrs { cfgs, attrs, .. } = filter_attributes(path.attrs);
 
                                 (name, cfgs, attrs)
                             }

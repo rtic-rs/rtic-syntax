@@ -1,5 +1,6 @@
 use syn::{parse, ForeignItemFn, ItemFn, Stmt};
 
+use crate::parse::util::FilterAttrs;
 use crate::{
     ast::{SoftwareTask, SoftwareTaskArgs},
     parse::util,
@@ -16,7 +17,7 @@ impl SoftwareTask {
 
         if valid_signature {
             if let Some((context, Ok(inputs))) = util::parse_inputs(item.sig.inputs, &name) {
-                let (cfgs, attrs) = util::extract_cfgs(item.attrs);
+                let FilterAttrs { cfgs, attrs, .. } = util::filter_attributes(item.attrs);
 
                 return Ok(SoftwareTask {
                     args,
@@ -54,7 +55,7 @@ impl SoftwareTask {
 
         if valid_signature {
             if let Some((context, Ok(inputs))) = util::parse_inputs(item.sig.inputs, &name) {
-                let (cfgs, attrs) = util::extract_cfgs(item.attrs);
+                let FilterAttrs { cfgs, attrs, .. } = util::filter_attributes(item.attrs);
 
                 return Ok(SoftwareTask {
                     args,

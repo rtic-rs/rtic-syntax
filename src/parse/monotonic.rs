@@ -2,6 +2,7 @@ use proc_macro2::Span;
 use proc_macro2::TokenStream as TokenStream2;
 use syn::{parse, spanned::Spanned, ItemType, Visibility};
 
+use crate::parse::util::FilterAttrs;
 use crate::{
     ast::{Monotonic, MonotonicArgs},
     parse::util,
@@ -22,7 +23,7 @@ impl Monotonic {
             ));
         }
 
-        let (cfgs, attrs) = util::extract_cfgs(item.attrs.clone());
+        let FilterAttrs { cfgs, attrs, .. } = util::filter_attributes(item.attrs.clone());
 
         if attrs.len() > 0 {
             return Err(parse::Error::new(

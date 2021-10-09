@@ -162,6 +162,9 @@ pub struct SharedResource {
     /// `#[cfg]` attributes like `#[cfg(debug_assertions)]`
     pub cfgs: Vec<Attribute>,
 
+    /// `#[doc]` attributes like `/// this is a docstring`
+    pub docs: Vec<Attribute>,
+
     /// Attributes that will apply to this resource
     pub attrs: Vec<Attribute>,
 
@@ -178,6 +181,9 @@ pub struct SharedResource {
 pub struct LocalResource {
     /// `#[cfg]` attributes like `#[cfg(debug_assertions)]`
     pub cfgs: Vec<Attribute>,
+
+    /// `#[doc]` attributes like `/// this is a docstring`
+    pub docs: Vec<Attribute>,
 
     /// Attributes that will apply to this resource
     pub attrs: Vec<Attribute>,

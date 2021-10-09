@@ -1,6 +1,7 @@
 use proc_macro2::Span;
 use syn::{parse, Field, Visibility};
 
+use crate::parse::util::FilterAttrs;
 use crate::{
     ast::{LocalResource, SharedResource, SharedResourceProperties},
     parse::util,
@@ -15,13 +16,18 @@ impl SharedResource {
             ));
         }
 
-        let (cfgs, mut attrs) = util::extract_cfgs(item.attrs.clone());
+        let FilterAttrs {
+            cfgs,
+            mut attrs,
+            docs,
+        } = util::filter_attributes(item.attrs.clone());
 
         let lock_free = util::extract_lock_free(&mut attrs)?;
 
         Ok(SharedResource {
             cfgs,
             attrs,
+            docs,
             ty: Box::new(item.ty.clone()),
             properties: SharedResourceProperties { lock_free },
         })
@@ -37,11 +43,12 @@ impl LocalResource {
             ));
         }
 
-        let (cfgs, attrs) = util::extract_cfgs(item.attrs.clone());
+        let FilterAttrs { cfgs, attrs, docs } = util::filter_attributes(item.attrs.clone());
 
         Ok(LocalResource {
             cfgs,
             attrs,
+            docs,
             ty: Box::new(item.ty.clone()),
         })
     }
