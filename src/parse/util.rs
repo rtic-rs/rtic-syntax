@@ -270,7 +270,7 @@ fn extract_init_resource_name_ident(ty: Type) -> Result<Ident, ()> {
     }
 }
 
-/// Checks Init's return type and returns the user provided types for use in the analysis
+/// Checks Init's return type, return the user provided types for analysis
 pub fn type_is_init_return(ty: &ReturnType, name: &str) -> Result<(Ident, Ident), ()> {
     match ty {
         ReturnType::Default => Err(()),
@@ -282,13 +282,11 @@ pub fn type_is_init_return(ty: &ReturnType, name: &str) -> Result<(Ident, Ident)
                 //
                 // We check the length and the last one here, analysis checks that the user
                 // provided structs are correct.
-                if t.elems.len() == 3 {
-                    if type_is_path(&t.elems[2], &[name, "Monotonics"]) {
-                        return Ok((
-                            extract_init_resource_name_ident(t.elems[0].clone())?,
-                            extract_init_resource_name_ident(t.elems[1].clone())?,
-                        ));
-                    }
+                if t.elems.len() == 3 && type_is_path(&t.elems[2], &[name, "Monotonics"]) {
+                    return Ok((
+                        extract_init_resource_name_ident(t.elems[0].clone())?,
+                        extract_init_resource_name_ident(t.elems[1].clone())?,
+                    ));
                 }
 
                 Err(())

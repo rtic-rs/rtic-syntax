@@ -24,7 +24,7 @@ impl Monotonic {
 
         let (cfgs, attrs) = util::extract_cfgs(item.attrs.clone());
 
-        if attrs.len() > 0 {
+        if !attrs.is_empty() {
             return Err(parse::Error::new(
                 attrs[0].path.span(),
                 "Monotonic does not support attributes other than `#[cfg]`",

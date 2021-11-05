@@ -32,10 +32,7 @@ impl App {
     }
 
     fn is_external(task_local: &TaskLocal) -> bool {
-        match task_local {
-            TaskLocal::External => true,
-            _ => false,
-        }
+        matches!(task_local, TaskLocal::External)
     }
 
     pub(crate) fn local_resource_accesses(&self) -> impl Iterator<Item = &Ident> {

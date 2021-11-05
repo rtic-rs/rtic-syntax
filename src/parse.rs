@@ -107,20 +107,16 @@ fn init_args(tokens: TokenStream2) -> parse::Result<InitArgs> {
                 break;
             }
 
-            // ,
             let _: Token![,] = content.parse()?;
         }
 
         if let Some(locals) = &local_resources {
             for (ident, task_local) in locals {
-                match task_local {
-                    TaskLocal::External => {
-                        return Err(parse::Error::new(
-                            ident.span(),
-                            "only declared local resources are allowed in init",
-                        ));
-                    }
-                    _ => {}
+                if let TaskLocal::External = task_local {
+                    return Err(parse::Error::new(
+                        ident.span(),
+                        "only declared local resources are allowed in init",
+                    ));
                 }
             }
         }
