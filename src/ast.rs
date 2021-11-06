@@ -254,7 +254,7 @@ pub struct SoftwareTask {
 #[non_exhaustive]
 pub struct SoftwareTaskArgs {
     /// The task capacity: the maximum number of pending messages that can be queued
-    pub capacity: u8,
+    pub capacity: u16,
 
     /// The priority of this task
     pub priority: u8,

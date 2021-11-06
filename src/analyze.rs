@@ -343,7 +343,7 @@ pub type SyncTypes = Set<Box<Type>>;
 #[derive(Debug, Default)]
 pub struct Channel {
     /// The channel capacity
-    pub capacity: u8,
+    pub capacity: u16,
 
     /// Tasks that can be spawned on this channel
     pub tasks: BTreeSet<Task>,

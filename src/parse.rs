@@ -275,7 +275,7 @@ fn task_args(
                         ));
                     }
 
-                    let value = lit.base10_parse::<u8>().ok();
+                    let value = lit.base10_parse::<u16>().ok();
                     if value.is_none() || value == Some(0) {
                         return Err(parse::Error::new(
                             lit.span(),
