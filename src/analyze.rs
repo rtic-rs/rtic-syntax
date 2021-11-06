@@ -3,7 +3,7 @@
 use core::cmp;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use quote::format_ident;
 use syn::{Ident, Type};
 
@@ -178,15 +178,15 @@ pub(crate) fn app(app: &App) -> Result<Analysis, syn::Error> {
     }
 
     // e. Location of resources
-    let mut shared_resource_locations = IndexMap::new();
+    let mut used_shared_resource = IndexSet::new();
     let mut ownerships = Ownerships::new();
     let mut sync_types = SyncTypes::new();
     for (prio, name, access) in app.shared_resource_accesses() {
         let res = app.shared_resources.get(name).expect("UNREACHABLE");
 
         // (e)
-        // Add each resource to shared_resource_locations
-        shared_resource_locations.insert(name.clone(), Location::Owned);
+        // This shared resource is used
+        used_shared_resource.insert(name.clone());
 
         // (c)
         if let Some(priority) = prio {
@@ -219,11 +219,11 @@ pub(crate) fn app(app: &App) -> Result<Analysis, syn::Error> {
     }
 
     // Create the list of used local resource Idents
-    let mut local_resource_locations = IndexMap::new();
+    let mut used_local_resource = IndexSet::new();
 
     for (_, _, locals, _) in task_resources_list {
         for (local, _) in locals {
-            local_resource_locations.insert(local.clone(), Location::Owned);
+            used_local_resource.insert(local.clone());
         }
     }
 
@@ -281,8 +281,8 @@ pub(crate) fn app(app: &App) -> Result<Analysis, syn::Error> {
 
     Ok(Analysis {
         channels,
-        shared_resource_locations,
-        local_resource_locations,
+        shared_resources: used_shared_resource,
+        local_resources: used_local_resource,
         tasks,
         ownerships,
         send_types,
@@ -310,17 +310,17 @@ pub struct Analysis {
     /// SPSC message channels
     pub channels: Channels,
 
-    /// Location of all *used* shared resources
+    /// Shared resources
     ///
-    /// If a resource is not listed here it means that's a "dead" (never accessed) resource and the
-    /// backend should not generate code for it
-    pub shared_resource_locations: SharedResourceLocations,
+    /// If a resource is not listed here it means that's a "dead" (never
+    /// accessed) resource and the backend should not generate code for it
+    pub shared_resources: UsedSharedResource,
 
-    /// Location of all *used* local resources
+    /// Local resources
     ///
-    /// If a resource is not listed here it means that's a "dead" (never accessed) resource and the
-    /// backend should not generate code for it
-    pub local_resource_locations: LocalResourceLocations,
+    /// If a resource is not listed here it means that's a "dead" (never
+    /// accessed) resource and the backend should not generate code for it
+    pub local_resources: UsedLocalResource,
 
     /// A vector containing all task names
     pub tasks: Tasks,
@@ -339,10 +339,10 @@ pub struct Analysis {
 pub type Channels = BTreeMap<Priority, Channel>;
 
 /// Location of all *used* shared resources
-pub type SharedResourceLocations = IndexMap<Resource, Location>;
+pub type UsedSharedResource = IndexSet<Resource>;
 
 /// Location of all *used* local resources
-pub type LocalResourceLocations = IndexMap<Resource, Location>;
+pub type UsedLocalResource = IndexSet<Resource>;
 
 /// Resource ownership
 pub type Ownerships = IndexMap<Resource, Ownership>;
@@ -403,11 +403,4 @@ impl Ownership {
     pub fn is_owned(&self) -> bool {
         matches!(self, Ownership::Owned { .. })
     }
-}
-
-/// Resource location
-#[derive(Clone, Debug, PartialEq)]
-pub enum Location {
-    /// resource that is owned
-    Owned,
 }
