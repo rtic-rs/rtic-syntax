@@ -279,7 +279,7 @@ fn task_args(
                     if value.is_none() || value == Some(0) {
                         return Err(parse::Error::new(
                             lit.span(),
-                            "this literal must be in the range 1...255",
+                            "this literal must be in the range 1...65536",
                         ));
                     }
 
