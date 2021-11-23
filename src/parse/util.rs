@@ -154,8 +154,6 @@ pub fn parse_local_resources(content: ParseStream<'_>) -> parse::Result<LocalRes
             "identifier appears more than once in list",
         ));
 
-        // println!("e: {:#?}", e);
-
         let (name, local) = match e {
             // local = [IDENT],
             Expr::Path(path) => {

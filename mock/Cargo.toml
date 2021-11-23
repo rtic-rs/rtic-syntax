@@ -1,5 +1,8 @@
 [package]
-authors = ["Jorge Aparicio <jorge@japaric.io>"]
+authors = [
+  "The Real-Time Interrupt-driven Concurrency developers",
+  "Jorge Aparicio <jorge@japaric.io>",
+]
 edition = "2018"
 name = "mock"
 publish = false

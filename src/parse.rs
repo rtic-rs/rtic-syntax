@@ -76,38 +76,36 @@ fn init_args(tokens: TokenStream2) -> parse::Result<InitArgs> {
 
         let content;
         parenthesized!(content in input);
-        loop {
-            if content.is_empty() {
-                break;
-            }
 
-            // #ident = ..
-            let ident: Ident = content.parse()?;
-            let _: Token![=] = content.parse()?;
+        if !content.is_empty() {
+            loop {
+                // Parse identifier name
+                let ident: Ident = content.parse()?;
+                // Handle equal sign
+                let _: Token![=] = content.parse()?;
 
-            let ident_s = ident.to_string();
-            match &*ident_s {
-                "local" => {
-                    if local_resources.is_some() {
-                        return Err(parse::Error::new(
-                            ident.span(),
-                            "argument appears more than once",
-                        ));
+                match &*ident.to_string() {
+                    "local" => {
+                        if local_resources.is_some() {
+                            return Err(parse::Error::new(
+                                ident.span(),
+                                "argument appears more than once",
+                            ));
+                        }
+
+                        local_resources = Some(util::parse_local_resources(&content)?);
                     }
-
-                    local_resources = Some(util::parse_local_resources(&content)?);
+                    _ => {
+                        return Err(parse::Error::new(ident.span(), "unexpected argument"));
+                    }
                 }
 
-                _ => {
-                    return Err(parse::Error::new(ident.span(), "unexpected argument"));
+                if content.is_empty() {
+                    break;
                 }
+                // Handle comma: ,
+                let _: Token![,] = content.parse()?;
             }
-
-            if content.is_empty() {
-                break;
-            }
-
-            let _: Token![,] = content.parse()?;
         }
 
         if let Some(locals) = &local_resources {
@@ -139,50 +137,47 @@ fn idle_args(tokens: TokenStream2) -> parse::Result<IdleArgs> {
 
         let content;
         parenthesized!(content in input);
-        loop {
-            if content.is_empty() {
-                break;
-            }
+        if !content.is_empty() {
+            loop {
+                // Parse identifier name
+                let ident: Ident = content.parse()?;
+                // Handle equal sign
+                let _: Token![=] = content.parse()?;
 
-            // #ident = ..
-            let ident: Ident = content.parse()?;
-            let _: Token![=] = content.parse()?;
+                match &*ident.to_string() {
+                    "shared" => {
+                        if shared_resources.is_some() {
+                            return Err(parse::Error::new(
+                                ident.span(),
+                                "argument appears more than once",
+                            ));
+                        }
 
-            let ident_s = ident.to_string();
-            match &*ident_s {
-                "shared" => {
-                    if shared_resources.is_some() {
-                        return Err(parse::Error::new(
-                            ident.span(),
-                            "argument appears more than once",
-                        ));
+                        shared_resources = Some(util::parse_shared_resources(&content)?);
                     }
 
-                    shared_resources = Some(util::parse_shared_resources(&content)?);
-                }
+                    "local" => {
+                        if local_resources.is_some() {
+                            return Err(parse::Error::new(
+                                ident.span(),
+                                "argument appears more than once",
+                            ));
+                        }
 
-                "local" => {
-                    if local_resources.is_some() {
-                        return Err(parse::Error::new(
-                            ident.span(),
-                            "argument appears more than once",
-                        ));
+                        local_resources = Some(util::parse_local_resources(&content)?);
                     }
 
-                    local_resources = Some(util::parse_local_resources(&content)?);
+                    _ => {
+                        return Err(parse::Error::new(ident.span(), "unexpected argument"));
+                    }
+                }
+                if content.is_empty() {
+                    break;
                 }
 
-                _ => {
-                    return Err(parse::Error::new(ident.span(), "unexpected argument"));
-                }
+                // Handle comma: ,
+                let _: Token![,] = content.parse()?;
             }
-
-            if content.is_empty() {
-                break;
-            }
-
-            // ,
-            let _: Token![,] = content.parse()?;
         }
 
         Ok(IdleArgs {
@@ -216,8 +211,9 @@ fn task_args(
                 break;
             }
 
-            // #ident = ..
+            // Parse identifier name
             let ident: Ident = content.parse()?;
+            // Handle equal sign
             let _: Token![=] = content.parse()?;
 
             let ident_s = ident.to_string();
@@ -244,7 +240,7 @@ fn task_args(
                         ));
                     }
 
-                    // #ident
+                    // Parse identifier name
                     let ident = content.parse()?;
 
                     binds = Some(ident);
@@ -346,7 +342,7 @@ fn task_args(
                 break;
             }
 
-            // ,
+            // Handle comma: ,
             let _: Token![,] = content.parse()?;
         }
         let priority = priority.unwrap_or(1);
@@ -380,83 +376,79 @@ fn monotonic_args(tokens: TokenStream2) -> parse::Result<MonotonicArgs> {
 
         let content;
         parenthesized!(content in input);
-        loop {
-            if content.is_empty() {
-                break;
+        if !content.is_empty() {
+            loop {
+                // Parse identifier name
+                let ident: Ident = content.parse()?;
+                // Handle equal sign
+                let _: Token![=] = content.parse()?;
+
+                match &*ident.to_string() {
+                    "binds" => {
+                        if binds.is_some() {
+                            return Err(parse::Error::new(
+                                ident.span(),
+                                "argument appears more than once",
+                            ));
+                        }
+                        // Parse identifier name
+                        let ident = content.parse()?;
+
+                        binds = Some(ident);
+                    }
+
+                    "priority" => {
+                        if priority.is_some() {
+                            return Err(parse::Error::new(
+                                ident.span(),
+                                "argument appears more than once",
+                            ));
+                        }
+
+                        // #lit
+                        let lit: LitInt = content.parse()?;
+
+                        if !lit.suffix().is_empty() {
+                            return Err(parse::Error::new(
+                                lit.span(),
+                                "this literal must be unsuffixed",
+                            ));
+                        }
+
+                        let value = lit.base10_parse::<u8>().ok();
+                        if value.is_none() || value == Some(0) {
+                            return Err(parse::Error::new(
+                                lit.span(),
+                                "this literal must be in the range 1...255",
+                            ));
+                        }
+
+                        priority = Some(value.unwrap());
+                    }
+
+                    "default" => {
+                        if default.is_some() {
+                            return Err(parse::Error::new(
+                                ident.span(),
+                                "argument appears more than once",
+                            ));
+                        }
+
+                        let lit: LitBool = content.parse()?;
+                        default = Some(lit.value);
+                    }
+
+                    _ => {
+                        return Err(parse::Error::new(ident.span(), "unexpected argument"));
+                    }
+                }
+                if content.is_empty() {
+                    break;
+                }
+
+                // Handle comma: ,
+                let _: Token![,] = content.parse()?;
             }
-
-            // #ident = ..
-            let ident: Ident = content.parse()?;
-            let _: Token![=] = content.parse()?;
-
-            let ident_s = ident.to_string();
-            match &*ident_s {
-                "binds" => {
-                    if binds.is_some() {
-                        return Err(parse::Error::new(
-                            ident.span(),
-                            "argument appears more than once",
-                        ));
-                    }
-
-                    // #ident
-                    let ident = content.parse()?;
-
-                    binds = Some(ident);
-                }
-
-                "priority" => {
-                    if priority.is_some() {
-                        return Err(parse::Error::new(
-                            ident.span(),
-                            "argument appears more than once",
-                        ));
-                    }
-
-                    // #lit
-                    let lit: LitInt = content.parse()?;
-
-                    if !lit.suffix().is_empty() {
-                        return Err(parse::Error::new(
-                            lit.span(),
-                            "this literal must be unsuffixed",
-                        ));
-                    }
-
-                    let value = lit.base10_parse::<u8>().ok();
-                    if value.is_none() || value == Some(0) {
-                        return Err(parse::Error::new(
-                            lit.span(),
-                            "this literal must be in the range 1...255",
-                        ));
-                    }
-
-                    priority = Some(value.unwrap());
-                }
-
-                "default" => {
-                    if default.is_some() {
-                        return Err(parse::Error::new(
-                            ident.span(),
-                            "argument appears more than once",
-                        ));
-                    }
-
-                    let lit: LitBool = content.parse()?;
-                    default = Some(lit.value);
-                }
-
-                _ => {
-                    return Err(parse::Error::new(ident.span(), "unexpected argument"));
-                }
-            }
-
-            if content.is_empty() {
-                break;
-            }
-
-            // ,
-            let _: Token![,] = content.parse()?;
         }
         let binds = if let Some(r) = binds {
             r

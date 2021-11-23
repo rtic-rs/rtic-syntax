@@ -224,7 +224,7 @@ pub(crate) fn app(app: &App) -> Result<Analysis, syn::Error> {
     let mut send_types = SendTypes::new();
     let owned_by_idle = Ownership::Owned { priority: 0 };
     for (name, res) in app.shared_resources.iter() {
-        // handle not owned by idle
+        // Handle not owned by idle
         if ownerships
             .get(name)
             .map(|ownership| *ownership != owned_by_idle)
