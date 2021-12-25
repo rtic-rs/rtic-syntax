@@ -5,6 +5,8 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+## [v1.0.0] - 2021-12-25
+
 ### Added
 
 - Allow annotating resources to activate special resource locking behaviour.
@@ -21,6 +23,8 @@ This project adheres to [Semantic Versioning](http://semver.org/).
   implementation in extern block `extern "Rust" { #[task(..)] fn t(..); }`.
 
 ### Changed
+
+- Edition 2021
 
 - [breaking-change] Remove `Location`, changes analysis struct contents:
   `shared_resource_locations` -> `shared_resources`. Same for local.
@@ -111,7 +115,8 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 - Initial release
 
-[Unreleased]: https://github.com/rtic-rs/rtic-syntax/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/rtic-rs/rtic-syntax/compare/v1.0.0...HEAD
+[v1.0.0]: https://github.com/rtic-rs/rtic-syntax/compare/v0.4.0...v1.0.0
 [v0.4.0]: https://github.com/rtic-rs/rtic-syntax/compare/v0.3.4...v0.4.0
 [v0.3.4]: https://github.com/rtic-rs/rtic-syntax/compare/v0.3.3...v0.3.4
 [v0.3.3]: https://github.com/rtic-rs/rtic-syntax/compare/v0.3.2...v0.3.3
