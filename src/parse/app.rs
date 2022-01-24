@@ -383,7 +383,46 @@ impl App {
                     for item in mod_.items {
                         if let ForeignItem::Fn(mut item) = item {
                             let span = item.sig.ident.span();
+                            // Find externally defined #[init] tasks
                             if let Some(pos) = item
+                                .attrs
+                                .iter()
+                                .position(|attr| util::attr_eq(attr, "init"))
+                            {
+                                let args = InitArgs::parse(item.attrs.remove(pos).tokens)?;
+
+                                // If an init function already exists, error
+                                if init.is_some() {
+                                    return Err(parse::Error::new(
+                                        span,
+                                        "`#[init]` function must appear at most once",
+                                    ));
+                                }
+
+                                check_ident(&item.sig.ident)?;
+
+                                init = Some(Init::parse_foreign(args, item.clone())?);
+
+                                // Find externally defined #[idle] tasks
+                            } else if let Some(pos) = item
+                                .attrs
+                                .iter()
+                                .position(|attr| util::attr_eq(attr, "idle"))
+                            {
+                                let args = IdleArgs::parse(item.attrs.remove(pos).tokens)?;
+
+                                // If an idle function already exists, error
+                                if idle.is_some() {
+                                    return Err(parse::Error::new(
+                                        span,
+                                        "`#[idle]` function must appear at most once",
+                                    ));
+                                }
+
+                                check_ident(&item.sig.ident)?;
+
+                                idle = Some(Idle::parse_foreign(args, item.clone())?);
+                            } else if let Some(pos) = item
                                 .attrs
                                 .iter()
                                 .position(|attr| util::attr_eq(attr, "task"))
@@ -400,7 +439,7 @@ impl App {
                                 if item.attrs.len() != 1 {
                                     return Err(parse::Error::new(
                                         span,
-                                        "`extern` task required `#[task(..)]` attribute",
+                                        "`extern` tasks only supports one attribute: `#[task(..)]`",
                                     ));
                                 }
 
@@ -430,14 +469,10 @@ impl App {
                             } else {
                                 return Err(parse::Error::new(
                                     span,
-                                    "`extern` task required `#[task(..)]` attribute",
+                                    "`extern` task, init or idle must have either `#[task(..)]`,
+                                    `#[init(..)]` or `#[idle(..)]` attribute",
                                 ));
                             }
-                        } else {
-                            return Err(parse::Error::new(
-                                item.span(),
-                                "this item must live outside the `#[app]` module",
-                            ));
                         }
                     }
                 }

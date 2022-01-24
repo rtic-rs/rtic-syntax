@@ -47,9 +47,6 @@ impl HardwareTask {
             ),
         ))
     }
-}
-
-impl HardwareTask {
     pub(crate) fn parse_foreign(
         args: HardwareTaskArgs,
         item: ForeignItemFn,
