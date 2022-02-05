@@ -1,5 +1,5 @@
 error: `binds = ...` is missing
- --> $DIR/monotonic-no-binds.rs:5:17
+ --> ui/monotonic-no-binds.rs:5:16
   |
 5 |     #[monotonic()]
-  |                 ^
+  |                ^^
