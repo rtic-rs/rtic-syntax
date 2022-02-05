@@ -8,6 +8,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 ### Added
 
 - CI changelog entry enforcer
+- Support for externally defined #[init] and #[idle]
 
 ## [v1.0.0] - 2021-12-25
 
