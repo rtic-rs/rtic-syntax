@@ -9,6 +9,10 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 - CI changelog entry enforcer
 
+### Fixed
+
+- UI test output
+
 ## [v1.0.0] - 2021-12-25
 
 ### Added
