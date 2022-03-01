@@ -9,6 +9,12 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 - CI changelog entry enforcer
 
+### Changed
+
+### Fixed
+
+- Use swatinem rust-cache for GHA CI
+
 ## [v1.0.0] - 2021-12-25
 
 ### Added
