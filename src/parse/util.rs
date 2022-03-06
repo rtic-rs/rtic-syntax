@@ -201,7 +201,7 @@ pub fn parse_local_resources(content: ParseStream<'_>) -> parse::Result<LocalRes
 
                         (name, ty, cfgs, attrs)
                     }
-                    _ => return Err(parse::Error::new(e.span(), "not a type")),
+                    e => return Err(parse::Error::new(e.span(), "malformed, expected a type")),
                 };
 
                 let expr = e.right; // Expr
@@ -217,7 +217,12 @@ pub fn parse_local_resources(content: ParseStream<'_>) -> parse::Result<LocalRes
                 )
             }
 
-            _ => return err,
+            expr => {
+                return Err(parse::Error::new(
+                    expr.span(),
+                    "malformed, exptected 'IDENT: TYPE = EXPR'",
+                ))
+            }
         };
 
         resources.insert(name, local);
