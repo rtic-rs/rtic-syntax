@@ -9,10 +9,12 @@ mod util;
 
 use proc_macro2::TokenStream as TokenStream2;
 use syn::{
-    braced, parenthesized,
+    braced,
+    group::parse_parens,
+    parenthesized,
     parse::{self, Parse, ParseStream, Parser},
     token::Brace,
-    Ident, Item, LitBool, LitInt, Token,
+    Ident, Item, LitBool, LitInt, Path, Token,
 };
 
 use crate::{
@@ -368,14 +370,22 @@ fn task_args(
     .parse2(tokens)
 }
 
-fn monotonic_args(tokens: TokenStream2) -> parse::Result<MonotonicArgs> {
+fn monotonic_args(path: Path, tokens: TokenStream2) -> parse::Result<MonotonicArgs> {
     (|input: ParseStream<'_>| -> parse::Result<MonotonicArgs> {
         let mut binds = None;
         let mut priority = None;
         let mut default = None;
 
-        let content;
-        parenthesized!(content in input);
+        let content = match parse_parens(input) {
+            Ok(parens) => parens.content,
+            Err(_) => {
+                return Err(parse::Error::new(
+                    path.segments.first().unwrap().ident.span(),
+                    "expected opening ( in #[monotonic( ... )]",
+                ));
+            }
+        };
+
         if !content.is_empty() {
             loop {
                 // Parse identifier name
@@ -450,6 +460,7 @@ fn monotonic_args(tokens: TokenStream2) -> parse::Result<MonotonicArgs> {
                 let _: Token![,] = content.parse()?;
             }
         }
+
         let binds = if let Some(r) = binds {
             r
         } else {

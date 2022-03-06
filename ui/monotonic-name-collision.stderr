@@ -1,5 +1,5 @@
-error: `#[monotonic]` on a specific type must appear at most once
- --> $DIR/monotonic-name-collision.rs:9:10
+error: `#[monotonic(...)]` on a specific type must appear at most once
+ --> ui/monotonic-name-collision.rs:9:10
   |
 9 |     type Fast1 = hal::Tim2Monotonic;
   |          ^^^^^

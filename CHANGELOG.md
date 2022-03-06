@@ -14,6 +14,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 ### Fixed
 
 - Use swatinem rust-cache for GHA CI
+- Cryptic error message when writing `#[monotonic]`
 
 ## [v1.0.0] - 2021-12-25
 

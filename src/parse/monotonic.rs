@@ -1,5 +1,5 @@
 use proc_macro2::Span;
-use proc_macro2::TokenStream as TokenStream2;
+use syn::Attribute;
 use syn::{parse, spanned::Spanned, ItemType, Visibility};
 
 use crate::parse::util::FilterAttrs;
@@ -9,8 +9,8 @@ use crate::{
 };
 
 impl MonotonicArgs {
-    pub(crate) fn parse(tokens: TokenStream2) -> parse::Result<Self> {
-        crate::parse::monotonic_args(tokens)
+    pub(crate) fn parse(attr: Attribute) -> parse::Result<Self> {
+        crate::parse::monotonic_args(attr.path, attr.tokens)
     }
 }
 
