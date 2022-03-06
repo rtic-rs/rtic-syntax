@@ -457,7 +457,7 @@ impl App {
                         if monotonics.contains_key(&type_item.ident) {
                             return Err(parse::Error::new(
                                 span,
-                                "`#[monotonic]` on a specific type must appear at most once",
+                                "`#[monotonic(...)]` on a specific type must appear at most once",
                             ));
                         }
 
@@ -470,7 +470,8 @@ impl App {
 
                         check_monotonic(&*type_item.ty)?;
 
-                        let args = MonotonicArgs::parse(type_item.attrs.remove(pos).tokens)?;
+                        let m = type_item.attrs.remove(pos);
+                        let args = MonotonicArgs::parse(m)?;
 
                         check_binding(&args.binds)?;
 
