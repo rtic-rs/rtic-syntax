@@ -13,6 +13,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Fixed
 
+- Better errors for malformed `local` expressions
 - Use swatinem rust-cache for GHA CI
 - Cryptic error message when writing `#[monotonic]`
 
