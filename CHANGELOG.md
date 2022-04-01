@@ -33,6 +33,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 ### Added
 
 - CI changelog entry enforcer
+- actor API syntax. for details see [RFC #52](https://github.com/rtic-rs/rfcs/pull/52)
 
 ### Changed
 
