@@ -144,7 +144,7 @@ impl Parse for Subscribe {
             let _: Token![,] = content.parse()?;
             let ident: Ident = content.parse()?;
 
-            if ident.to_string() == "capacity" {
+            if ident == "capacity" {
                 let _: Token![=] = content.parse()?;
                 Some(content.parse()?)
             } else {
