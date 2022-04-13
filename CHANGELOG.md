@@ -7,6 +7,14 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [v1.0.1] - 2022-04-13
+
+### Added
+
 - CI changelog entry enforcer
 
 ### Changed
@@ -127,7 +135,8 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 - Initial release
 
-[Unreleased]: https://github.com/rtic-rs/rtic-syntax/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/rtic-rs/rtic-syntax/compare/v1.0.1...HEAD
+[v1.0.0]: https://github.com/rtic-rs/rtic-syntax/compare/v1.0.0...v1.0.1
 [v1.0.0]: https://github.com/rtic-rs/rtic-syntax/compare/v0.4.0...v1.0.0
 [v0.4.0]: https://github.com/rtic-rs/rtic-syntax/compare/v0.3.4...v0.4.0
 [v0.3.4]: https://github.com/rtic-rs/rtic-syntax/compare/v0.3.3...v0.3.4
