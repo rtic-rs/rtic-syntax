@@ -1,4 +1,4 @@
-error: malformed, exptected 'IDENT: TYPE = EXPR'
+error: malformed, expected 'IDENT: TYPE = EXPR'
   --> ui/local-malformed-2.rs:11:21
    |
 11 |     #[task(local = [a: u32])]
