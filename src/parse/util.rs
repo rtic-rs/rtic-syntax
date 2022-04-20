@@ -220,7 +220,7 @@ pub fn parse_local_resources(content: ParseStream<'_>) -> parse::Result<LocalRes
             expr => {
                 return Err(parse::Error::new(
                     expr.span(),
-                    "malformed, exptected 'IDENT: TYPE = EXPR'",
+                    "malformed, expected 'IDENT: TYPE = EXPR'",
                 ))
             }
         };
