@@ -126,6 +126,9 @@ pub struct Idle {
 
     /// The statements that make up this `idle` function
     pub stmts: Vec<Stmt>,
+
+    /// If idle is marked as `async`
+    pub is_async: bool,
 }
 
 /// `idle` context metadata
@@ -247,6 +250,9 @@ pub struct SoftwareTask {
 
     /// The task is declared externally
     pub is_extern: bool,
+
+    /// If the task is marked as `async`
+    pub is_async: bool,
 }
 
 /// Software task metadata

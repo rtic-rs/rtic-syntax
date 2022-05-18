@@ -7,6 +7,8 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Added
 
+- Support for async idle and software tasks
+
 ### Changed
 
 ### Fixed

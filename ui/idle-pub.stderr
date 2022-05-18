@@ -1,5 +1,5 @@
-error: this `#[idle]` function must have signature `fn(idle::Context) -> !`
- --> $DIR/idle-pub.rs:6:12
+error: this `#[idle]` function must have signature `(async) fn(idle::Context) -> !`
+ --> ui/idle-pub.rs:6:12
   |
 6 |     pub fn idle(_: idle::Context) -> ! {
   |            ^^^^

@@ -15,7 +15,7 @@ impl InitArgs {
 
 impl Init {
     pub(crate) fn parse(args: InitArgs, item: ItemFn) -> parse::Result<Self> {
-        let valid_signature = util::check_fn_signature(&item) && item.sig.inputs.len() == 1;
+        let valid_signature = util::check_fn_signature(&item, false) && item.sig.inputs.len() == 1;
 
         let span = item.sig.ident.span();
 

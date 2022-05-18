@@ -9,7 +9,7 @@ use crate::{
 impl HardwareTask {
     pub(crate) fn parse(args: HardwareTaskArgs, item: ItemFn) -> parse::Result<Self> {
         let span = item.sig.ident.span();
-        let valid_signature = util::check_fn_signature(&item)
+        let valid_signature = util::check_fn_signature(&item, false)
             && item.sig.inputs.len() == 1
             && util::type_is_unit(&item.sig.output);
 
@@ -55,7 +55,7 @@ impl HardwareTask {
         item: ForeignItemFn,
     ) -> parse::Result<Self> {
         let span = item.sig.ident.span();
-        let valid_signature = util::check_foreign_fn_signature(&item)
+        let valid_signature = util::check_foreign_fn_signature(&item, false)
             && item.sig.inputs.len() == 1
             && util::type_is_unit(&item.sig.output);
 

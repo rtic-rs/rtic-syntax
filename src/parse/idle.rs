@@ -14,11 +14,12 @@ impl IdleArgs {
 
 impl Idle {
     pub(crate) fn parse(args: IdleArgs, item: ItemFn) -> parse::Result<Self> {
-        let valid_signature = util::check_fn_signature(&item)
+        let valid_signature = util::check_fn_signature(&item, true)
             && item.sig.inputs.len() == 1
             && util::type_is_bottom(&item.sig.output);
 
         let name = item.sig.ident.to_string();
+        let is_async = item.sig.asyncness.is_some();
 
         if valid_signature {
             if let Some((context, Ok(rest))) = util::parse_inputs(item.sig.inputs, &name) {
@@ -29,6 +30,7 @@ impl Idle {
                         context,
                         name: item.sig.ident,
                         stmts: item.block.stmts,
+                        is_async,
                     });
                 }
             }
@@ -37,7 +39,7 @@ impl Idle {
         Err(parse::Error::new(
             item.sig.ident.span(),
             &format!(
-                "this `#[idle]` function must have signature `fn({}::Context) -> !`",
+                "this `#[idle]` function must have signature `(async) fn({}::Context) -> !`",
                 name
             ),
         ))

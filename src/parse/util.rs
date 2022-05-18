@@ -35,10 +35,10 @@ pub fn attr_eq(attr: &Attribute, name: &str) -> bool {
 /// - is not generic (has no type parameters)
 /// - is not variadic
 /// - uses the Rust ABI (and not e.g. "C")
-pub fn check_fn_signature(item: &ItemFn) -> bool {
+pub fn check_fn_signature(item: &ItemFn, allow_async: bool) -> bool {
     item.vis == Visibility::Inherited
         && item.sig.constness.is_none()
-        && item.sig.asyncness.is_none()
+        && (item.sig.asyncness.is_none() || allow_async)
         && item.sig.abi.is_none()
         && item.sig.unsafety.is_none()
         && item.sig.generics.params.is_empty()
@@ -47,10 +47,10 @@ pub fn check_fn_signature(item: &ItemFn) -> bool {
 }
 
 #[allow(dead_code)]
-pub fn check_foreign_fn_signature(item: &ForeignItemFn) -> bool {
+pub fn check_foreign_fn_signature(item: &ForeignItemFn, allow_async: bool) -> bool {
     item.vis == Visibility::Inherited
         && item.sig.constness.is_none()
-        && item.sig.asyncness.is_none()
+        && (item.sig.asyncness.is_none() || allow_async)
         && item.sig.abi.is_none()
         && item.sig.unsafety.is_none()
         && item.sig.generics.params.is_empty()
