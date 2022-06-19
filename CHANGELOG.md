@@ -11,6 +11,12 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Fixed
 
+## [v1.0.2] - 2022-06-19
+
+### Fixed
+
+- Use of private `syn::group` module
+
 ## [v1.0.1] - 2022-04-13
 
 ### Added
@@ -135,8 +141,9 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 - Initial release
 
-[Unreleased]: https://github.com/rtic-rs/rtic-syntax/compare/v1.0.1...HEAD
-[v1.0.0]: https://github.com/rtic-rs/rtic-syntax/compare/v1.0.0...v1.0.1
+[Unreleased]: https://github.com/rtic-rs/rtic-syntax/compare/v1.0.2...HEAD
+[v1.0.2]: https://github.com/rtic-rs/rtic-syntax/compare/v1.0.1...v1.0.2
+[v1.0.1]: https://github.com/rtic-rs/rtic-syntax/compare/v1.0.0...v1.0.1
 [v1.0.0]: https://github.com/rtic-rs/rtic-syntax/compare/v0.4.0...v1.0.0
 [v0.4.0]: https://github.com/rtic-rs/rtic-syntax/compare/v0.3.4...v0.4.0
 [v0.3.4]: https://github.com/rtic-rs/rtic-syntax/compare/v0.3.3...v0.3.4
