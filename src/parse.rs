@@ -202,6 +202,7 @@ fn task_args(
         let mut priority = None;
         let mut shared_resources = None;
         let mut local_resources = None;
+        let mut prio_span = None;
 
 
         let content;
@@ -217,6 +218,7 @@ fn task_args(
             let _: Token![=] = content.parse()?;
 
             let ident_s = ident.to_string();
+
             match &*ident_s {
                 "binds" if !settings.parse_binds => {
                     return Err(parse::Error::new(
@@ -301,13 +303,14 @@ fn task_args(
                     }
 
                     let value = lit.base10_parse::<u8>().ok();
-                    if value.is_none() || value == Some(0) {
+                    if value.is_none() {
                         return Err(parse::Error::new(
                             lit.span(),
-                            "this literal must be in the range 1...255",
+                            "this literal must be in the range 0...255",
                         ));
                     }
 
+                    prio_span = Some(lit.span());
                     priority = Some(value.unwrap());
                 }
 
@@ -350,6 +353,13 @@ fn task_args(
         let local_resources = local_resources.unwrap_or_default();
 
         Ok(if let Some(binds) = binds {
+            if priority == 0 {
+                return Err(parse::Error::new(
+                    prio_span.unwrap(),
+                    "hardware tasks are not allowed to be at priority 0",
+                ));
+            }
+
             Either::Left(HardwareTaskArgs {
                 binds,
                 priority,

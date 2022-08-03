@@ -126,9 +126,6 @@ pub struct Idle {
 
     /// The statements that make up this `idle` function
     pub stmts: Vec<Stmt>,
-
-    /// If idle is marked as `async`
-    pub is_async: bool,
 }
 
 /// `idle` context metadata

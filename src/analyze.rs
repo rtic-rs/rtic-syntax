@@ -39,7 +39,7 @@ pub(crate) fn app(app: &App) -> Result<Analysis, syn::Error> {
                         .collect::<Vec<_>>(),
                     &ht.args.local_resources,
                     0,
-                    ht.is_async,
+                    false,
                 )
             }))
             .chain(app.software_tasks.iter().map(|(name, ht)| {
@@ -183,6 +183,33 @@ pub(crate) fn app(app: &App) -> Result<Analysis, syn::Error> {
                 resource.to_string(),
             ),
         ));
+    }
+
+    // Check 0-priority async software tasks and idle dependency
+    for (name, task) in &app.software_tasks {
+        if task.args.priority == 0 {
+            // If there is a 0-priority task, there must be no idle
+            if app.idle.is_some() {
+                error.push(syn::Error::new(
+                    name.span(),
+                    format!(
+                        "Software task {:?} has priority 0, but `#[idle]` is defined. 0-priority software tasks are only allowed if there is no `#[idle]`.",
+                        name.to_string(),
+                    )
+                ));
+            }
+
+            // 0-priority tasks must be async
+            if !task.is_async {
+                error.push(syn::Error::new(
+                    name.span(),
+                    format!(
+                        "Software task {:?} has priority 0, but is not `async`. 0-priority software tasks must be `async`.",
+                        name.to_string(),
+                    )
+                ));
+            }
+        }
     }
 
     // Collect errors if any and return/halt

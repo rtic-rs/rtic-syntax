@@ -1,5 +1,5 @@
-error: this literal must be in the range 1...255
- --> $DIR/task-priority-too-low.rs:5:23
+error: hardware tasks are not allowed to be at priority 0
+ --> ui/task-priority-too-low.rs:5:38
   |
-5 |     #[task(priority = 0)]
-  |                       ^
+5 |     #[task(binds = UART0, priority = 0)]
+  |                                      ^

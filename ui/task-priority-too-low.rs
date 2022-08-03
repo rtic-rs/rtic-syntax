@@ -1,7 +1,7 @@
 #![no_main]
 
-#[mock::app]
+#[mock::app(parse_binds)]
 mod app {
-    #[task(priority = 0)]
+    #[task(binds = UART0, priority = 0)]
     fn foo(_: foo::Context) {}
 }
