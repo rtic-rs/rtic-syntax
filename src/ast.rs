@@ -267,6 +267,9 @@ pub struct SoftwareTaskArgs {
 
     /// Shared resources that can be accessed from this context
     pub shared_resources: SharedResources,
+
+    /// Only same priority tasks can spawn this task
+    pub only_same_priority_spawn: bool,
 }
 
 impl Default for SoftwareTaskArgs {
@@ -276,6 +279,7 @@ impl Default for SoftwareTaskArgs {
             priority: 1,
             local_resources: LocalResources::new(),
             shared_resources: SharedResources::new(),
+            only_same_priority_spawn: false,
         }
     }
 }

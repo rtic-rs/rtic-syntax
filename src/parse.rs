@@ -203,7 +203,8 @@ fn task_args(
         let mut shared_resources = None;
         let mut local_resources = None;
         let mut prio_span = None;
-
+        let mut only_same_priority_spawn = false;
+        let mut only_same_prio_span = None;
 
         let content;
         parenthesized!(content in input);
@@ -214,10 +215,31 @@ fn task_args(
 
             // Parse identifier name
             let ident: Ident = content.parse()?;
+            let ident_s = ident.to_string();
+
+            if  ident_s ==  "only_same_priority_spawn_please_fix_me" {
+                if only_same_priority_spawn {
+                    return Err(parse::Error::new(
+                        ident.span(),
+                        "argument appears more than once",
+                    ));
+                }
+
+                only_same_priority_spawn = true;
+                only_same_prio_span = Some(ident.span());
+
+                if content.is_empty() {
+                    break;
+                }
+
+                // Handle comma: ,
+                let _: Token![,] = content.parse()?;
+
+                continue;
+            }
+
             // Handle equal sign
             let _: Token![=] = content.parse()?;
-
-            let ident_s = ident.to_string();
 
             match &*ident_s {
                 "binds" if !settings.parse_binds => {
@@ -336,6 +358,7 @@ fn task_args(
                     local_resources = Some(util::parse_local_resources(&content)?);
                 }
 
+
                 _ => {
                     return Err(parse::Error::new(ident.span(), "unexpected argument"));
                 }
@@ -360,6 +383,13 @@ fn task_args(
                 ));
             }
 
+            if only_same_priority_spawn {
+                return Err(parse::Error::new(
+                    only_same_prio_span.unwrap(),
+                    "hardware tasks are not allowed to be spawned, `only_same_priority_spawn_please_fix_me` is only for software tasks",
+                ));
+            }
+
             Either::Left(HardwareTaskArgs {
                 binds,
                 priority,
@@ -372,6 +402,7 @@ fn task_args(
                 priority,
                 shared_resources,
                 local_resources,
+                only_same_priority_spawn,
             })
         })
     })

@@ -286,8 +286,13 @@ pub(crate) fn app(app: &App) -> Result<Analysis, syn::Error> {
     // Most local resources need to be `Send` as well
     for (name, res) in app.local_resources.iter() {
         if let Some(idle) = &app.idle {
-            // Only Send if not in idle
-            if idle.args.local_resources.get(name).is_none() {
+            // Only Send if not in idle or not at idle prio
+            if idle.args.local_resources.get(name).is_none()
+                && !ownerships
+                    .get(name)
+                    .map(|ownership| *ownership != owned_by_idle)
+                    .unwrap_or(false)
+            {
                 send_types.insert(res.ty.clone());
             }
         } else {
@@ -303,10 +308,12 @@ pub(crate) fn app(app: &App) -> Result<Analysis, syn::Error> {
         let channel = channels.entry(spawnee_prio).or_default();
         channel.tasks.insert(name.clone());
 
-        // All inputs are now send as we do not know from where they may be spawned.
-        spawnee.inputs.iter().for_each(|input| {
-            send_types.insert(input.ty.clone());
-        });
+        if !spawnee.args.only_same_priority_spawn {
+            // Require `Send` if the task can be spawned from other priorities
+            spawnee.inputs.iter().for_each(|input| {
+                send_types.insert(input.ty.clone());
+            });
+        }
     }
 
     // No channel should ever be empty
