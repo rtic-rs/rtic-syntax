@@ -468,7 +468,7 @@ impl App {
                             ));
                         }
 
-                        check_monotonic(&*type_item.ty)?;
+                        check_monotonic(&type_item.ty)?;
 
                         let m = type_item.attrs.remove(pos);
                         let args = MonotonicArgs::parse(m)?;
