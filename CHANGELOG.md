@@ -11,6 +11,9 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Changed
 
+- CI: Updated to checkout@v3
+- CI: Use native Rustup
+
 ### Fixed
 
 ## [v1.0.2] - 2022-06-19
