@@ -11,7 +11,7 @@ keywords = []
 license = "MIT OR Apache-2.0"
 name = "rtic-syntax"
 repository = "https://github.com/rtic-rs/rtic-syntax"
-version = "1.0.2"
+version = "1.0.3"
 
 [dependencies]
 indexmap = "1.0.2"

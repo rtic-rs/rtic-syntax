@@ -33,7 +33,7 @@ impl SoftwareTask {
 
         Err(parse::Error::new(
             span,
-            &format!(
+            format!(
                 "this task handler must have type signature `fn({}::Context, ..)`",
                 name
             ),
@@ -71,7 +71,7 @@ impl SoftwareTask {
 
         Err(parse::Error::new(
             span,
-            &format!(
+            format!(
                 "this task handler must have type signature `fn({}::Context, ..)`",
                 name
             ),
