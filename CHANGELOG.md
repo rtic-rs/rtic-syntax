@@ -9,6 +9,14 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Changed
 
+### Fixed
+
+## [v1.0.3] - 2023-02-26
+
+### Added
+
+### Changed
+
 - CI: Updated to checkout@v3
 - CI: Use native Rustup
 
@@ -144,7 +152,8 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 - Initial release
 
-[Unreleased]: https://github.com/rtic-rs/rtic-syntax/compare/v1.0.2...HEAD
+[Unreleased]: https://github.com/rtic-rs/rtic-syntax/compare/v1.0.3...HEAD
+[v1.0.3]: https://github.com/rtic-rs/rtic-syntax/compare/v1.0.2...v1.0.3
 [v1.0.2]: https://github.com/rtic-rs/rtic-syntax/compare/v1.0.1...v1.0.2
 [v1.0.1]: https://github.com/rtic-rs/rtic-syntax/compare/v1.0.0...v1.0.1
 [v1.0.0]: https://github.com/rtic-rs/rtic-syntax/compare/v0.4.0...v1.0.0
