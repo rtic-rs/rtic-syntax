@@ -1,5 +1,10 @@
 # `rtic-syntax`
 
+This repository contains the `rtic-syntax` crate which only works with
+[`cortex-m-rtic` v1](https://github.com/rtic-rs/rtic/tree/release/v1)
+
+Development efforts are now focused on [RTIC v2](https://github.com/rtic-rs/rtic)
+
 > Parser of the `#[app]` macro used by the Real-Time Interrupt-driven Concurrency (RTIC)
 > framework
 
