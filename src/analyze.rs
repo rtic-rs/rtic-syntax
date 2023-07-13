@@ -11,10 +11,10 @@ use crate::{
     Set,
 };
 
+type TaskName = String;
+
 pub(crate) fn app(app: &App) -> Result<Analysis, syn::Error> {
     // Collect all tasks into a vector
-    type TaskName = String;
-    type Priority = u8;
 
     // The task list is a Tuple (Name, Shared Resources, Local Resources, Priority)
     let task_resources_list: Vec<(TaskName, Vec<&Ident>, &LocalResources, Priority)> =
@@ -252,7 +252,9 @@ pub(crate) fn app(app: &App) -> Result<Analysis, syn::Error> {
         let spawnee_prio = spawnee.args.priority;
 
         let channel = channels.entry(spawnee_prio).or_default();
-        channel.tasks.insert(name.clone());
+        channel
+            .spawnees
+            .insert(Spawnee::Task { name: name.clone() });
 
         // All inputs are now send as we do not know from where they may be spawned.
         spawnee.inputs.iter().for_each(|input| {
@@ -260,15 +262,41 @@ pub(crate) fn app(app: &App) -> Result<Analysis, syn::Error> {
         });
     }
 
+    for (name, actor) in &app.actors {
+        let spawnee_prio = actor.priority;
+
+        if !actor.subscriptions.is_empty() {
+            for (index, subscription) in actor.subscriptions.iter().enumerate() {
+                let channel = channels.entry(spawnee_prio).or_default();
+                channel.spawnees.insert(Spawnee::Actor {
+                    name: name.clone(),
+                    subscription_index: index,
+                });
+
+                // All inputs are now send as we do not know from where they may be spawned.
+                send_types.insert(Box::new(subscription.ty.clone()));
+            }
+        }
+    }
+
     // No channel should ever be empty
-    debug_assert!(channels.values().all(|channel| !channel.tasks.is_empty()));
+    debug_assert!(channels
+        .values()
+        .all(|channel| !channel.spawnees.is_empty()));
 
     // Compute channel capacities
     for channel in channels.values_mut() {
         channel.capacity = channel
-            .tasks
+            .spawnees
             .iter()
-            .map(|name| app.software_tasks[name].args.capacity)
+            .map(|spawnee| match spawnee {
+                Spawnee::Task { name } => app.software_tasks[name].args.capacity,
+                Spawnee::Actor {
+                    name,
+                    subscription_index,
+                    ..
+                } => app.actors[name].subscriptions[*subscription_index].capacity,
+            })
             .sum();
     }
 
@@ -345,8 +373,25 @@ pub struct Channel {
     /// The channel capacity
     pub capacity: u8,
 
-    /// Tasks that can be spawned on this channel
-    pub tasks: BTreeSet<Task>,
+    /// Tasks / AO that can be spawned on this channel
+    pub spawnees: BTreeSet<Spawnee>,
+}
+
+/// What can be spawned
+#[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum Spawnee {
+    /// A software task
+    Task {
+        /// The name of the task
+        name: Task,
+    },
+    /// An actor
+    Actor {
+        /// The name of the actor
+        name: Ident,
+        /// Index into the actor's `subscriptions` field
+        subscription_index: usize,
+    },
 }
 
 /// Resource ownership

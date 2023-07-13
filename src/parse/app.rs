@@ -11,7 +11,7 @@ use syn::{
 use super::Input;
 use crate::{
     ast::{
-        App, AppArgs, ExternInterrupt, ExternInterrupts, HardwareTask, Idle, IdleArgs, Init,
+        Actor, App, AppArgs, ExternInterrupt, ExternInterrupts, HardwareTask, Idle, IdleArgs, Init,
         InitArgs, LocalResource, Monotonic, MonotonicArgs, SharedResource, SoftwareTask,
     },
     parse::util,
@@ -143,7 +143,9 @@ impl App {
         let mut shared_resources_ident = None;
         let mut shared_resources = Map::new();
         let mut local_resources_ident = None;
+        let mut actors_ident = None;
         let mut local_resources = Map::new();
+        let mut actors = Map::new();
         let mut monotonics = Map::new();
         let mut hardware_tasks = Map::new();
         let mut software_tasks = Map::new();
@@ -366,6 +368,48 @@ impl App {
                                 "this `struct` must have named fields",
                             ));
                         }
+                    } else if let Some(_pos) = struct_item
+                        .attrs
+                        .iter()
+                        .position(|attr| util::attr_eq(attr, "actors"))
+                    {
+                        let span = struct_item.ident.span();
+
+                        actors_ident = Some(struct_item.ident.clone());
+
+                        if !actors.is_empty() {
+                            return Err(parse::Error::new(
+                                span,
+                                "`#[actors]` struct must appear at most once",
+                            ));
+                        }
+
+                        if struct_item.vis != Visibility::Inherited {
+                            return Err(parse::Error::new(
+                                struct_item.span(),
+                                "this item must have inherited / private visibility",
+                            ));
+                        }
+
+                        if let Fields::Named(fields) = &mut struct_item.fields {
+                            for field in &mut fields.named {
+                                let ident = field.ident.as_ref().expect("UNREACHABLE");
+
+                                if actors.contains_key(ident) {
+                                    return Err(parse::Error::new(
+                                        ident.span(),
+                                        "this resource is listed more than once",
+                                    ));
+                                }
+
+                                actors.insert(ident.clone(), Actor::parse(field, ident.span())?);
+                            }
+                        } else {
+                            return Err(parse::Error::new(
+                                struct_item.span(),
+                                "this `struct` must have named fields",
+                            ));
+                        }
                     } else {
                         // Structure without the #[resources] attribute should just be passed along
                         user_code.push(item.clone());
@@ -516,6 +560,39 @@ impl App {
             ));
         }
 
+        match (&actors_ident, &init.user_actors_struct) {
+            (None, None) => {}
+            (None, Some(init_actors_struct)) => {
+                return Err(parse::Error::new(
+                    init_actors_struct.span(),
+                    format!(
+                        "a `#[actors]` struct named `{}` needs to be defined",
+                        init_actors_struct
+                    ),
+                ));
+            }
+            (Some(actors_ident), None) => {
+                return Err(parse::Error::new(
+                    actors_ident.span(),
+                    format!(
+                        "`#[init]` return type needs to include `{}` as the 4th tuple element ",
+                        actors_ident
+                    ),
+                ));
+            }
+            (Some(actors_ident), Some(init_actors_struct)) => {
+                if actors_ident != init_actors_struct {
+                    return Err(parse::Error::new(
+                        init_actors_struct.span(),
+                        format!(
+                            "This name and the one defined on `#[actors]` are not the same. Should this be `{}`?",
+                            actors_ident
+                        ),
+                    ));
+                }
+            }
+        }
+
         Ok(App {
             args,
             name: input.ident,
@@ -524,6 +601,7 @@ impl App {
             monotonics,
             shared_resources,
             local_resources,
+            actors,
             user_imports,
             user_code,
             hardware_tasks,

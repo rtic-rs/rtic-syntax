@@ -283,22 +283,36 @@ fn extract_init_resource_name_ident(ty: Type) -> Result<Ident, ()> {
 }
 
 /// Checks Init's return type, return the user provided types for analysis
-pub fn type_is_init_return(ty: &ReturnType, name: &str) -> Result<(Ident, Ident), ()> {
+pub fn type_is_init_return(
+    ty: &ReturnType,
+    name: &str,
+) -> Result<(Ident, Ident, Option<Ident>), ()> {
     match ty {
         ReturnType::Default => Err(()),
 
         ReturnType::Type(_, ty) => match &**ty {
             Type::Tuple(t) => {
                 // return should be:
-                // fn -> (User's #[shared] struct, User's #[local] struct, {name}::Monotonics)
+                // fn -> (User's #[shared] struct, User's #[local] struct, {name}::Monotonics) OR
+                // fn -> (User's #[shared] struct, User's #[local] struct, {name}::Monotonics, User's #[actors] struct)
                 //
-                // We check the length and the last one here, analysis checks that the user
+                // We check the length of the tuple and the Monotonics element here, analysis checks that the user
                 // provided structs are correct.
-                if t.elems.len() == 3 && type_is_path(&t.elems[2], &[name, "Monotonics"]) {
-                    return Ok((
-                        extract_init_resource_name_ident(t.elems[0].clone())?,
-                        extract_init_resource_name_ident(t.elems[1].clone())?,
-                    ));
+                let elems_count = t.elems.len();
+
+                if (3..=4).contains(&elems_count) {
+                    let shared = extract_init_resource_name_ident(t.elems[0].clone())?;
+                    let local = extract_init_resource_name_ident(t.elems[1].clone())?;
+
+                    if type_is_path(&t.elems[2], &[name, "Monotonics"]) {
+                        let actors = if elems_count == 4 {
+                            Some(extract_init_resource_name_ident(t.elems[3].clone())?)
+                        } else {
+                            None
+                        };
+
+                        return Ok((shared, local, actors));
+                    }
                 }
 
                 Err(())
