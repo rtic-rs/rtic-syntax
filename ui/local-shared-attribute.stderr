@@ -1,5 +1,5 @@
 error: attributes are not supported here
- --> $DIR/local-shared-attribute.rs:8:9
+ --> ui/local-shared-attribute.rs:9:9
   |
-8 |         #[test]
+9 |         b, // Error
   |         ^
