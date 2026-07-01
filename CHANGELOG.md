@@ -9,6 +9,8 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Changed
 
+- Update syn to v2: Enables Rust Edition 2024
+
 ### Fixed
 
 ## [v1.0.3] - 2023-02-26
