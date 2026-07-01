@@ -202,7 +202,9 @@ impl App {
                         .iter()
                         .position(|attr| util::attr_eq(attr, "init"))
                     {
-                        let args = InitArgs::parse(item.attrs.remove(pos).tokens)?;
+                        let args = InitArgs::parse(
+                            item.attrs.remove(pos).parse_args().unwrap_or_default(),
+                        )?;
 
                         // If an init function already exists, error
                         if init.is_some() {
@@ -220,7 +222,9 @@ impl App {
                         .iter()
                         .position(|attr| util::attr_eq(attr, "idle"))
                     {
-                        let args = IdleArgs::parse(item.attrs.remove(pos).tokens)?;
+                        let args = IdleArgs::parse(
+                            item.attrs.remove(pos).parse_args().unwrap_or_default(),
+                        )?;
 
                         // If an idle function already exists, error
                         if idle.is_some() {
@@ -247,7 +251,10 @@ impl App {
                             ));
                         }
 
-                        match crate::parse::task_args(item.attrs.remove(pos).tokens, settings)? {
+                        match crate::parse::task_args(
+                            item.attrs.remove(pos).parse_args().unwrap_or_default(),
+                            settings,
+                        )? {
                             Either::Left(args) => {
                                 check_binding(&args.binds)?;
                                 check_ident(&item.sig.ident)?;
@@ -405,7 +412,7 @@ impl App {
                                 }
 
                                 match crate::parse::task_args(
-                                    item.attrs.remove(pos).tokens,
+                                    item.attrs.remove(pos).parse_args().unwrap_or_default(),
                                     settings,
                                 )? {
                                     Either::Left(args) => {

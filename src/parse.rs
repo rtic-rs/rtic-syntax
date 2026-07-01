@@ -7,12 +7,12 @@ mod resource;
 mod software_task;
 mod util;
 
-use proc_macro2::TokenStream as TokenStream2;
+use proc_macro2::{Span, TokenStream as TokenStream2};
 use syn::{
-    braced, parenthesized,
+    braced,
     parse::{self, Parse, ParseStream, Parser},
-    token::{self, Brace},
-    Ident, Item, LitBool, LitInt, Path, Token,
+    token::Brace,
+    Ident, Item, LitBool, LitInt, Token,
 };
 
 use crate::{
@@ -74,15 +74,12 @@ fn init_args(tokens: TokenStream2) -> parse::Result<InitArgs> {
 
         let mut local_resources = None;
 
-        let content;
-        parenthesized!(content in input);
-
-        if !content.is_empty() {
+        if !input.is_empty() {
             loop {
                 // Parse identifier name
-                let ident: Ident = content.parse()?;
+                let ident: Ident = input.parse()?;
                 // Handle equal sign
-                let _: Token![=] = content.parse()?;
+                let _: Token![=] = input.parse()?;
 
                 match &*ident.to_string() {
                     "local" => {
@@ -93,18 +90,18 @@ fn init_args(tokens: TokenStream2) -> parse::Result<InitArgs> {
                             ));
                         }
 
-                        local_resources = Some(util::parse_local_resources(&content)?);
+                        local_resources = Some(util::parse_local_resources(input)?);
                     }
                     _ => {
                         return Err(parse::Error::new(ident.span(), "unexpected argument"));
                     }
                 }
 
-                if content.is_empty() {
+                if input.is_empty() {
                     break;
                 }
                 // Handle comma: ,
-                let _: Token![,] = content.parse()?;
+                let _: Token![,] = input.parse()?;
             }
         }
 
@@ -135,14 +132,12 @@ fn idle_args(tokens: TokenStream2) -> parse::Result<IdleArgs> {
         let mut shared_resources = None;
         let mut local_resources = None;
 
-        let content;
-        parenthesized!(content in input);
-        if !content.is_empty() {
+        if !input.is_empty() {
             loop {
                 // Parse identifier name
-                let ident: Ident = content.parse()?;
+                let ident: Ident = input.parse()?;
                 // Handle equal sign
-                let _: Token![=] = content.parse()?;
+                let _: Token![=] = input.parse()?;
 
                 match &*ident.to_string() {
                     "shared" => {
@@ -153,7 +148,7 @@ fn idle_args(tokens: TokenStream2) -> parse::Result<IdleArgs> {
                             ));
                         }
 
-                        shared_resources = Some(util::parse_shared_resources(&content)?);
+                        shared_resources = Some(util::parse_shared_resources(input)?);
                     }
 
                     "local" => {
@@ -164,19 +159,19 @@ fn idle_args(tokens: TokenStream2) -> parse::Result<IdleArgs> {
                             ));
                         }
 
-                        local_resources = Some(util::parse_local_resources(&content)?);
+                        local_resources = Some(util::parse_local_resources(input)?);
                     }
 
                     _ => {
                         return Err(parse::Error::new(ident.span(), "unexpected argument"));
                     }
                 }
-                if content.is_empty() {
+                if input.is_empty() {
                     break;
                 }
 
                 // Handle comma: ,
-                let _: Token![,] = content.parse()?;
+                let _: Token![,] = input.parse()?;
             }
         }
 
@@ -204,17 +199,15 @@ fn task_args(
         let mut local_resources = None;
 
 
-        let content;
-        parenthesized!(content in input);
         loop {
-            if content.is_empty() {
+            if input.is_empty() {
                 break;
             }
 
             // Parse identifier name
-            let ident: Ident = content.parse()?;
+            let ident: Ident = input.parse()?;
             // Handle equal sign
-            let _: Token![=] = content.parse()?;
+            let _: Token![=] = input.parse()?;
 
             let ident_s = ident.to_string();
             match &*ident_s {
@@ -241,7 +234,7 @@ fn task_args(
                     }
 
                     // Parse identifier name
-                    let ident = content.parse()?;
+                    let ident = input.parse()?;
 
                     binds = Some(ident);
                 }
@@ -262,7 +255,7 @@ fn task_args(
                     }
 
                     // #lit
-                    let lit: LitInt = content.parse()?;
+                    let lit: LitInt = input.parse()?;
 
                     if !lit.suffix().is_empty() {
                         return Err(parse::Error::new(
@@ -291,7 +284,7 @@ fn task_args(
                     }
 
                     // #lit
-                    let lit: LitInt = content.parse()?;
+                    let lit: LitInt = input.parse()?;
 
                     if !lit.suffix().is_empty() {
                         return Err(parse::Error::new(
@@ -319,7 +312,7 @@ fn task_args(
                         ));
                     }
 
-                    shared_resources = Some(util::parse_shared_resources(&content)?);
+                    shared_resources = Some(util::parse_shared_resources(input)?);
                 }
 
                 "local" => {
@@ -330,7 +323,7 @@ fn task_args(
                         ));
                     }
 
-                    local_resources = Some(util::parse_local_resources(&content)?);
+                    local_resources = Some(util::parse_local_resources(input)?);
                 }
 
                 _ => {
@@ -338,12 +331,12 @@ fn task_args(
                 }
             }
 
-            if content.is_empty() {
+            if input.is_empty() {
                 break;
             }
 
             // Handle comma: ,
-            let _: Token![,] = content.parse()?;
+            let _: Token![,] = input.parse()?;
         }
         let priority = priority.unwrap_or(1);
         let shared_resources = shared_resources.unwrap_or_default();
@@ -368,28 +361,18 @@ fn task_args(
     .parse2(tokens)
 }
 
-fn monotonic_args(path: Path, tokens: TokenStream2) -> parse::Result<MonotonicArgs> {
+fn monotonic_args(error_loc: Span, tokens: TokenStream2) -> parse::Result<MonotonicArgs> {
     (|input: ParseStream<'_>| -> parse::Result<MonotonicArgs> {
         let mut binds = None;
         let mut priority = None;
         let mut default = None;
 
-        if !input.peek(token::Paren) {
-            return Err(parse::Error::new(
-                path.segments.first().unwrap().ident.span(),
-                "expected opening ( in #[monotonic( ... )]",
-            ));
-        }
-
-        let content;
-        parenthesized!(content in input);
-
-        if !content.is_empty() {
+        if !input.is_empty() {
             loop {
                 // Parse identifier name
-                let ident: Ident = content.parse()?;
+                let ident: Ident = input.parse()?;
                 // Handle equal sign
-                let _: Token![=] = content.parse()?;
+                let _: Token![=] = input.parse()?;
 
                 match &*ident.to_string() {
                     "binds" => {
@@ -400,7 +383,7 @@ fn monotonic_args(path: Path, tokens: TokenStream2) -> parse::Result<MonotonicAr
                             ));
                         }
                         // Parse identifier name
-                        let ident = content.parse()?;
+                        let ident = input.parse()?;
 
                         binds = Some(ident);
                     }
@@ -414,7 +397,7 @@ fn monotonic_args(path: Path, tokens: TokenStream2) -> parse::Result<MonotonicAr
                         }
 
                         // #lit
-                        let lit: LitInt = content.parse()?;
+                        let lit: LitInt = input.parse()?;
 
                         if !lit.suffix().is_empty() {
                             return Err(parse::Error::new(
@@ -442,7 +425,7 @@ fn monotonic_args(path: Path, tokens: TokenStream2) -> parse::Result<MonotonicAr
                             ));
                         }
 
-                        let lit: LitBool = content.parse()?;
+                        let lit: LitBool = input.parse()?;
                         default = Some(lit.value);
                     }
 
@@ -450,22 +433,19 @@ fn monotonic_args(path: Path, tokens: TokenStream2) -> parse::Result<MonotonicAr
                         return Err(parse::Error::new(ident.span(), "unexpected argument"));
                     }
                 }
-                if content.is_empty() {
+                if input.is_empty() {
                     break;
                 }
 
                 // Handle comma: ,
-                let _: Token![,] = content.parse()?;
+                let _: Token![,] = input.parse()?;
             }
         }
 
         let binds = if let Some(r) = binds {
             r
         } else {
-            return Err(parse::Error::new(
-                content.span(),
-                "`binds = ...` is missing",
-            ));
+            return Err(parse::Error::new(error_loc, "`binds = ...` is missing"));
         };
         let default = default.unwrap_or(false);
 

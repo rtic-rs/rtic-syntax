@@ -10,7 +10,7 @@ use crate::{
 
 impl MonotonicArgs {
     pub(crate) fn parse(attr: Attribute) -> parse::Result<Self> {
-        crate::parse::monotonic_args(attr.path, attr.tokens)
+        crate::parse::monotonic_args(attr.path().span(), attr.parse_args()?)
     }
 }
 
@@ -27,7 +27,7 @@ impl Monotonic {
 
         if !attrs.is_empty() {
             return Err(parse::Error::new(
-                attrs[0].path.span(),
+                attrs[0].path().span(),
                 "Monotonic does not support attributes other than `#[cfg]`",
             ));
         }
