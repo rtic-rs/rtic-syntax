@@ -1,15 +1,14 @@
 use syn::{
-    bracketed,
+    Abi, AttrStyle, Attribute, Expr, ExprPath, FnArg, ForeignItemFn, Ident, ItemFn, Pat, PatType,
+    Path, PathArguments, ReturnType, Token, Type, Visibility, bracketed,
     parse::{self, ParseStream},
     punctuated::Punctuated,
     spanned::Spanned,
-    Abi, AttrStyle, Attribute, Expr, ExprPath, FnArg, ForeignItemFn, Ident, ItemFn, Pat, PatType,
-    Path, PathArguments, ReturnType, Token, Type, Visibility,
 };
 
 use crate::{
-    ast::{Access, Local, LocalResources, SharedResources, TaskLocal},
     Map,
+    ast::{Access, Local, LocalResources, SharedResources, TaskLocal},
 };
 
 pub fn abi_is_rust(abi: &Abi) -> bool {
@@ -221,7 +220,7 @@ pub fn parse_local_resources(content: ParseStream<'_>) -> parse::Result<LocalRes
                     return Err(parse::Error::new(
                         ty.span(),
                         "unsupported type, must be an array, tuple, pointer or type path",
-                    ))
+                    ));
                 }
             };
 

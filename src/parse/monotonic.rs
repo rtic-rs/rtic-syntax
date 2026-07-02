@@ -1,6 +1,6 @@
 use proc_macro2::Span;
 use syn::Attribute;
-use syn::{parse, spanned::Spanned, ItemType, Visibility};
+use syn::{ItemType, Visibility, parse, spanned::Spanned};
 
 use crate::parse::util::FilterAttrs;
 use crate::{

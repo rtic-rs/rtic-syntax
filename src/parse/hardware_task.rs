@@ -1,4 +1,4 @@
-use syn::{parse, ForeignItemFn, ItemFn, Stmt};
+use syn::{ForeignItemFn, ItemFn, Stmt, parse};
 
 use crate::parse::util::FilterAttrs;
 use crate::{

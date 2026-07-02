@@ -3,19 +3,19 @@ use std::collections::HashSet;
 // use indexmap::map::Entry;
 use proc_macro2::TokenStream as TokenStream2;
 use syn::{
+    Expr, ExprArray, Fields, ForeignItem, Ident, Item, LitBool, Path, Token, Type, Visibility,
     parse::{self, ParseStream, Parser},
     spanned::Spanned,
-    Expr, ExprArray, Fields, ForeignItem, Ident, Item, LitBool, Path, Token, Type, Visibility,
 };
 
 use super::Input;
 use crate::{
+    Either, Map, Set, Settings,
     ast::{
         App, AppArgs, ExternInterrupt, ExternInterrupts, HardwareTask, Idle, IdleArgs, Init,
         InitArgs, LocalResource, Monotonic, MonotonicArgs, SharedResource, SoftwareTask,
     },
     parse::util,
-    Either, Map, Set, Settings,
 };
 
 impl AppArgs {

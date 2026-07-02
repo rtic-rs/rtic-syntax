@@ -1,5 +1,5 @@
 use proc_macro2::Span;
-use syn::{parse, Field, Visibility};
+use syn::{Field, Visibility, parse};
 
 use crate::parse::util::FilterAttrs;
 use crate::{

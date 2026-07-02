@@ -1,4 +1,4 @@
-use crate::{analyze::Ownership, Settings};
+use crate::{Settings, analyze::Ownership};
 use quote::quote;
 
 #[test]

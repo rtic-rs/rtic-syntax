@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream as TokenStream2;
 
-use syn::{parse, ItemFn};
+use syn::{ItemFn, parse};
 
 use crate::{
     ast::{Init, InitArgs},

@@ -7,8 +7,8 @@ use indexmap::{IndexMap, IndexSet};
 use syn::{Ident, Type};
 
 use crate::{
-    ast::{App, LocalResources, TaskLocal},
     Set,
+    ast::{App, LocalResources, TaskLocal},
 };
 
 pub(crate) fn app(app: &App) -> Result<Analysis, syn::Error> {

@@ -9,18 +9,17 @@ mod util;
 
 use proc_macro2::{Span, TokenStream as TokenStream2};
 use syn::{
-    braced,
+    Ident, Item, LitBool, LitInt, Token, braced,
     parse::{self, Parse, ParseStream, Parser},
     token::Brace,
-    Ident, Item, LitBool, LitInt, Token,
 };
 
 use crate::{
+    Either, Settings,
     ast::{
         App, AppArgs, HardwareTaskArgs, IdleArgs, InitArgs, MonotonicArgs, SoftwareTaskArgs,
         TaskLocal,
     },
-    Either, Settings,
 };
 
 // Parse the app, both app arguments and body (input)
