@@ -22,21 +22,20 @@ impl HardwareTask {
             ));
         }
 
-        if valid_signature {
-            if let Some((context, Ok(rest))) = util::parse_inputs(item.sig.inputs, &name) {
-                if rest.is_empty() {
-                    let FilterAttrs { cfgs, attrs, .. } = util::filter_attributes(item.attrs);
+        if valid_signature
+            && let Some((context, Ok(rest))) = util::parse_inputs(item.sig.inputs, &name)
+            && rest.is_empty()
+        {
+            let FilterAttrs { cfgs, attrs, .. } = util::filter_attributes(item.attrs);
 
-                    return Ok(HardwareTask {
-                        args,
-                        cfgs,
-                        attrs,
-                        context,
-                        stmts: item.block.stmts,
-                        is_extern: false,
-                    });
-                }
-            }
+            return Ok(HardwareTask {
+                args,
+                cfgs,
+                attrs,
+                context,
+                stmts: item.block.stmts,
+                is_extern: false,
+            });
         }
 
         Err(parse::Error::new(
@@ -68,21 +67,20 @@ impl HardwareTask {
             ));
         }
 
-        if valid_signature {
-            if let Some((context, Ok(rest))) = util::parse_inputs(item.sig.inputs, &name) {
-                if rest.is_empty() {
-                    let FilterAttrs { cfgs, attrs, .. } = util::filter_attributes(item.attrs);
+        if valid_signature
+            && let Some((context, Ok(rest))) = util::parse_inputs(item.sig.inputs, &name)
+            && rest.is_empty()
+        {
+            let FilterAttrs { cfgs, attrs, .. } = util::filter_attributes(item.attrs);
 
-                    return Ok(HardwareTask {
-                        args,
-                        cfgs,
-                        attrs,
-                        context,
-                        stmts: Vec::<Stmt>::new(),
-                        is_extern: true,
-                    });
-                }
-            }
+            return Ok(HardwareTask {
+                args,
+                cfgs,
+                attrs,
+                context,
+                stmts: Vec::<Stmt>::new(),
+                is_extern: true,
+            });
         }
 
         Err(parse::Error::new(

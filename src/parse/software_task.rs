@@ -15,20 +15,20 @@ impl SoftwareTask {
 
         let name = item.sig.ident.to_string();
 
-        if valid_signature {
-            if let Some((context, Ok(inputs))) = util::parse_inputs(item.sig.inputs, &name) {
-                let FilterAttrs { cfgs, attrs, .. } = util::filter_attributes(item.attrs);
+        if valid_signature
+            && let Some((context, Ok(inputs))) = util::parse_inputs(item.sig.inputs, &name)
+        {
+            let FilterAttrs { cfgs, attrs, .. } = util::filter_attributes(item.attrs);
 
-                return Ok(SoftwareTask {
-                    args,
-                    attrs,
-                    cfgs,
-                    context,
-                    inputs,
-                    stmts: item.block.stmts,
-                    is_extern: false,
-                });
-            }
+            return Ok(SoftwareTask {
+                args,
+                attrs,
+                cfgs,
+                context,
+                inputs,
+                stmts: item.block.stmts,
+                is_extern: false,
+            });
         }
 
         Err(parse::Error::new(
@@ -53,20 +53,20 @@ impl SoftwareTask {
 
         let name = item.sig.ident.to_string();
 
-        if valid_signature {
-            if let Some((context, Ok(inputs))) = util::parse_inputs(item.sig.inputs, &name) {
-                let FilterAttrs { cfgs, attrs, .. } = util::filter_attributes(item.attrs);
+        if valid_signature
+            && let Some((context, Ok(inputs))) = util::parse_inputs(item.sig.inputs, &name)
+        {
+            let FilterAttrs { cfgs, attrs, .. } = util::filter_attributes(item.attrs);
 
-                return Ok(SoftwareTask {
-                    args,
-                    attrs,
-                    cfgs,
-                    context,
-                    inputs,
-                    stmts: Vec::<Stmt>::new(),
-                    is_extern: true,
-                });
-            }
+            return Ok(SoftwareTask {
+                args,
+                attrs,
+                cfgs,
+                context,
+                inputs,
+                stmts: Vec::<Stmt>::new(),
+                is_extern: true,
+            });
         }
 
         Err(parse::Error::new(
