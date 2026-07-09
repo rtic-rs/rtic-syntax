@@ -35,6 +35,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 ### Added
 
 - CI changelog entry enforcer
+- Support for externally defined #[init] and #[idle]
 
 ### Changed
 
