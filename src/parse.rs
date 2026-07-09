@@ -1,3 +1,4 @@
+mod actor;
 mod app;
 mod hardware_task;
 mod idle;

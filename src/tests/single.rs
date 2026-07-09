@@ -1,4 +1,7 @@
-use crate::{analyze::Ownership, Settings};
+use crate::{
+    analyze::{Ownership, Spawnee},
+    Settings,
+};
 use quote::quote;
 
 #[test]
@@ -431,4 +434,106 @@ fn late_resources() {
 
     let late = &app.shared_resources;
     assert_eq!(late.len(), 1);
+}
+
+#[test]
+fn actors() {
+    let (app, analysis) = crate::parse2(
+        quote!(),
+        quote!(
+            mod app {
+                #[actors]
+                struct Actors {
+                    #[priority = 2]
+                    #[subscribe(MsgA)]
+                    #[subscribe(MsgB, capacity = 2)]
+                    a: (),
+
+                    #[subscribe(MsgA)]
+                    #[init(1)]
+                    b: u32,
+
+                    #[priority = 1]
+                    #[subscribe(MsgB, capacity = 3)]
+                    c: (),
+                }
+
+                #[shared]
+                struct Shared {}
+
+                #[local]
+                struct Local {}
+
+                #[init]
+                fn init(_: init::Context) -> (Shared, Local, init::Monotonics, Actors) {
+                    ..
+                }
+            }
+        ),
+        Settings::default(),
+    )
+    .unwrap();
+
+    let actors = &app.actors;
+    assert_eq!(actors.len(), 3);
+
+    {
+        let actor = &app.actors[0];
+        assert_eq!(2, actor.priority);
+        assert_eq!(1, actor.subscriptions[0].capacity);
+        assert_eq!(2, actor.subscriptions[1].capacity);
+        assert_eq!(None, actor.init);
+    }
+
+    {
+        let actor = &app.actors[1];
+
+        assert_eq!(1, actor.priority);
+        assert_eq!(1, actor.subscriptions[0].capacity);
+        assert_eq!(
+            Some("1"),
+            actor
+                .init
+                .as_ref()
+                .map(|expr| quote!(#expr).to_string())
+                .as_deref()
+        );
+    }
+
+    {
+        let actor = &app.actors[2];
+
+        assert_eq!(1, actor.priority);
+        assert_eq!(3, actor.subscriptions[0].capacity);
+        assert_eq!(None, actor.init);
+    }
+
+    let expected = [
+        (
+            /* priority: */ 1,
+            /* capacity */ 4,
+            [("b", 0), ("c", 0)],
+        ),
+        (
+            /* priority: */ 2,
+            /* capacity */ 3,
+            [("a", 0), ("a", 1)],
+        ),
+    ];
+    for (actual, expected) in analysis.channels.iter().zip(expected) {
+        assert_eq!(*actual.0, expected.0);
+        assert_eq!(actual.1.capacity, expected.1);
+        for (spawnee, expected) in actual.1.spawnees.iter().zip(expected.2) {
+            match spawnee {
+                Spawnee::Task { .. } => panic!(),
+                Spawnee::Actor {
+                    name,
+                    subscription_index,
+                } => {
+                    assert_eq!(expected.0, name.to_string());
+                    assert_eq!(expected.1, *subscription_index);
+                }
+            }
+        }
+    }
 }

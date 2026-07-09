@@ -29,6 +29,9 @@ pub struct App {
     /// Task local resources defined in `#[local]`
     pub local_resources: Map<LocalResource>,
 
+    /// Actors defined in the `#[actors]` struct
+    pub actors: Map<Actor>,
+
     /// User imports
     pub user_imports: Vec<ItemUse>,
 
@@ -90,6 +93,9 @@ pub struct Init {
 
     /// The name of the user provided local resources struct
     pub user_local_struct: Ident,
+
+    /// The name of the user provided actors struct
+    pub user_actors_struct: Option<Ident>,
 }
 
 /// `init` context metadata
@@ -190,6 +196,31 @@ pub struct LocalResource {
 
     /// The type of this resource
     pub ty: Box<Type>,
+}
+
+/// An actor defined in the `#[actors]` struct.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct Actor {
+    /// The priority of this actor
+    pub priority: u8,
+    /// The expression used to initialized this actor. If absent, uses late/runtime
+    /// initialization.
+    pub init: Option<Box<Expr>>,
+    /// Type of the actor.
+    pub ty: Box<Type>,
+    /// #[subscribe] attributes
+    pub subscriptions: Vec<Subscription>,
+}
+
+/// The `#[subscribe]` attribute of an actor
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct Subscription {
+    /// Capacity of this channel
+    pub capacity: u8,
+    /// Message type
+    pub ty: Type,
 }
 
 /// Monotonic
